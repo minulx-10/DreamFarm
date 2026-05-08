@@ -4,7 +4,7 @@ from core.assets import get_font, BLACK, WHITE
 
 class EndingScene:
     def __init__(self):
-        self.font = get_font(28)
+        self.font = get_font(24)
         self.font_small = get_font(20)
         self.printed_text = ""
         self.char_idx = 0
@@ -14,6 +14,26 @@ class EndingScene:
         
         self.text_to_print = ""
         self.initialized = False
+
+    def wrap_text(self, text, font, max_width):
+        wrapped_text = ""
+        current_line = ""
+        for char in text:
+            if char == '\n':
+                wrapped_text += current_line + '\n'
+                current_line = ""
+                continue
+                
+            test_line = current_line + char
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                wrapped_text += current_line + '\n'
+                current_line = char if char != ' ' else ""
+                
+        if current_line:
+            wrapped_text += current_line
+        return wrapped_text
 
     def get_ending(self):
         from core.game_state import append_josa
@@ -49,7 +69,8 @@ class EndingScene:
     def update(self, dt):
         if not self.initialized:
             ending_data = self.get_ending()
-            self.text_to_print = f"[{ending_data['title']}]\n\n" + ending_data["text"]
+            raw_text = f"[{ending_data['title']}]\n\n" + ending_data["text"]
+            self.text_to_print = self.wrap_text(raw_text, self.font, 640)
             self.initialized = True
             
         if not self.finished:
@@ -71,16 +92,16 @@ class EndingScene:
         screen.blit(dad, (400 - dad.get_width()//2, 80))
         
         # Undertale text box style
-        box_rect = pygame.Rect(50, 350, 700, 200)
+        box_rect = pygame.Rect(50, 300, 700, 260)
         pygame.draw.rect(screen, WHITE, box_rect, 4)
         
-        y = 380
+        y = 330
         lines = self.printed_text.split('\n')
         for line in lines:
             surf = self.font.render(line, True, WHITE)
             screen.blit(surf, (80, y))
-            y += 35
+            y += 32
             
         if self.finished:
             prompt = self.font_small.render("계속...", True, (150, 150, 150))
-            screen.blit(prompt, (650, 510))
+            screen.blit(prompt, (650, 520))

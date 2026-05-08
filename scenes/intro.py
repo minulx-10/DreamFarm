@@ -4,8 +4,8 @@ from core.assets import get_font, BLACK, WHITE, sprites
 
 class IntroScene:
     def __init__(self):
-        self.font = get_font(26)
-        self.font_small = get_font(20)
+        self.font = get_font(22)
+        self.font_small = get_font(18)
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
@@ -14,6 +14,26 @@ class IntroScene:
         
         self.text_to_print = ""
         self.initialized = False
+
+    def wrap_text(self, text, font, max_width):
+        wrapped_text = ""
+        current_line = ""
+        for char in text:
+            if char == '\n':
+                wrapped_text += current_line + '\n'
+                current_line = ""
+                continue
+                
+            test_line = current_line + char
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                wrapped_text += current_line + '\n'
+                current_line = char if char != ' ' else ""
+                
+        if current_line:
+            wrapped_text += current_line
+        return wrapped_text
 
     def get_intro_text(self):
         from core.game_state import append_josa
@@ -49,7 +69,8 @@ class IntroScene:
 
     def update(self, dt):
         if not self.initialized:
-            self.text_to_print = self.get_intro_text()
+            raw_text = self.get_intro_text()
+            self.text_to_print = self.wrap_text(raw_text, self.font, 680)
             self.initialized = True
             
         if not self.finished:
@@ -68,15 +89,15 @@ class IntroScene:
         dad = sprites['dad']
         screen.blit(dad, (400 - dad.get_width()//2, 80))
         
-        box_rect = pygame.Rect(40, 330, 720, 240)
+        box_rect = pygame.Rect(40, 260, 720, 310)
         pygame.draw.rect(screen, WHITE, box_rect, 4)
         
-        y = 350
+        y = 280
         lines = self.printed_text.split('\n')
         for line in lines:
             surf = self.font.render(line, True, WHITE)
             screen.blit(surf, (60, y))
-            y += 30
+            y += 28
             
         if self.finished:
             prompt = self.font_small.render("시작하려면 클릭하거나 스페이스바를 누르세요", True, (150, 150, 150))

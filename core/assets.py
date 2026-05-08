@@ -27,7 +27,7 @@ import os
 import urllib.request
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "Galmuri11.ttf")
-FONT_URL = "https://github.com/quiple/galmuri/releases/download/v1.1.1/Galmuri11.ttf"
+FONT_URL = "https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.ttf"
 
 fonts = {}
 
