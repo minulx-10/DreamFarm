@@ -34,7 +34,7 @@ class NameInputScene:
     def draw(self, screen):
         screen.fill(BLACK)
         
-        prompt = self.font_large.render("당신의 이름은 무엇입니까?", True, WHITE)
+        prompt = self.font_large.render("꿈속 밭에 남길 이름은?", True, WHITE)
         screen.blit(prompt, (400 - prompt.get_width()//2, 200))
         
         input_rect = pygame.Rect(250, 280, 300, 50)
@@ -48,5 +48,5 @@ class NameInputScene:
         name_surf = self.font_large.render(display_text, True, YELLOW)
         screen.blit(name_surf, (input_rect.x + 10, input_rect.y + 5))
         
-        desc = self.font_small.render("입력 후 Enter를 누르세요", True, (150, 150, 150))
+        desc = self.font_small.render("이름을 입력하고 Enter를 누르세요", True, (150, 150, 150))
         screen.blit(desc, (400 - desc.get_width()//2, 400))

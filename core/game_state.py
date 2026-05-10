@@ -11,6 +11,10 @@ class GameState:
         self.transition_next = ""
         self.is_clear_transition = False
         self.return_scene = "farm"
+        
+        self.memory_title = ""
+        self.memory_text = ""
+        self.memory_next = "farm"
 
 game_state = GameState()
 

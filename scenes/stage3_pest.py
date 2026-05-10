@@ -54,7 +54,7 @@ class Stage3Scene:
                 elif game_state.score >= 100: bonus = 5
                 
                 game_state.understanding += bonus
-                game_state.transition_text = f"미니게임 완료!\n\n획득 점수: {game_state.score}점\n추가 이해도 보너스: +{bonus}"
+                game_state.transition_text = f"해충 대응 완료!\n\n획득 점수: {game_state.score}점\n잎 아래를 살피는 법을 익혔습니다. 이해도 +{bonus}"
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -92,4 +92,4 @@ class Stage3Scene:
             screen.blit(clear_text, (400 - clear_text.get_width()//2, 200 - clear_text.get_height()//2))
             draw_bottom_bar(screen, "결과", f"얻은 점수: {game_state.score}")
         else:
-            draw_bottom_bar(screen, "해충 제거", "돌아다니는 벌레를 클릭해서 빠르게 제거하세요!")
+            draw_bottom_bar(screen, "해충 제거", "잎 주변을 돌아다니는 해충을 빠르게 눌러 주세요.")

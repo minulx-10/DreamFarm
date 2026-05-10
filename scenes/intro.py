@@ -42,12 +42,13 @@ class IntroScene:
         name_ga = append_josa(name, "이/가")
         return (
             "[당근 한 뿌리의 시간]\n\n"
-            f"{name_eun} 당근 반찬을 밀어냈고, 아버지의 깊은 한숨이 들렸다.\n"
-            f"아버지는 조용히 두 손을 모아 기도하셨다.\n"
-            f"'우리 {name_ga} 농부의 땀방울과 음식의 소중함을 알게 해주세요...'\n\n"
-            f"그날 밤, {name_eun} 꿈속의 낯선 밭에서 깨어난다.\n"
-            f"어디선가 하늘의 목소리가 들려온다.\n"
-            f"'네가 외면하던 것을 네 손으로 길러 보아라.'"
+            f"{name_eun} 식탁 위 당근 반찬을 슬쩍 밀어냈다.\n"
+            f"아버지는 아무 말 없이 그릇을 바라보다가 작게 한숨을 쉬었다.\n"
+            f"'언젠가는 이 한 조각에도 시간이 들어 있다는 걸 알게 되겠지.'\n\n"
+            f"그날 밤, {name_eun} 낯선 흙냄새 속에서 눈을 뜬다.\n"
+            f"발밑에는 끝이 보이지 않는 당근밭이 펼쳐져 있었다.\n"
+            f"어디선가 낮은 목소리가 들린다.\n"
+            f"'네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.'"
         )
 
     def handle_events(self, events):
@@ -62,7 +63,7 @@ class IntroScene:
 
     def start_game(self):
         game_state.understanding = 0
-        game_state.transition_text = "[기본 조작]\n오른쪽 버튼들을 알맞은 순서대로 클릭하여\n농작물을 끝까지 키워보세요!"
+        game_state.transition_text = "[꿈속 밭일]\n밭의 상태를 살피고 알맞은 행동을 고르세요.\n기다리는 것도 선택이지만, 방치하면 문제가 커집니다."
         game_state.transition_next = "farm"
         game_state.is_clear_transition = False
         game_state.current_scene = "transition"

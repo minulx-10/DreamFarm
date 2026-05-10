@@ -23,7 +23,7 @@ class Stage2Scene:
         self.stage_clear = False
         self.clear_timer = 2.0
         
-        self.status_msg = "게이지가 초록색 영역에 올 때 스페이스바 또는 클릭하세요!"
+        self.status_msg = "물방울이 초록 구간에 닿는 순간 클릭하거나 스페이스바를 누르세요."
         self.stopped = False
         self.stop_timer = 0
 
@@ -38,9 +38,9 @@ class Stage2Scene:
                 cursor_rect = pygame.Rect(self.gauge_x + self.cursor_pos - 5, self.gauge_y - 10, 10, self.gauge_h + 20)
                 if cursor_rect.colliderect(self.target_zone):
                     game_state.score += 200
-                    self.status_msg = f"성공! (현재 성공: {self.attempts}/{self.max_attempts})"
+                    self.status_msg = f"알맞게 스며들었습니다. (시도: {self.attempts}/{self.max_attempts})"
                 else:
-                    self.status_msg = f"실패... 물이 빗나갔습니다. (현재 시도: {self.attempts}/{self.max_attempts})"
+                    self.status_msg = f"물이 너무 급하게 흘렀습니다. (시도: {self.attempts}/{self.max_attempts})"
 
     def update(self, dt):
         if self.stage_clear:
@@ -52,7 +52,7 @@ class Stage2Scene:
                 elif game_state.score >= 100: bonus = 5
                 
                 game_state.understanding += bonus
-                game_state.transition_text = f"미니게임 완료!\n\n획득 점수: {game_state.score}점\n추가 이해도 보너스: +{bonus}"
+                game_state.transition_text = f"물 주기 완료!\n\n획득 점수: {game_state.score}점\n물을 기다리는 때를 배웠습니다. 이해도 +{bonus}"
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"

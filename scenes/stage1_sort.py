@@ -16,19 +16,19 @@ class SortItem:
         
         if item_type == 'seed':
             self.name = "당근 씨앗"
-            self.desc = "밭에 심어야 할 소중한 씨앗입니다."
+            self.desc = "밭으로 보내야 할 당근 씨앗입니다."
             self.is_good = True
         elif item_type == 'weed':
             self.name = "잡초"
-            self.desc = "영양분을 빼앗는 잡초입니다. 치워야 합니다."
+            self.desc = "당근의 영양분을 빼앗습니다. 치워야 합니다."
             self.is_good = False
         elif item_type == 'rock':
             self.name = "돌멩이"
-            self.desc = "뿌리를 막는 단단한 돌멩이입니다. 치워야 합니다."
+            self.desc = "뿌리가 뻗는 길을 막습니다. 치워야 합니다."
             self.is_good = False
         elif item_type == 'leaf':
             self.name = "썩은 잎"
-            self.desc = "병균을 옮길 수 있는 썩은 잎입니다. 치워야 합니다."
+            self.desc = "병이 옮을 수 있습니다. 치워야 합니다."
             self.is_good = False
 
     def draw(self, screen):
@@ -51,7 +51,7 @@ class Stage1Scene:
         self.bin_keep = pygame.Rect(140, 400, 120, 120)
         self.bin_trash = pygame.Rect(540, 400, 120, 120)
         self.hovered_name = "밭 준비하기"
-        self.hovered_desc = "씨앗은 밭(왼쪽)으로, 쓰레기는 쓰레기통(오른쪽)으로 분류하세요!"
+        self.hovered_desc = "씨앗은 왼쪽 밭으로, 방해물은 오른쪽 통으로 옮기세요."
         self.stage_clear = False
         self.clear_timer = 2.0
 
@@ -76,18 +76,18 @@ class Stage1Scene:
                 if self.bin_keep.collidepoint(event.pos):
                     if self.dragged_item.is_good:
                         game_state.score += 100
-                        self.hovered_desc = "정확합니다! 씨앗을 심을 준비가 되었습니다."
+                        self.hovered_desc = "좋습니다. 씨앗이 제자리를 찾았습니다."
                     else:
                         game_state.score -= 50
-                        self.hovered_desc = "앗! 이건 밭에 두면 안 됩니다."
+                        self.hovered_desc = "이건 밭에 두면 당근이 자라기 어렵습니다."
                     self.items.remove(self.dragged_item)
                 elif self.bin_trash.collidepoint(event.pos):
                     if not self.dragged_item.is_good:
                         game_state.score += 100
-                        self.hovered_desc = "잘 치웠습니다!"
+                        self.hovered_desc = "잘 치웠습니다. 흙이 한결 깨끗해졌습니다."
                     else:
                         game_state.score -= 50
-                        self.hovered_desc = "앗! 소중한 씨앗을 버리면 안 됩니다."
+                        self.hovered_desc = "씨앗까지 버리면 수확할 것이 없어집니다."
                     self.items.remove(self.dragged_item)
                 self.dragged_item = None
             elif event.type == pygame.MOUSEMOTION:
@@ -104,7 +104,7 @@ class Stage1Scene:
                             break
                     if not hovered:
                         self.hovered_name = "밭 준비하기"
-                        self.hovered_desc = "씨앗은 밭(왼쪽)으로, 쓰레기는 쓰레기통(오른쪽)으로 분류하세요!"
+                        self.hovered_desc = "씨앗은 왼쪽 밭으로, 방해물은 오른쪽 통으로 옮기세요."
 
     def update(self, dt):
         if self.stage_clear:
@@ -116,7 +116,7 @@ class Stage1Scene:
                 elif game_state.score >= 100: bonus = 5
                 
                 game_state.understanding += bonus
-                game_state.transition_text = f"미니게임 완료!\n\n획득 점수: {game_state.score}점\n추가 이해도 보너스: +{bonus}"
+                game_state.transition_text = f"밭 정리 완료!\n\n획득 점수: {game_state.score}점\n흙을 보는 눈이 깊어졌습니다. 이해도 +{bonus}"
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -153,6 +153,6 @@ class Stage1Scene:
             draw_bottom_bar(screen, "결과", f"얻은 점수: {game_state.score}")
         else:
             if self.dragged_item:
-                draw_bottom_bar(screen, self.dragged_item.name, "분류할 위치로 드래그하세요.")
+                draw_bottom_bar(screen, self.dragged_item.name, "알맞은 위치로 끌어다 놓으세요.")
             else:
                 draw_bottom_bar(screen, self.hovered_name, self.hovered_desc)

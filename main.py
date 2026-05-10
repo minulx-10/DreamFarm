@@ -8,6 +8,7 @@ from core.game_state import game_state
 from scenes.name_input import NameInputScene
 from scenes.intro import IntroScene
 from scenes.transition import TransitionScene
+from scenes.memory import MemoryScene
 from scenes.farm import FarmScene
 from scenes.stage1_sort import Stage1Scene
 from scenes.stage2_water import Stage2Scene
@@ -27,6 +28,7 @@ def main():
         "name_input": NameInputScene(),
         "intro": IntroScene(),
         "transition": TransitionScene(),
+        "memory": MemoryScene(),
         "farm": FarmScene(),
         "stage1": Stage1Scene(),
         "stage2": Stage2Scene(),
@@ -48,6 +50,7 @@ def main():
             elif target_scene == "stage3": scenes["stage3"] = Stage3Scene()
             elif target_scene == "ending": scenes["ending"] = EndingScene()
             elif target_scene == "intro": scenes["intro"] = IntroScene()
+            elif target_scene == "memory": scenes["memory"] = MemoryScene()
             
             current_scene_obj = scenes[target_scene]
 
