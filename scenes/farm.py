@@ -2,7 +2,7 @@ import pygame
 import random
 from core.game_state import append_josa, game_state
 from core.assets import *
-from core.ui import draw_wood_panel, draw_top_bar, draw_bottom_bar
+from core.ui import draw_light_panel, draw_wood_panel, draw_top_bar, draw_bottom_bar
 
 
 class Button:
@@ -14,10 +14,10 @@ class Button:
 
     def draw(self, screen):
         pygame.draw.rect(screen, WOOD_DARK, self.rect.move(3, 3), border_radius=6)
-        pygame.draw.rect(screen, WOOD_LIGHT, self.rect, border_radius=6)
-        pygame.draw.rect(screen, WOOD_COLOR, self.rect.inflate(-6, -6), border_radius=4)
-        pygame.draw.rect(screen, TEXT_BROWN, self.rect, 2, border_radius=6)
-        text_surf = self.font.render(self.text, True, TEXT_BROWN)
+        pygame.draw.rect(screen, PANEL_PALE, self.rect, border_radius=6)
+        pygame.draw.rect(screen, WOOD_LIGHT, self.rect.inflate(-6, -6), border_radius=4)
+        pygame.draw.rect(screen, TEXT_DARK, self.rect, 2, border_radius=6)
+        text_surf = self.font.render(self.text, True, TEXT_DARK)
         screen.blit(
             text_surf,
             (
@@ -34,11 +34,11 @@ class FarmScene:
     def __init__(self):
         self.day = 1
         self.growth = 0
-        self.growth_goal = 24
-        self.moisture = 45
-        self.health = 72
-        self.weeds = 18
-        self.pests = 8
+        self.growth_goal = 36
+        self.moisture = 44
+        self.health = 66
+        self.weeds = 25
+        self.pests = 14
         self.drainage = 55
         self.stress = 0
         self.actions_taken = 0
@@ -120,7 +120,9 @@ class FarmScene:
         self.apply_field_pressure(difficulty)
 
         if self.is_good_turn():
-            gain = 1 + (1 if self.health >= 70 else 0)
+            gain = 1
+            if action == "기다리기" and self.health >= 74 and self.weeds < 35 and self.pests < 30:
+                gain += 1
             self.growth += gain
             game_state.understanding += 1
             result += f" 당근이 조금 더 자랐습니다. (+성장 {gain})"
@@ -144,23 +146,23 @@ class FarmScene:
 
         if action == "물 주기":
             if self.moisture < 35:
-                self.moisture += 38
-                self.health += 7
+                self.moisture += 34
+                self.health += 4
                 self.stress = max(0, self.stress - 6)
                 return "마른 흙이 물을 천천히 머금습니다."
             if self.moisture > 70:
                 self.moisture += 18
-                self.health -= 10 + difficulty
-                self.stress += 8
+                self.health -= 12 + difficulty
+                self.stress += 10
                 return "이미 젖은 흙에 물이 고였습니다. 뿌리가 답답해 보입니다."
-            self.moisture += 20
-            self.health += 2
+            self.moisture += 18
+            self.health += 0
             return "알맞게 물을 주었습니다. 잎 끝이 조금 살아납니다."
 
         if action == "잡초 뽑기":
             if self.weeds > 20:
-                self.weeds -= 45
-                self.health += 5
+                self.weeds -= 34
+                self.health += 3
                 return "잡초를 뽑아내자 당근 주변에 숨 쉴 틈이 생겼습니다."
             self.health -= 5
             self.stress += 6
@@ -168,17 +170,17 @@ class FarmScene:
 
         if action == "해충 살피기":
             if self.pests > 18:
-                self.pests -= 42
-                self.health += 5
+                self.pests -= 32
+                self.health += 3
                 return "잎 아래 숨어 있던 해충을 미리 털어냈습니다."
             self.stress = max(0, self.stress - 2)
             return "큰 해충은 보이지 않습니다. 대신 잎 상태를 차분히 확인했습니다."
 
         if action == "배수로 정리":
             if self.moisture > 68 or self.drainage < 45:
-                self.moisture -= 24
-                self.drainage += 26
-                self.health += 3
+                self.moisture -= 22
+                self.drainage += 22
+                self.health += 1
                 return "고인 물길을 터 주자 흙냄새가 한결 가벼워졌습니다."
             self.drainage += 8
             self.stress += 5
@@ -186,8 +188,8 @@ class FarmScene:
 
         if action == "흙 북돋기":
             if self.health < 65 or self.stress > 24:
-                self.health += 12
-                self.stress = max(0, self.stress - 14)
+                self.health += 8
+                self.stress = max(0, self.stress - 10)
                 self.drainage += 4
                 return "흙을 살짝 북돋우자 기울던 줄기가 다시 중심을 잡습니다."
             self.health += 2
@@ -196,7 +198,6 @@ class FarmScene:
 
         if action == "기다리기":
             if self.is_good_turn():
-                self.growth += 1
                 self.moisture -= 8
                 return "손대지 않고 기다리자 당근이 조용히 뿌리를 내립니다."
             self.health -= 8 + difficulty
@@ -207,30 +208,30 @@ class FarmScene:
 
     def apply_field_pressure(self, difficulty):
         self.day += 1
-        self.moisture -= random.randint(3, 6 + difficulty)
-        self.weeds += random.randint(3, 5 + difficulty)
-        self.pests += random.randint(1, 3 + difficulty)
+        self.moisture -= random.randint(4, 7 + difficulty)
+        self.weeds += random.randint(4, 7 + difficulty)
+        self.pests += random.randint(2, 5 + difficulty)
 
         if self.moisture > 75:
-            self.health -= 4 + difficulty
+            self.health -= 5 + difficulty
             self.drainage -= 5
         if self.moisture < 22:
-            self.health -= 5 + difficulty
+            self.health -= 6 + difficulty
             self.stress += 5
         if self.weeds > 55:
-            self.health -= 4 + difficulty
-        if self.pests > 48:
             self.health -= 5 + difficulty
-        if random.random() < 0.15 + difficulty * 0.03:
+        if self.pests > 48:
+            self.health -= 6 + difficulty
+        if random.random() < 0.18 + difficulty * 0.04:
             self.drainage -= random.randint(4, 10)
 
     def is_good_turn(self):
         return (
             30 <= self.moisture <= 72
             and self.health >= 45
-            and self.weeds <= 70
-            and self.pests <= 65
-            and self.stress <= 70
+            and self.weeds <= 62
+            and self.pests <= 58
+            and self.stress <= 62
         )
 
     def inspect_message(self):
@@ -421,71 +422,120 @@ class FarmScene:
         pygame.draw.rect(screen, color, fill)
         pygame.draw.rect(screen, BLACK, bar, 2)
 
-    def draw_field_summary(self, screen):
-        panel = pygame.Rect(430, 82, 320, 92)
-        draw_wood_panel(screen, panel)
-        status_font = get_font(18)
-        title_font = get_font(20)
-        title = title_font.render("밭 상태", True, TEXT_BROWN)
-        screen.blit(title, (455, 98))
+    def draw_labeled_meter(self, screen, label, value, max_value, x, y, w, color):
+        font = get_font(16)
+        label_surf = font.render(label, True, TEXT_DARK)
+        value_surf = font.render(f"{value}/{max_value}", True, TEXT_DARK)
+        screen.blit(label_surf, (x, y - 1))
+        screen.blit(value_surf, (x + w - value_surf.get_width(), y - 1))
 
-        growth_text = status_font.render(f"성장 {self.growth}/{self.growth_goal}", True, TEXT_BROWN)
-        insight_text = status_font.render(f"이해도 {game_state.understanding}", True, TEXT_BROWN)
-        health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_BROWN)
-        screen.blit(growth_text, (455, 126))
-        screen.blit(insight_text, (585, 126))
-        screen.blit(health_text, (455, 150))
+        bar = pygame.Rect(x, y + 22, w, 15)
+        fill_w = int((bar.w - 4) * max(0, min(value, max_value)) / max_value)
+        pygame.draw.rect(screen, (82, 62, 42), bar)
+        pygame.draw.rect(screen, color, (bar.x + 2, bar.y + 2, fill_w, bar.h - 4))
+        pygame.draw.rect(screen, TEXT_DARK, bar, 2)
+
+    def draw_field_summary(self, screen):
+        panel = pygame.Rect(430, 82, 320, 100)
+        draw_light_panel(screen, panel)
+        title_font = get_font(20)
+        title = title_font.render("밭 상태", True, TEXT_DARK)
+        screen.blit(title, (450, 96))
+
+        self.draw_labeled_meter(screen, "성장", self.growth, self.growth_goal, 450, 123, 130, (235, 150, 55))
+        self.draw_labeled_meter(screen, "이해도", game_state.understanding, 60, 600, 123, 125, (120, 180, 90))
+
+        status_font = get_font(16)
+        health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_DARK)
+        screen.blit(health_text, (450, 162))
 
         if self.growth >= self.growth_goal:
-            ready = status_font.render("수확 가능", True, (170, 70, 20))
-            screen.blit(ready, (620, 150))
+            ready = status_font.render("수확 가능", True, (145, 55, 0))
+            screen.blit(ready, (640, 162))
 
     def draw_meters(self, screen):
-        panel = pygame.Rect(430, 182, 320, 108)
-        draw_wood_panel(screen, panel)
-        self.draw_status_meter(screen, "수분", self.moisture, 452, 204, (80, 170, 240))
-        self.draw_status_meter(screen, "건강", self.health, 452, 228, (90, 185, 95))
-        self.draw_status_meter(screen, "잡초", self.weeds, 452, 252, (80, 140, 55))
-        self.draw_status_meter(screen, "해충", self.pests, 452, 276, (210, 110, 60))
+        panel = pygame.Rect(430, 190, 320, 100)
+        draw_light_panel(screen, panel)
+        self.draw_status_meter(screen, "수분", self.moisture, 452, 208, (80, 170, 240))
+        self.draw_status_meter(screen, "건강", self.health, 452, 232, (90, 185, 95))
+        self.draw_status_meter(screen, "잡초", self.weeds, 452, 256, (80, 140, 55))
+        self.draw_status_meter(screen, "해충", self.pests, 452, 280, (210, 110, 60))
+
+    def crop_positions(self):
+        return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
+
+    def draw_crop(self, screen, x, y, growth_stage):
+        mound = pygame.Rect(x - 34, y + 30, 68, 24)
+        pygame.draw.ellipse(screen, DIRT_DARK, mound)
+        pygame.draw.ellipse(screen, DIRT_COLOR, mound.inflate(-8, -6))
+
+        if growth_stage <= 0:
+            return
+        if growth_stage < 5:
+            sprite, offset = sprites["seed"], (-15, 21)
+        elif growth_stage < 10:
+            sprite, offset = sprites["sprout1"], (-15, 9)
+        elif growth_stage < 16:
+            sprite, offset = sprites["sprout2"], (-20, -2)
+        elif growth_stage < 23:
+            sprite, offset = sprites["sprout3"], (-22, -12)
+        elif growth_stage < self.growth_goal:
+            sprite, offset = sprites["sprout4"], (-24, -18)
+        else:
+            sprite, offset = sprites["carrot"], (-24, -45)
+        screen.blit(sprite, (x + offset[0], y + offset[1]))
+
+    def draw_farm_plot(self, screen):
+        plot_rect = pygame.Rect(50, 145, 350, 305)
+        draw_wood_panel(screen, plot_rect)
+        inner_plot = plot_rect.inflate(-22, -22)
+
+        if self.moisture > 72:
+            base_color = (110, 75, 45)
+        elif self.moisture < 28:
+            base_color = (128, 78, 48)
+        else:
+            base_color = DIRT_COLOR
+
+        pygame.draw.rect(screen, base_color, inner_plot)
+        pygame.draw.rect(screen, DIRT_DARK, inner_plot, 4)
+
+        for y in (inner_plot.y + 82, inner_plot.y + 192):
+            row = pygame.Rect(inner_plot.x + 18, y, inner_plot.w - 36, 52)
+            pygame.draw.ellipse(screen, DIRT_DARK, row)
+            pygame.draw.ellipse(screen, base_color, row.inflate(-10, -10))
+
+        if self.moisture < 28:
+            for x in range(inner_plot.x + 35, inner_plot.right - 35, 55):
+                pygame.draw.line(screen, (85, 55, 35), (x, inner_plot.y + 44), (x + 18, inner_plot.y + 58), 2)
+                pygame.draw.line(screen, (85, 55, 35), (x + 10, inner_plot.y + 180), (x - 8, inner_plot.y + 198), 2)
+        elif self.moisture > 72:
+            for x in range(inner_plot.x + 30, inner_plot.right - 40, 65):
+                pygame.draw.ellipse(screen, (95, 130, 150), (x, inner_plot.y + 210, 36, 10))
+
+        growth_stage = max(0, min(self.growth, self.growth_goal))
+        for x, y in self.crop_positions():
+            self.draw_crop(screen, x, y, growth_stage)
+
+        if self.weeds > 32:
+            weed_count = 2 if self.weeds < 55 else 4
+            weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]
+            for x, y in weed_spots[:weed_count]:
+                screen.blit(sprites["weed"], (x, y))
+
+        if self.pests > 32:
+            bug_count = 1 if self.pests < 55 else 3
+            bug_spots = [(150, 228), (284, 336), (332, 220)]
+            for x, y in bug_spots[:bug_count]:
+                screen.blit(sprites["bug"], (x, y))
 
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
-
-        plot_rect = pygame.Rect(50, 145, 350, 305)
-        draw_wood_panel(screen, plot_rect)
-        inner_plot = plot_rect.inflate(-20, -20)
-        dirt_color = DIRT_WET if self.moisture > 68 else DIRT_COLOR if self.moisture > 28 else DIRT_DARK
-        pygame.draw.rect(screen, dirt_color, inner_plot)
-        pygame.draw.rect(screen, DIRT_DARK, inner_plot, 4)
-
-        growth_stage = max(0, min(self.growth, self.growth_goal))
-        if growth_stage > 0:
-            for i in range(5):
-                x = 80 + i * 60
-                y = 260
-                if growth_stage < 4:
-                    screen.blit(sprites["seed"], (x, y))
-                elif growth_stage < 8:
-                    screen.blit(sprites["sprout1"], (x, y - 10))
-                elif growth_stage < 12:
-                    screen.blit(sprites["sprout2"], (x - 5, y - 20))
-                elif growth_stage < 16:
-                    screen.blit(sprites["sprout3"], (x - 5, y - 30))
-                elif growth_stage < self.growth_goal:
-                    screen.blit(sprites["sprout4"], (x - 5, y - 35))
-                else:
-                    screen.blit(sprites["carrot"], (x - 5, y - 60))
-
-        if self.weeds > 35:
-            for i in range(3):
-                screen.blit(sprites["weed"], (95 + i * 95, 345))
-        if self.pests > 35:
-            for i in range(2):
-                screen.blit(sprites["bug"], (160 + i * 105, 205))
+        self.draw_farm_plot(screen)
 
         title_font = get_font(24)
         title = f"{self.day}일째: 꿈속 당근밭"
-        title_surf = title_font.render(title, True, TEXT_BROWN)
+        title_surf = title_font.render(title, True, TEXT_DARK)
         title_rect = pygame.Rect(50, 82, 350, 48)
         draw_wood_panel(screen, title_rect)
         screen.blit(
@@ -498,7 +548,9 @@ class FarmScene:
 
         self.draw_field_summary(screen)
         self.draw_meters(screen)
-        action_title = get_font(20).render("오늘 할 일", True, TEXT_BROWN)
+        action_panel = pygame.Rect(430, 300, 320, 164)
+        draw_light_panel(screen, action_panel)
+        action_title = get_font(20).render("오늘 할 일", True, TEXT_DARK)
         screen.blit(action_title, (450, 306))
 
         for btn in self.buttons:

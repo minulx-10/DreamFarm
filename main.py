@@ -18,7 +18,7 @@ from scenes.ending import EndingScene
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
-    pygame.display.set_caption("당근 한 뿌리의 시간 (미니게임 모음집)")
+    pygame.display.set_caption("몽중농원")
     clock = pygame.time.Clock()
     
     from core.assets import init_sprites

@@ -1,7 +1,7 @@
 import pygame
 from core.game_state import game_state
-from core.assets import get_font, BLACK, WHITE, TEXT_BROWN, WOOD_LIGHT
-from core.ui import draw_wood_panel
+from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
+from core.ui import draw_light_panel
 
 
 class MemoryScene:
@@ -69,10 +69,10 @@ class MemoryScene:
             pygame.draw.rect(screen, (shade, shade - 5, shade + 8), (0, y, 800, 18))
 
         panel = pygame.Rect(70, 95, 660, 410)
-        draw_wood_panel(screen, panel)
+        draw_light_panel(screen, panel)
 
         title = game_state.memory_title or "짧은 회상"
-        title_surf = self.font_title.render(title, True, TEXT_BROWN)
+        title_surf = self.font_title.render(title, True, TEXT_DARK)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 130))
 
         line = pygame.Rect(120, 175, 560, 3)
@@ -80,10 +80,10 @@ class MemoryScene:
 
         y = 210
         for text_line in self.printed_text.split("\n"):
-            surf = self.font.render(text_line, True, WHITE)
+            surf = self.font.render(text_line, True, TEXT_DARK)
             screen.blit(surf, (100, y))
             y += 32
 
         if self.finished:
-            prompt = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, (180, 170, 160))
+            prompt = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 455))

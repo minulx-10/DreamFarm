@@ -22,6 +22,9 @@ WOOD_COLOR = (220, 170, 110)
 WOOD_DARK = (170, 120, 70)
 WOOD_LIGHT = (250, 210, 150)
 TEXT_BROWN = (60, 40, 20)
+TEXT_DARK = (35, 24, 14)
+TEXT_MUTED = (95, 72, 48)
+PANEL_PALE = (242, 200, 138)
 
 import os
 import urllib.request

@@ -1,42 +1,24 @@
 import pygame
-from core.game_state import game_state
-from core.assets import get_font, BLACK, WHITE
+from core.game_state import append_josa, game_state
+from core.assets import BLACK, WHITE, get_font, sprites
+from core.ui import draw_centered_lines, wrap_text
+
 
 class EndingScene:
     def __init__(self):
-        self.font = get_font(24)
-        self.font_small = get_font(20)
+        self.font = get_font(23)
+        self.font_small = get_font(18)
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
-        self.char_delay = 0.05
+        self.char_delay = 0.04
         self.finished = False
-        
-        self.text_to_print = ""
-        self.initialized = False
-
-    def wrap_text(self, text, font, max_width):
-        wrapped_text = ""
-        current_line = ""
-        for char in text:
-            if char == '\n':
-                wrapped_text += current_line + '\n'
-                current_line = ""
-                continue
-                
-            test_line = current_line + char
-            if font.size(test_line)[0] <= max_width:
-                current_line = test_line
-            else:
-                wrapped_text += current_line + '\n'
-                current_line = char if char != ' ' else ""
-                
-        if current_line:
-            wrapped_text += current_line
-        return wrapped_text
+        self.ending_data = self.get_ending()
+        self.pages = self.build_pages()
+        self.page_index = 0
+        self.text_to_print = self.prepare_page(self.page_index)
 
     def get_ending(self):
-        from core.game_state import append_josa
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
         u = game_state.understanding
@@ -56,52 +38,78 @@ class EndingScene:
                 "text": f"수확한 당근을 베어 문 순간, 꿈속의 세상은 황금빛으로 물든다.\n아버지가 흘린 땀과 오랜 기다림의 무게가 담긴 달콤한 맛이었다.\n잠에서 깬 {name_eun} 식탁 위의 당근을 망설임 없이 입에 넣는다.\n'아빠, 오늘부터 제가 삽질할게요. 다 알려주세요.'"
             }
 
+    def build_pages(self):
+        text_lines = self.ending_data["text"].split("\n")
+        if len(text_lines) <= 2:
+            return [
+                f"[{self.ending_data['title']}]\n\n" + "\n".join(text_lines),
+            ]
+        split_at = max(1, len(text_lines) // 2)
+        return [
+            f"[{self.ending_data['title']}]\n\n" + "\n".join(text_lines[:split_at]),
+            "\n".join(text_lines[split_at:]),
+        ]
+
+    def prepare_page(self, index):
+        lines = []
+        for paragraph in self.pages[index].split("\n"):
+            if not paragraph:
+                lines.append("")
+            else:
+                lines.extend(wrap_text(paragraph, self.font, 610))
+        return "\n".join(lines)
+
+    def advance(self):
+        if not self.finished:
+            self.printed_text = self.text_to_print
+            self.char_idx = len(self.text_to_print)
+            self.finished = True
+            return
+
+        if self.page_index < len(self.pages) - 1:
+            self.page_index += 1
+            self.printed_text = ""
+            self.char_idx = 0
+            self.finished = False
+            self.text_to_print = self.prepare_page(self.page_index)
+        else:
+            game_state.running = False
+
     def handle_events(self, events):
         for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
-                if not self.finished:
-                    self.printed_text = self.text_to_print
-                    self.char_idx = len(self.text_to_print)
-                    self.finished = True
-                else:
-                    game_state.running = False
+            if event.type == pygame.MOUSEBUTTONDOWN or (
+                event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
+            ):
+                self.advance()
 
     def update(self, dt):
-        if not self.initialized:
-            ending_data = self.get_ending()
-            raw_text = f"[{ending_data['title']}]\n\n" + ending_data["text"]
-            self.text_to_print = self.wrap_text(raw_text, self.font, 640)
-            self.initialized = True
-            
-        if not self.finished:
-            self.char_timer += dt
-            if self.char_timer >= self.char_delay:
-                self.char_timer = 0
-                if self.char_idx < len(self.text_to_print):
-                    self.printed_text += self.text_to_print[self.char_idx]
-                    self.char_idx += 1
-                else:
-                    self.finished = True
+        if self.finished:
+            return
+
+        self.char_timer += dt
+        if self.char_timer >= self.char_delay:
+            self.char_timer = 0
+            if self.char_idx < len(self.text_to_print):
+                self.printed_text += self.text_to_print[self.char_idx]
+                self.char_idx += 1
+            else:
+                self.finished = True
 
     def draw(self, screen):
         screen.fill(BLACK)
-        
-        # Draw Dad sprite
-        from core.assets import sprites
-        dad = sprites['dad']
-        screen.blit(dad, (400 - dad.get_width()//2, 80))
-        
-        # Undertale text box style
-        box_rect = pygame.Rect(50, 300, 700, 260)
+
+        dad = sprites["dad"]
+        screen.blit(dad, (400 - dad.get_width() // 2, 78))
+
+        box_rect = pygame.Rect(55, 292, 690, 250)
         pygame.draw.rect(screen, WHITE, box_rect, 4)
-        
-        y = 330
-        lines = self.printed_text.split('\n')
-        for line in lines:
-            surf = self.font.render(line, True, WHITE)
-            screen.blit(surf, (80, y))
-            y += 32
-            
+
+        draw_centered_lines(screen, self.printed_text.split("\n"), self.font, WHITE, 400, 322, line_gap=5)
+
+        page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, (130, 130, 130))
+        screen.blit(page, (690, 548))
+
         if self.finished:
-            prompt = self.font_small.render("계속...", True, (150, 150, 150))
-            screen.blit(prompt, (650, 520))
+            prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "끝내기"
+            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, (150, 150, 150))
+            screen.blit(prompt, (400 - prompt.get_width() // 2, 562))
