@@ -2,6 +2,43 @@ import pygame
 from core.assets import *
 from core.game_state import game_state
 
+
+def wrap_text(text, font, max_width, max_lines=None):
+    lines = []
+    for paragraph in str(text).split("\n"):
+        current = ""
+        for char in paragraph:
+            test_line = current + char
+            if font.size(test_line)[0] <= max_width:
+                current = test_line
+            else:
+                if current:
+                    lines.append(current)
+                current = char if char != " " else ""
+                if max_lines and len(lines) >= max_lines:
+                    break
+        if max_lines and len(lines) >= max_lines:
+            break
+        lines.append(current)
+
+    if max_lines and len(lines) > max_lines:
+        lines = lines[:max_lines]
+
+    if max_lines and len(lines) == max_lines and font.size(lines[-1])[0] > max_width:
+        while lines[-1] and font.size(lines[-1] + "...")[0] > max_width:
+            lines[-1] = lines[-1][:-1]
+        lines[-1] += "..."
+    return lines
+
+
+def draw_multiline_text(screen, text, font, color, x, y, max_width, line_gap=4, max_lines=None):
+    lines = wrap_text(text, font, max_width, max_lines)
+    for i, line in enumerate(lines):
+        surf = font.render(line, True, color)
+        screen.blit(surf, (x, y + i * (font.get_height() + line_gap)))
+    return y + len(lines) * (font.get_height() + line_gap)
+
+
 def draw_wood_panel(screen, rect):
     pygame.draw.rect(screen, WOOD_COLOR, rect)
     pygame.draw.rect(screen, WOOD_LIGHT, rect, 4)
@@ -32,10 +69,9 @@ def draw_bottom_bar(screen, obj_name, obj_desc):
     draw_wood_panel(screen, panel_rect)
     
     font_name = get_font(26)
-    font_desc = get_font(20)
+    font_desc = get_font(18)
     
     name_surf = font_name.render(obj_name, True, TEXT_BROWN)
-    desc_surf = font_desc.render(obj_desc, True, (80, 60, 40))
     
     screen.blit(name_surf, (30, 600 - 85))
-    screen.blit(desc_surf, (30, 600 - 50))
+    draw_multiline_text(screen, obj_desc, font_desc, (80, 60, 40), 30, 600 - 52, 730, line_gap=1, max_lines=2)

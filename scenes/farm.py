@@ -13,7 +13,10 @@ class Button:
         self.font = get_font(20)
 
     def draw(self, screen):
-        draw_wood_panel(screen, self.rect)
+        pygame.draw.rect(screen, WOOD_DARK, self.rect.move(3, 3), border_radius=6)
+        pygame.draw.rect(screen, WOOD_LIGHT, self.rect, border_radius=6)
+        pygame.draw.rect(screen, WOOD_COLOR, self.rect.inflate(-6, -6), border_radius=4)
+        pygame.draw.rect(screen, TEXT_BROWN, self.rect, 2, border_radius=6)
         text_surf = self.font.render(self.text, True, TEXT_BROWN)
         screen.blit(
             text_surf,
@@ -41,6 +44,7 @@ class FarmScene:
         self.actions_taken = 0
         self.last_action = ""
         self.message = "꿈속의 밭은 조용하지만, 흙은 이미 목이 말라 보입니다."
+        self.notice = "상태를 살피며 당근을 수확까지 키우세요."
         self.memory_cooldown = 2
         self.memories_seen = set()
         self.buttons = []
@@ -50,7 +54,7 @@ class FarmScene:
         actions = self.get_available_actions()
         self.buttons = []
         start_x = 440
-        start_y = 170
+        start_y = 330
         for i, action in enumerate(actions):
             bx = start_x + (i % 2) * 160
             by = start_y + (i // 2) * 72
@@ -106,6 +110,7 @@ class FarmScene:
                 self.health -= 8
                 self.stress += 10
                 self.message = "아직 뽑기에는 이릅니다. 잎이 힘없이 흔들립니다."
+                self.notice = "수확은 성장과 건강이 충분할 때 시도하세요."
             return
 
         self.actions_taken += 1
@@ -124,6 +129,7 @@ class FarmScene:
             result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
 
         self.message = result
+        self.notice = self.build_notice()
         self.clamp_stats()
         self.try_trigger_memory()
         if game_state.current_scene == "farm":
@@ -245,6 +251,36 @@ class FarmScene:
         if not warnings:
             return "밭은 안정적입니다. 지금은 기다려도 괜찮아 보입니다."
         return "살펴보니 " + ", ".join(warnings[:2]) + "."
+
+    def build_notice(self):
+        if self.growth >= self.growth_goal:
+            return "수확할 수 있습니다. 건강이 너무 낮아지기 전에 거두세요."
+        if self.health < 45:
+            return "작물이 약해졌습니다. 흙 북돋기로 회복시키는 편이 좋습니다."
+        if self.moisture < 30:
+            return "흙이 말랐습니다. 물 주기를 우선 고민하세요."
+        if self.moisture > 72:
+            return "흙이 젖었습니다. 배수로를 정리하면 안정됩니다."
+        if self.weeds > 50:
+            return "잡초가 번졌습니다. 오래 두면 건강이 깎입니다."
+        if self.pests > 42:
+            return "해충 조짐이 큽니다. 잎 아래를 살펴야 합니다."
+        if self.is_good_turn():
+            return "밭이 안정적입니다. 기다리면 성장하기 좋은 흐름입니다."
+        return "한 가지 문제가 커지기 전에 균형을 맞추세요."
+
+    def grade_text(self, value, low_bad=True):
+        if low_bad:
+            if value >= 70:
+                return "좋음"
+            if value >= 45:
+                return "보통"
+            return "위험"
+        if value <= 30:
+            return "낮음"
+        if value <= 65:
+            return "주의"
+        return "높음"
 
     def try_trigger_memory(self):
         if self.memory_cooldown > 0:
@@ -379,11 +415,38 @@ class FarmScene:
         font = get_font(18)
         label_surf = font.render(label, True, BLACK)
         screen.blit(label_surf, (x, y - 2))
-        bar = pygame.Rect(x + 72, y, 210, 18)
+        bar = pygame.Rect(x + 62, y, 175, 16)
         pygame.draw.rect(screen, (70, 55, 40), bar)
         fill = pygame.Rect(bar.x + 2, bar.y + 2, int((bar.w - 4) * value / 100), bar.h - 4)
         pygame.draw.rect(screen, color, fill)
         pygame.draw.rect(screen, BLACK, bar, 2)
+
+    def draw_field_summary(self, screen):
+        panel = pygame.Rect(430, 82, 320, 92)
+        draw_wood_panel(screen, panel)
+        status_font = get_font(18)
+        title_font = get_font(20)
+        title = title_font.render("밭 상태", True, TEXT_BROWN)
+        screen.blit(title, (455, 98))
+
+        growth_text = status_font.render(f"성장 {self.growth}/{self.growth_goal}", True, TEXT_BROWN)
+        insight_text = status_font.render(f"이해도 {game_state.understanding}", True, TEXT_BROWN)
+        health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_BROWN)
+        screen.blit(growth_text, (455, 126))
+        screen.blit(insight_text, (585, 126))
+        screen.blit(health_text, (455, 150))
+
+        if self.growth >= self.growth_goal:
+            ready = status_font.render("수확 가능", True, (170, 70, 20))
+            screen.blit(ready, (620, 150))
+
+    def draw_meters(self, screen):
+        panel = pygame.Rect(430, 182, 320, 108)
+        draw_wood_panel(screen, panel)
+        self.draw_status_meter(screen, "수분", self.moisture, 452, 204, (80, 170, 240))
+        self.draw_status_meter(screen, "건강", self.health, 452, 228, (90, 185, 95))
+        self.draw_status_meter(screen, "잡초", self.weeds, 452, 252, (80, 140, 55))
+        self.draw_status_meter(screen, "해충", self.pests, 452, 276, (210, 110, 60))
 
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
@@ -433,24 +496,13 @@ class FarmScene:
             ),
         )
 
-        status_panel = pygame.Rect(430, 82, 320, 70)
-        draw_wood_panel(screen, status_panel)
-        status_font = get_font(18)
-        growth_text = status_font.render(f"성장 {self.growth}/{self.growth_goal}", True, TEXT_BROWN)
-        insight_text = status_font.render(f"이해도 {game_state.understanding}", True, TEXT_BROWN)
-        screen.blit(growth_text, (455, 98))
-        screen.blit(insight_text, (455, 124))
-        if self.growth >= self.growth_goal:
-            ready = status_font.render("수확할 수 있습니다", True, (170, 70, 20))
-            screen.blit(ready, (590, 111))
-
-        self.draw_status_meter(screen, "수분", self.moisture, 430, 340, (80, 170, 240))
-        self.draw_status_meter(screen, "건강", self.health, 430, 366, (90, 185, 95))
-        self.draw_status_meter(screen, "잡초", self.weeds, 430, 392, (80, 140, 55))
-        self.draw_status_meter(screen, "해충", self.pests, 430, 418, (210, 110, 60))
+        self.draw_field_summary(screen)
+        self.draw_meters(screen)
+        action_title = get_font(20).render("오늘 할 일", True, TEXT_BROWN)
+        screen.blit(action_title, (450, 306))
 
         for btn in self.buttons:
             btn.draw(screen)
 
         draw_top_bar(screen, show_stats=False)
-        draw_bottom_bar(screen, "농장 일지", self.message)
+        draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")

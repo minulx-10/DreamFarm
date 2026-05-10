@@ -22,12 +22,26 @@ class TransitionScene:
         panel = pygame.Rect(100, 100, 600, 400)
         draw_wood_panel(screen, panel)
         
-        lines = game_state.transition_text.split('\n')
         y_offset = 140
-        for line in lines:
-            rendered = self.font.render(line, True, TEXT_BROWN)
-            screen.blit(rendered, (400 - rendered.get_width()//2, y_offset))
-            y_offset += 35
+        for paragraph in game_state.transition_text.split('\n'):
+            if not paragraph:
+                y_offset += 18
+                continue
+            lines = []
+            current = ""
+            for char in paragraph:
+                test = current + char
+                if self.font.size(test)[0] <= 520:
+                    current = test
+                else:
+                    lines.append(current)
+                    current = char
+            if current:
+                lines.append(current)
+            for line in lines:
+                rendered = self.font.render(line, True, TEXT_BROWN)
+                screen.blit(rendered, (400 - rendered.get_width()//2, y_offset))
+                y_offset += 32
             
         if game_state.is_clear_transition:
             score_text = self.font.render(f"현재 누적 이해도: {game_state.understanding}", True, (200, 100, 0))
