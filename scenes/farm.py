@@ -46,6 +46,8 @@ class FarmScene:
         self.message = "상태를 확인하세요."
         self.notice = "추천 행동: 살펴보기"
         self.memory_cooldown = 2
+        self.minigame_cooldown = 5
+        self.last_minigame = None
         self.memories_seen = set()
         self.buttons = []
         self.rebuild_buttons()
@@ -383,26 +385,46 @@ class FarmScene:
     def try_trigger_minigame(self, action):
         if action in ("살펴보기", "수확하기"):
             return
+        if self.minigame_cooldown > 0:
+            self.minigame_cooldown -= 1
+            return
+
         risk = max(self.weeds, self.pests, abs(self.moisture - 52), 100 - self.health)
-        chance = 0.16 + min(0.2, risk / 350)
+        chance = 0.06 + min(0.12, risk / 650)
         if random.random() >= chance:
             return
 
-        if self.weeds > self.pests and self.weeds > 35:
-            mg = "stage1"
-            text = "[돌발 상황]\n\n밭에 씨앗과 잡동사니가 뒤섞였습니다.\n필요한 것만 골라 밭을 다시 정리하세요."
-        elif self.moisture < 35 or action == "물 주기":
-            mg = "stage2"
-            text = "[돌발 상황]\n\n흙이 갑자기 물을 빨아들입니다.\n타이밍을 맞춰 알맞은 만큼만 물을 주세요."
-        else:
-            mg = "stage3"
-            text = "[돌발 상황]\n\n잎 아래에서 해충이 한꺼번에 튀어나왔습니다.\n빠르게 눌러 작물을 지켜내세요."
+        candidates = []
+        if self.weeds > 52:
+            candidates.append(("stage1", 1, "[돌발 상황]\n\n밭에 씨앗과 잡동사니가 뒤섞였습니다.\n필요한 것만 골라 밭을 다시 정리하세요."))
+        if self.moisture < 38 or action == "물 주기":
+            candidates.append(("stage2", 3, "[돌발 상황]\n\n흙이 갑자기 물을 빨아들입니다.\n타이밍을 맞춰 알맞은 만큼만 물을 주세요."))
+        if self.pests > 34 or self.health < 55:
+            candidates.append(("stage3", 3, "[돌발 상황]\n\n잎 아래에서 해충이 한꺼번에 튀어나왔습니다.\n빠르게 눌러 작물을 지켜내세요."))
+
+        if not candidates:
+            return
+
+        if self.last_minigame and len(candidates) > 1:
+            candidates = [candidate for candidate in candidates if candidate[0] != self.last_minigame] or candidates
+
+        total_weight = sum(weight for _, weight, _ in candidates)
+        roll = random.uniform(0, total_weight)
+        upto = 0
+        mg, text = candidates[-1][0], candidates[-1][2]
+        for candidate, weight, candidate_text in candidates:
+            upto += weight
+            if roll <= upto:
+                mg, text = candidate, candidate_text
+                break
 
         game_state.transition_text = text
         game_state.current_scene = "transition"
         game_state.is_clear_transition = False
         game_state.transition_next = mg
         game_state.return_scene = "farm"
+        self.last_minigame = mg
+        self.minigame_cooldown = 7 if mg == "stage1" else 5
 
     def update(self, dt):
         if self.health <= 0:
