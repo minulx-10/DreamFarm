@@ -121,16 +121,17 @@ class FarmScene:
         result = self.apply_action(action, difficulty)
         self.apply_field_pressure(difficulty)
 
-        if self.is_good_turn():
-            gain = 1
-            if action == "기다리기" and self.health >= 74 and self.weeds < 35 and self.pests < 30:
-                gain += 1
-            self.growth += gain
-            game_state.understanding += 1
-            result += f" 당근이 조금 더 자랐습니다. (+성장 {gain})"
-        elif self.health <= 20:
+        if self.health <= 20:
             self.growth = max(0, self.growth - 1)
             result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
+        else:
+            gain = 1
+            if self.is_good_turn() and action == "기다리기":
+                gain += 1
+            self.growth += gain
+            if self.is_good_turn():
+                game_state.understanding += 1
+            result += f" 밭일을 이어가며 성장했습니다. (+성장 {gain})"
 
         self.message = result
         self.notice = self.build_notice()
@@ -446,8 +447,9 @@ class FarmScene:
 
     def draw_labeled_meter(self, screen, label, value, max_value, x, y, w, color):
         font = get_font(16)
+        shown_value = max(0, min(value, max_value))
         label_surf = font.render(label, True, TEXT_DARK)
-        value_surf = font.render(f"{value}/{max_value}", True, TEXT_DARK)
+        value_surf = font.render(f"{shown_value}/{max_value}", True, TEXT_DARK)
         screen.blit(label_surf, (x, y - 1))
         screen.blit(value_surf, (x + w - value_surf.get_width(), y - 1))
 
@@ -476,12 +478,12 @@ class FarmScene:
             screen.blit(ready, (640, 162))
 
     def draw_meters(self, screen):
-        panel = pygame.Rect(430, 190, 320, 100)
+        panel = pygame.Rect(430, 190, 320, 106)
         draw_light_panel(screen, panel)
-        self.draw_status_meter(screen, "수분", self.moisture, 452, 208, (80, 170, 240))
-        self.draw_status_meter(screen, "건강", self.health, 452, 232, (90, 185, 95))
-        self.draw_status_meter(screen, "잡초", self.weeds, 452, 256, (80, 140, 55))
-        self.draw_status_meter(screen, "해충", self.pests, 452, 280, (210, 110, 60))
+        self.draw_status_meter(screen, "수분", self.moisture, 452, 205, (80, 170, 240))
+        self.draw_status_meter(screen, "건강", self.health, 452, 228, (90, 185, 95))
+        self.draw_status_meter(screen, "잡초", self.weeds, 452, 251, (80, 140, 55))
+        self.draw_status_meter(screen, "해충", self.pests, 452, 274, (210, 110, 60))
 
     def crop_positions(self):
         return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
