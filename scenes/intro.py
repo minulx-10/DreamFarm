@@ -69,6 +69,8 @@ class IntroScene:
 
     def start_game(self):
         game_state.understanding = 0
+        game_state.final_health = 100
+        game_state.farm_mistakes = 0
         game_state.transition_text = (
             "[꿈속 밭일]\n"
             "밭의 상태를 살피고 알맞은 행동을 고르세요.\n"

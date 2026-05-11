@@ -15,6 +15,9 @@ class GameState:
         self.memory_title = ""
         self.memory_text = ""
         self.memory_next = "farm"
+        
+        self.final_health = 100
+        self.farm_mistakes = 0
 
 game_state = GameState()
 

@@ -48,6 +48,7 @@ class FarmScene:
         self.memory_cooldown = 2
         self.minigame_cooldown = 5
         self.last_minigame = None
+        self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
         self.rebuild_buttons()
@@ -107,10 +108,13 @@ class FarmScene:
         if action == "수확하기":
             if self.growth >= self.growth_goal and self.health >= 35:
                 game_state.understanding += 12
+                game_state.final_health = self.health
+                game_state.farm_mistakes = self.mistakes
                 game_state.current_scene = "ending"
             else:
                 self.health -= 8
                 self.stress += 10
+                self.mistakes += 1
                 self.message = "아직 성장 수치가 부족합니다."
                 self.notice = "추천 행동: 수확하지 말고 밭 상태를 먼저 회복하세요."
             return
@@ -122,6 +126,7 @@ class FarmScene:
         self.apply_field_pressure(difficulty)
 
         if self.health <= 20:
+            self.mistakes += 1
             self.growth = max(0, self.growth - 1)
             result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
         else:
@@ -157,6 +162,7 @@ class FarmScene:
                 self.moisture += 18
                 self.health -= 12 + difficulty
                 self.stress += 10
+                self.mistakes += 1
                 return "물 주기 실패: 수분이 너무 높아 건강이 감소했습니다."
             self.moisture += 18
             self.health += 0
@@ -169,6 +175,7 @@ class FarmScene:
                 return "잡초 뽑기 성공: 잡초 수치가 크게 감소했습니다."
             self.health -= 5
             self.stress += 6
+            self.mistakes += 1
             return "잡초 뽑기 실패: 잡초가 적어 건강이 감소했습니다."
 
         if action == "해충 살피기":
@@ -187,6 +194,7 @@ class FarmScene:
                 return "배수로 정리 성공: 수분이 낮아지고 배수가 회복되었습니다."
             self.drainage += 8
             self.stress += 5
+            self.mistakes += 1
             return "배수로 정리 효과 낮음: 지금은 다른 행동이 더 필요합니다."
 
         if action == "흙 북돋기":
@@ -205,6 +213,7 @@ class FarmScene:
                 return "기다리기 성공: 안정 상태라 성장이 진행됩니다."
             self.health -= 8 + difficulty
             self.stress += 8
+            self.mistakes += 1
             return "기다리기 실패: 문제가 있는 상태라 건강이 감소했습니다."
 
         return "행동을 처리했습니다."
@@ -431,6 +440,7 @@ class FarmScene:
         if self.health <= 0:
             self.health = 25
             self.stress = 45
+            self.mistakes += 2
             game_state.understanding = max(0, game_state.understanding - 8)
             self.message = "당근이 크게 시들었습니다. 다시 흙을 다독이며 회복시켜야 합니다."
             self.rebuild_buttons()

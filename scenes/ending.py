@@ -22,12 +22,14 @@ class EndingScene:
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
         u = game_state.understanding
-        if u < 20:
+        final_health = game_state.final_health
+        mistakes = game_state.farm_mistakes
+        if final_health < 45 or mistakes >= 8 or u < 20:
             return {
                 "title": "배드엔딩: 아직은 쓰기만 한 맛",
                 "text": f"{name_eun} 수확한 당근을 바라보았지만 끝내 입에 넣지 못한다.\n잠에서 깬 뒤에도 식탁 위 당근 반찬을 가만히 바라볼 뿐이다.\n하지만 예전처럼 무작정 밀어내지는 않는다."
             }
-        elif u < 50:
+        elif final_health < 70 or mistakes >= 4 or u < 50:
             return {
                 "title": "배드엔딩: 조금은 알 것 같은 마음",
                 "text": f"{name_eun} 수확한 당근을 아주 조금 베어 문다.\n잠에서 깬 뒤 식탁에서 머뭇거리다가 당근 반찬 한 조각을 집어 먹는다.\n아버지는 아무 말 없이 조용히 웃는다."
@@ -86,6 +88,8 @@ class EndingScene:
         game_state.memory_title = ""
         game_state.memory_text = ""
         game_state.memory_next = "farm"
+        game_state.final_health = 100
+        game_state.farm_mistakes = 0
         game_state.current_scene = "intro"
 
     def handle_events(self, events):
