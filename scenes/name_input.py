@@ -14,9 +14,12 @@ class NameInputScene:
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.TEXTEDITING:
-                self.ime_text = event.text
+                if len(self.input_text) + len(event.text) <= 8:
+                    self.ime_text = event.text
+                else:
+                    self.ime_text = event.text[:max(0, 8 - len(self.input_text))]
             elif event.type == pygame.TEXTINPUT:
-                if len(self.input_text) + len(event.text) <= 10:
+                if len(self.input_text) + len(event.text) <= 8:
                     self.input_text += event.text
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:

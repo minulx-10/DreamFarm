@@ -20,6 +20,24 @@ class IntroScene:
     def get_intro_pages(self):
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
+
+        # #14 2nd playthrough: different intro
+        if game_state.is_second_run:
+            return [
+                (
+                    "[몽중농원]\n다시, 당근 한 뿌리의 시간\n\n"
+                    f"{name_eun} 식탁 위 당근 반찬을 바라본다.\n"
+                    "이 꿈은... 전에도 꾼 적이 있다.\n"
+                    "이번에는 조금 다르게 해볼 수 있을까."
+                ),
+                (
+                    f"다시 눈을 뜨는 흙냄새.\n"
+                    f"낯설지 않다. 이 밭을 알고 있다.\n\n"
+                    "낮은 목소리가 들린다.\n"
+                    "'다시 왔구나. 이번에는 조금 더 보일 게다.'"
+                ),
+            ]
+
         return [
             (
                 "[몽중농원]\n당근 한 뿌리의 시간\n\n"

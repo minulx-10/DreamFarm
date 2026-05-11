@@ -1,4 +1,6 @@
 import random
+import json
+import os
 
 
 class GameState:
@@ -39,6 +41,45 @@ class GameState:
 
         # Story choice
         self.choice_data = None
+
+        # ===== NEW SYSTEMS =====
+
+        # #11 Attitude tracking
+        self.patience_score = 0
+        self.care_score = 0
+        self.empathy_choices = 0
+        self.recovery_count = 0
+        self.rush_count = 0
+        self.last_failure_action = ""
+
+        # #5 Dad lessons learned
+        self.dad_lessons = {}
+
+        # #12 Silent gifts
+        self.gifts_revealed = 0
+
+        # #15 Sensory memory
+        self.current_sense = "낯선 흙냄새가 코끝을 스친다."
+
+        # #10 Father perspective
+        self.dad_mode = False
+        self.dad_mode_turns = 0
+        self.dad_mode_triggered = False
+
+        # #1 Father day interludes seen
+        self.father_day_seen = set()
+
+        # #14 2nd playthrough
+        self.is_second_run = False
+        self.prev_ending = ""
+        self.prev_understanding = 0
+
+        # #13 Wait animation state
+        self.wait_active = False
+        self.wait_timer = 0.0
+
+        # Ending type for save
+        self.last_ending = ""
 
 
 game_state = GameState()
@@ -125,12 +166,94 @@ FAILURE_ECHOES = {
     "기다리기": "'기다려도 되는 때와 안 되는 때가 있단다.'",
 }
 
+# #10 Father perspective echoes (when playing as dad)
+FATHER_ECHOES = {
+    "물 주기": ["아이가 먹을 당근이니까.", "오늘도 안 먹겠지. 그래도."],
+    "잡초 뽑기": ["이 밭만큼은 깨끗하게.", "아이는 모르겠지만, 이것도 사랑이다."],
+    "해충 살피기": ["잎 하나도 함부로 놔둘 수 없다.", "내가 지키지 않으면 누가 지키겠나."],
+    "배수로 정리": ["비가 오기 전에 해야 한다.", "준비하는 사람은 늘 보이지 않는 법이지."],
+    "흙 북돋기": ["이 흙에 내 시간이 쌓인다.", "아이가 언젠가 이 흙을 만져볼까."],
+    "기다리기": ["조급해하면 안 된다. 당근도, 아이도.", "기다릴 줄 아는 게 농부의 일이다."],
+    "살펴보기": ["오늘도 무사히 자라고 있구나.", "이 밭이 내 하루의 전부다."],
+}
+
+# #6 Weather wisdom
+WEATHER_WISDOM = {
+    "맑음": "맑은 날이 오래가면 오히려 조심해야 한단다.",
+    "흐림": "구름은 비를 데려오기도, 막아주기도 한다.",
+    "비": "비가 오면 쉬어야 할 것 같지만, 배수로는 비 올 때 정리해야 한단다.",
+    "가뭄": "메마른 땅도 기다림을 안다. 급한 마음이 더 해롭다.",
+    "강풍": "바람은 약한 뿌리를 먼저 시험한다.",
+}
+
 WEATHER_DATA = {
     "맑음": {"moisture": -2, "stress": -3, "desc": "하늘이 맑다."},
     "흐림": {"moisture": 0, "stress": 0, "desc": "구름이 끼어 있다."},
     "비": {"moisture": 10, "drainage": -3, "desc": "빗방울이 떨어진다."},
     "가뭄": {"moisture": -8, "health": -3, "desc": "땅이 갈라지고 있다."},
     "강풍": {"pests": -5, "stress": 5, "desc": "바람이 세차게 분다."},
+}
+
+# #12 Silent gifts (revealed every 5 turns)
+SILENT_GIFTS = [
+    "밭 옆에 물통이 미리 채워져 있다.",
+    "흙 위에 장갑이 놓여 있다. 내 사이즈다.",
+    "삽 손잡이에 테이프가 감겨 있다. 손이 안 아프게.",
+    "그늘에 도시락이 놓여 있다. 아직 따뜻하다.",
+    "밭 가장자리에 돌이 치워져 있다. 누가 했을까.",
+    "이 밭의 이랑이 유난히 반듯하다. 오래된 손길.",
+    "호미 옆에 작은 쪽지. '힘들면 쉬어라.'",
+]
+
+# #15 Sensory memory (per action, per tier)
+SENSORY_DATA = {
+    "low": {
+        "물 주기": "차가운 물이 손등을 적신다.",
+        "잡초 뽑기": "풀 냄새가 손에 밴다.",
+        "해충 살피기": "잎 뒤에서 뭔가 꿈틀거린다.",
+        "배수로 정리": "진흙이 장화에 달라붙는다.",
+        "흙 북돋기": "흙이 손톱 사이로 들어온다.",
+        "기다리기": "바람 소리만 들린다.",
+    },
+    "mid": {
+        "물 주기": "물이 흙에 스며드는 소리가 조용하다.",
+        "잡초 뽑기": "뿌리가 끊어지는 감각이 손끝에 남는다.",
+        "해충 살피기": "잎의 뒷면은 생각보다 부드럽다.",
+        "배수로 정리": "물길이 잡히자 흙 냄새가 달라진다.",
+        "흙 북돋기": "차가운 흙 사이로 따뜻한 게 올라온다.",
+        "기다리기": "흙 속에서 아주 작은 소리가 나는 것 같다.",
+    },
+    "high": {
+        "물 주기": "이 물소리는 아버지의 작업복에서 맡았던 냄새와 닮았다.",
+        "잡초 뽑기": "손이 거칠어진다. 아버지의 손등이 떠오른다.",
+        "해충 살피기": "조용히 지키는 일. 이게 매일의 사랑이었구나.",
+        "배수로 정리": "보이지 않는 곳을 돌보는 손길의 온기.",
+        "흙 북돋기": "이 흙에는 누군가의 시간이 켜켜이 쌓여 있다.",
+        "기다리기": "고요 속에서 자라는 것은 당근만이 아니다.",
+    },
+}
+
+# #1 Father day narration pages
+FATHER_DAY_NARRATIONS = {
+    30: [
+        "새벽 4시.\n아직 어두운 하늘 아래, 아버지는 장화를 신었다.\n오늘도 아이는 당근을 먹지 않겠지.\n그래도 물은 줘야 한다.\n이 흙이 기다리니까.",
+        "밭에 도착하면 먼저 하는 일.\n이랑 사이를 걸으며 어젯밤 사이 달라진 것을 살핀다.\n무릎이 아프다.\n하지만 이 당근은 아이의 식탁에 올라갈 것이다.\n그것만으로 충분하다.",
+    ],
+    50: [
+        "오늘은 비가 올 것 같다.\n아버지는 배수로를 미리 정리하고,\n아이가 쓸 장갑을 밭 옆에 놓아 둔다.\n혹시나 하는 마음으로.\n아이는 모르겠지만, 괜찮다.\n알아주길 바라고 한 일이 아니니까.",
+    ],
+}
+
+# #8 Journal retrospective lines
+JOURNAL_RETROSPECTIVES = {
+    "이걸 왜 해야 하는지 아직 모르겠다.": "→ 지금은 안다. 그때의 '모르겠다'가 시작이었다.",
+    "조금씩 알 것 같기도 하다.": "→ 알 것 같다는 느낌이 맞았다.",
+    "이 일의 무게가 느껴진다.": "→ 그 무게는 사랑의 무게였다.",
+    "실수가 잦았다. 아직 모르는 것이 많다.": "→ 서툴렀지만, 포기하지 않았다.",
+    "당근이 많이 힘들어 보였다.": "→ 힘들어 보이는 것도 볼 줄 알게 되었다.",
+    "수분은 적당했다.": "→ '적당함'을 아는 것이 농부의 눈이다.",
+    "오늘 물을 너무 많이 줬다.": "→ 넘치는 것도 부족한 것만큼 해롭다는 걸 배웠다.",
+    "흙이 바짝 말라 있었다.": "→ 마른 흙을 기억하기에, 물의 소중함을 안다.",
 }
 
 STORY_EVENTS = [
@@ -173,6 +296,10 @@ def get_understanding_tier(value):
 
 
 def pick_action_echo(action):
+    # In dad mode, use father echoes
+    if game_state.dad_mode:
+        echoes = FATHER_ECHOES.get(action, [])
+        return random.choice(echoes) if echoes else ""
     tier = get_understanding_tier(game_state.understanding)
     echoes = ACTION_ECHOES.get(action, {}).get(tier, [])
     if echoes:
@@ -181,7 +308,95 @@ def pick_action_echo(action):
 
 
 def pick_failure_echo(action):
-    return FAILURE_ECHOES.get(action, "")
+    echo = FAILURE_ECHOES.get(action, "")
+    # #5 Record lesson
+    if echo and action not in game_state.dad_lessons:
+        game_state.dad_lessons[action] = echo
+    return echo
+
+
+def pick_sensory(action):
+    """#15 Pick a sensory description based on action and understanding tier."""
+    tier = get_understanding_tier(game_state.understanding)
+    return SENSORY_DATA.get(tier, {}).get(action, "")
+
+
+def get_silent_gift():
+    """#12 Get the next silent gift text, or None if all revealed."""
+    idx = game_state.gifts_revealed
+    if idx < len(SILENT_GIFTS):
+        return SILENT_GIFTS[idx]
+    return None
+
+
+def reveal_gift():
+    """#12 Mark next gift as revealed."""
+    game_state.gifts_revealed = min(game_state.gifts_revealed + 1, len(SILENT_GIFTS))
+
+
+def check_recovery(action, is_fail):
+    """#5 Check if player recovered from a previous failure."""
+    if not is_fail and game_state.last_failure_action == action:
+        game_state.recovery_count += 1
+        game_state.last_failure_action = ""
+        lesson = game_state.dad_lessons.get(action, "")
+        if lesson:
+            return f"그때 아버지가 한 말이 맞았다. 이번에는 달랐다."
+    if is_fail:
+        game_state.last_failure_action = action
+    return ""
+
+
+def track_attitude(action, is_fail, is_good_turn):
+    """#11 Track player attitude based on actions."""
+    if action == "기다리기" and not is_fail:
+        game_state.patience_score += 1
+    if action == "기다리기" and is_fail:
+        game_state.rush_count += 1
+    if action == "살펴보기" and is_good_turn:
+        game_state.care_score += 1
+
+
+def get_season(growth, growth_goal):
+    """#7 Get current season based on growth progress."""
+    ratio = growth / max(1, growth_goal)
+    if ratio < 0.22:
+        return "이른 봄"
+    elif ratio < 0.50:
+        return "봄"
+    elif ratio < 0.78:
+        return "여름"
+    else:
+        return "가을"
+
+
+def get_season_colors(growth, growth_goal):
+    """#7 Get palette colors based on season."""
+    season = get_season(growth, growth_goal)
+    if season == "이른 봄":
+        return {
+            "grass": (75, 130, 70), "grass_dark": (55, 105, 50),
+            "dirt": (130, 85, 55), "dirt_dark": (105, 68, 42),
+            "sky_tint": (180, 195, 210),
+        }
+    elif season == "봄":
+        return {
+            "grass": (90, 160, 70), "grass_dark": (70, 130, 50),
+            "dirt": (145, 95, 60), "dirt_dark": (120, 75, 45),
+            "sky_tint": (210, 225, 200),
+        }
+    elif season == "여름":
+        return {
+            "grass": (60, 145, 55), "grass_dark": (45, 115, 40),
+            "dirt": (140, 90, 55), "dirt_dark": (115, 72, 42),
+            "sky_tint": (200, 220, 180),
+        }
+    else:  # 가을
+        return {
+            "grass": (140, 155, 60), "grass_dark": (110, 125, 45),
+            "dirt": (150, 100, 60), "dirt_dark": (125, 80, 48),
+            "sky_tint": (230, 200, 140),
+        }
 
 
 def advance_weather():
@@ -201,3 +416,84 @@ def check_epiphany():
             game_state.pending_epiphany = text
             return True
     return False
+
+
+def check_father_day():
+    """#1 Check if father day interlude should trigger."""
+    u = game_state.understanding
+    for threshold in FATHER_DAY_NARRATIONS:
+        if u >= threshold and threshold not in game_state.father_day_seen:
+            game_state.father_day_seen.add(threshold)
+            return threshold
+    return None
+
+
+def get_attitude_ending():
+    """#11 Determine ending type based on attitude, not just scores."""
+    p = game_state.patience_score
+    c = game_state.care_score
+    e = game_state.empathy_choices
+    r = game_state.recovery_count
+    rush = game_state.rush_count
+    u = game_state.understanding
+    h = game_state.final_health
+    m = game_state.farm_mistakes
+
+    # True ending: high empathy + patience + understanding
+    if u >= 50 and e >= 2 and p >= 3 and h >= 50:
+        return "true"
+    # Happy ending: good stats overall
+    if h >= 70 and m < 4 and u >= 50:
+        return "happy"
+    # Growth ending: many failures but recovered
+    if r >= 3 and u >= 30:
+        return "growth"
+    # Skill ending: good health/score but low empathy
+    if h >= 65 and u >= 35 and e <= 1:
+        return "skill"
+    # Rush ending: too impatient
+    if rush >= 4:
+        return "rush"
+    # Normal ending
+    if h >= 45 and u >= 20:
+        return "normal"
+    # Bad ending
+    return "bad"
+
+
+# #14 Save/Load for 2nd playthrough
+SAVE_PATH = os.path.join(os.path.dirname(__file__), "save_data.json")
+
+
+def save_progress():
+    data = {
+        "completed": True,
+        "ending": game_state.last_ending,
+        "understanding": game_state.understanding,
+        "empathy_choices": game_state.empathy_choices,
+        "patience_score": game_state.patience_score,
+    }
+    try:
+        with open(SAVE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def load_progress():
+    try:
+        if os.path.exists(SAVE_PATH):
+            with open(SAVE_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
+def apply_second_run():
+    """#14 Apply 2nd playthrough state."""
+    data = load_progress()
+    if data and data.get("completed"):
+        game_state.is_second_run = True
+        game_state.prev_ending = data.get("ending", "")
+        game_state.prev_understanding = data.get("understanding", 0)

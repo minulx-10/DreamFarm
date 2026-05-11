@@ -210,22 +210,26 @@ XRRRrrRRRX
 ..XXXXXX..
 ''', 15)
 
-def draw_tiled_background(screen, w, h):
-    screen.fill(GRASS_COLOR)
+def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, dirt_dk=None):
+    gc = grass or GRASS_COLOR
+    gd = grass_dk or GRASS_DARK
+    dc = dirt or DIRT_COLOR
+    dd = dirt_dk or DIRT_DARK
+    screen.fill(gc)
     for y in range(0, h, 40):
         for x in range(0, w, 40):
             if (x+y) % 120 == 0:
-                pygame.draw.rect(screen, GRASS_DARK, (x+10, y+10, 8, 4))
-                pygame.draw.rect(screen, GRASS_DARK, (x+14, y+6, 4, 8))
+                pygame.draw.rect(screen, gd, (x+10, y+10, 8, 4))
+                pygame.draw.rect(screen, gd, (x+14, y+6, 4, 8))
 
     dirt_rect = pygame.Rect(50, 80, w - 100, h - 250)
-    pygame.draw.rect(screen, DIRT_COLOR, dirt_rect)
-    pygame.draw.rect(screen, DIRT_DARK, dirt_rect, 6)
+    pygame.draw.rect(screen, dc, dirt_rect)
+    pygame.draw.rect(screen, dd, dirt_rect, 6)
     
     for y in range(80, h - 170, 40):
-        pygame.draw.line(screen, DIRT_DARK, (50, y), (w-50, y), 2)
+        pygame.draw.line(screen, dd, (50, y), (w-50, y), 2)
     for x in range(50, w - 50, 40):
-        pygame.draw.line(screen, DIRT_DARK, (x, 80), (x, h-170), 2)
+        pygame.draw.line(screen, dd, (x, 80), (x, h-170), 2)
 
 
 def draw_weather_icon(screen, weather, x, y, size=20):

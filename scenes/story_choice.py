@@ -43,6 +43,9 @@ class StoryChoiceScene:
 
     def _apply(self, choice):
         label, effects = choice
+        # #11 Track empathy if this is the compassionate choice (choice_b)
+        if choice == self.choice_b:
+            game_state.empathy_choices += 1
         for key, val in effects.items():
             if key == "understanding":
                 game_state.understanding += val

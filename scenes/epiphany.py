@@ -3,7 +3,6 @@ import pygame
 from core.game_state import game_state
 from core.assets import BLACK, get_font
 
-
 class EpiphanyScene:
     """Fullscreen epiphany moment — dramatic text reveal when understanding crosses a threshold."""
 

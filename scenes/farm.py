@@ -1,9 +1,13 @@
 import pygame
 import random
+import datetime
 from core.game_state import (
     append_josa, game_state, pick_action_echo, pick_failure_echo,
     check_epiphany, advance_weather, get_understanding_stage,
-    WEATHER_DATA, STORY_EVENTS,
+    WEATHER_DATA, STORY_EVENTS, WEATHER_WISDOM, SILENT_GIFTS,
+    pick_sensory, get_silent_gift, reveal_gift, check_recovery,
+    track_attitude, get_season_colors, get_season,
+    check_father_day,
 )
 from core.assets import *
 from core.ui import (
@@ -68,12 +72,28 @@ class FarmScene:
         self.dad_shadow_total = 0
         self.dad_shadow_text = ""
         self.dad_shadow_x = 0
-        self.dad_shadow_phase = "off"  # off, fade_in, hold, fade_out
+        self.dad_shadow_phase = "off"
         # Echo: longer display with panel
         self.echo_text = ""
         self.echo_timer = 0
         # Individual crop growth offsets (randomized per plot)
         self.crop_offsets = [random.randint(-2, 2) for _ in range(6)]
+        # #12 Silent gift display
+        self.gift_text = ""
+        self.gift_timer = 0
+        # #6 Weather wisdom display
+        self.wisdom_text = ""
+        self.wisdom_timer = 0
+        # #13 Wait animation
+        self.wait_phase = "off"  # off, waiting, done
+        self.wait_elapsed = 0
+        self.wait_dots = 0
+        # #7 Seasonal colors cache
+        self.season_colors = get_season_colors(self.growth, self.growth_goal)
+        # #15 Sensory text
+        self.sense_text = game_state.current_sense
+        # #10 Dad mode turn counter
+        self.dad_turns_done = 0
         self.rebuild_buttons()
 
     def rebuild_buttons(self):
@@ -133,7 +153,16 @@ class FarmScene:
                 game_state.understanding += 12
                 game_state.final_health = self.health
                 game_state.farm_mistakes = self.mistakes
-                game_state.current_scene = "ending"
+                # #4 Go to harvest minigame instead of directly to ending
+                game_state.transition_text = (
+                    "[수확의 시간]\n\n"
+                    "이 한 뿌리를 위해 여기까지 왔다.\n"
+                    "조심히, 천천히 뽑아 보자."
+                )
+                game_state.transition_next = "stage4"
+                game_state.is_clear_transition = False
+                game_state.return_scene = "farm"
+                game_state.current_scene = "transition"
             else:
                 self.health -= 8
                 self.stress += 10
@@ -149,6 +178,9 @@ class FarmScene:
         is_fail = "실패" in result or "효과 낮음" in result
         self.apply_field_pressure(difficulty)
         self.apply_weather_effects()
+
+        # #11 Attitude tracking
+        track_attitude(action, is_fail, self.is_good_turn())
 
         # Combo system
         if not is_fail:
@@ -176,21 +208,35 @@ class FarmScene:
                 game_state.understanding += 1
             result += f" 밭일을 이어가며 성장했습니다. (+성장 {gain})"
 
-        # Failure echo (dad's voice)
+        # #5 Failure echo + lesson recording
         if is_fail:
             echo = pick_failure_echo(action)
             if echo:
                 result += f" {echo}"
+        else:
+            # #5 Check recovery from previous failure
+            recovery_msg = check_recovery(action, is_fail)
+            if recovery_msg:
+                self.echo_text = recovery_msg
+                self.echo_timer = 6.0
+
+        # #15 Sensory update
+        if action not in ("살펴보기",):
+            sense = pick_sensory(action)
+            if sense:
+                self.sense_text = sense
+                game_state.current_sense = sense
 
         # Action echo (longer display)
-        if not is_fail and action not in ("살펴보기",):
+        if not is_fail and action not in ("살펴보기",) and not self.echo_text:
             ae = pick_action_echo(action)
             if ae and random.random() < 0.45:
                 self.echo_text = ae
                 self.echo_timer = 6.0
 
         # Dad shadow (smooth fade animation)
-        if not is_fail and random.random() < 0.12 and self.dad_shadow_phase == "off":
+        shadow_chance = 0.20 if game_state.dad_mode else 0.12
+        if not is_fail and random.random() < shadow_chance and self.dad_shadow_phase == "off":
             self.dad_shadow_phase = "fade_in"
             self.dad_shadow_timer = 0
             self.dad_shadow_total = 4.0
@@ -201,16 +247,48 @@ class FarmScene:
                 "아버지가 여기 서 있었던 것 같다.",
             ])
 
+        # #12 Silent gifts every 5 turns
+        if self.day % 5 == 0:
+            gift = get_silent_gift()
+            if gift:
+                self.gift_text = gift
+                self.gift_timer = 5.0
+                reveal_gift()
+
         self.message = result
         self.notice = self.build_notice()
         self.clamp_stats()
+
+        # #7 Update seasonal colors
+        self.season_colors = get_season_colors(self.growth, self.growth_goal)
 
         # Journal every 5 turns
         if self.day % 5 == 0:
             self._write_journal()
 
-        # Priority: epiphany > memory > story > minigame
-        if check_epiphany():
+        # #10 Dad mode turn tracking
+        if game_state.dad_mode:
+            self.dad_turns_done += 1
+            if self.dad_turns_done >= game_state.dad_mode_turns:
+                game_state.dad_mode = False
+                self.dad_turns_done = 0
+                game_state.understanding += 10
+                game_state.transition_text = (
+                    "...\n\n"
+                    "아버지의 하루가 끝났다.\n"
+                    "아이는 모를 것이다. 이 밭의 모든 이랑에\n"
+                    "아버지의 시간이 묻혀 있다는 것을."
+                )
+                game_state.transition_next = "farm"
+                game_state.is_clear_transition = True
+                game_state.current_scene = "transition"
+                return
+
+        # Priority: father_day > epiphany > memory > story > minigame
+        fd = check_father_day()
+        if fd and not game_state.dad_mode:
+            game_state.current_scene = "father_day"
+        elif check_epiphany():
             game_state.current_scene = "epiphany"
         elif game_state.current_scene == "farm":
             self.try_trigger_memory()
@@ -314,7 +392,13 @@ class FarmScene:
         # Weather tick
         game_state.weather_turns_left -= 1
         if game_state.weather_turns_left <= 0:
+            old_weather = game_state.weather
             advance_weather()
+            # #6 Weather wisdom on change
+            new_weather = game_state.weather
+            if new_weather != old_weather and new_weather in WEATHER_WISDOM:
+                self.wisdom_text = WEATHER_WISDOM[new_weather]
+                self.wisdom_timer = 4.0
 
     def apply_weather_effects(self):
         w = WEATHER_DATA.get(game_state.weather, {})
@@ -573,7 +657,7 @@ class FarmScene:
                     self.dad_shadow_phase = "hold"
             elif self.dad_shadow_phase == "hold":
                 self.dad_shadow_alpha = 120
-                self.dad_shadow_x += 0.15 * dt * 60  # slight drift
+                self.dad_shadow_x += 0.15 * dt * 60
                 if t >= fade_out_start:
                     self.dad_shadow_phase = "fade_out"
             elif self.dad_shadow_phase == "fade_out":
@@ -585,6 +669,12 @@ class FarmScene:
         # Echo fade
         if self.echo_timer > 0:
             self.echo_timer -= dt
+        # #12 Gift fade
+        if self.gift_timer > 0:
+            self.gift_timer -= dt
+        # #6 Wisdom fade
+        if self.wisdom_timer > 0:
+            self.wisdom_timer -= dt
 
         if self.health <= 0:
             self.health = 25
@@ -678,15 +768,16 @@ class FarmScene:
         draw_wood_panel(screen, plot_rect)
         inner_plot = plot_rect.inflate(-22, -22)
 
+        sc = self.season_colors
         if self.moisture > 72:
             base_color = (110, 75, 45)
         elif self.moisture < 28:
             base_color = (128, 78, 48)
         else:
-            base_color = DIRT_COLOR
+            base_color = sc["dirt"]
 
         pygame.draw.rect(screen, base_color, inner_plot)
-        pygame.draw.rect(screen, DIRT_DARK, inner_plot, 4)
+        pygame.draw.rect(screen, sc["dirt_dark"], inner_plot, 4)
 
         for y in (inner_plot.y + 72, inner_plot.y + 182):
             pygame.draw.rect(screen, DIRT_DARK, (inner_plot.x + 20, y, inner_plot.w - 40, 56))
@@ -719,8 +810,24 @@ class FarmScene:
                 screen.blit(sprites["bug"], (x, y))
 
     def draw(self, screen):
-        draw_tiled_background(screen, 800, 600)
+        # #7 Seasonal tiled background
+        sc = self.season_colors
+        draw_tiled_background(screen, 800, 600, sc["grass"], sc["grass_dark"],
+                              sc["dirt"], sc["dirt_dark"])
         self.draw_farm_plot(screen)
+
+        # Real-world time tint
+        hour = datetime.datetime.now().hour
+        tint = pygame.Surface((800, 600), pygame.SRCALPHA)
+        if 4 <= hour <= 6:
+            tint.fill((30, 20, 60, 70))
+        elif 17 <= hour <= 19:
+            tint.fill((100, 40, 0, 50))
+        elif hour >= 20 or hour <= 3:
+            tint.fill((10, 15, 30, 100))
+
+        if hour < 7 or hour >= 17:
+            screen.blit(tint, (0, 0))
 
         # Dad shadow overlay with narration
         if self.dad_shadow_alpha > 0:
@@ -738,18 +845,25 @@ class FarmScene:
                 screen.blit(ts, (225 - ts.get_width() // 2, 360))
 
         title_font = get_font(24)
-        # Weather in title bar (drawn icon + text)
-        title = f"{self.day}일째  {game_state.weather}"
-        title_surf = title_font.render(title, True, TEXT_DARK)
+        # #10 Dad mode title
+        if game_state.dad_mode:
+            prefix = "아버지의 밭 "
+        else:
+            prefix = f"{self.day}일째 "
+            
+        prefix_surf = title_font.render(prefix, True, TEXT_DARK)
+        weather_surf = title_font.render(game_state.weather, True, TEXT_DARK)
+        
         title_rect = pygame.Rect(50, 82, 350, 48)
         draw_wood_panel(screen, title_rect)
-        # Center text, then draw weather icon to left of weather name
-        tx = title_rect.centerx - title_surf.get_width() // 2
-        ty = title_rect.centery - title_surf.get_height() // 2
-        screen.blit(title_surf, (tx, ty))
-        # Draw weather icon in the gap (2 spaces before weather name)
-        icon_x = tx + title_font.size(f"{self.day}일째 ")[0]
-        draw_weather_icon(screen, game_state.weather, icon_x, ty + 2, 20)
+        
+        total_w = prefix_surf.get_width() + 25 + weather_surf.get_width()
+        tx = title_rect.centerx - total_w // 2
+        ty = title_rect.centery - prefix_surf.get_height() // 2
+        
+        screen.blit(prefix_surf, (tx, ty))
+        draw_weather_icon(screen, game_state.weather, tx + prefix_surf.get_width(), ty + 2, 20)
+        screen.blit(weather_surf, (tx + prefix_surf.get_width() + 25, ty))
 
         self.draw_field_summary(screen)
         self.draw_meters(screen)
@@ -771,10 +885,15 @@ class FarmScene:
 
         draw_top_bar(screen, show_stats=False)
 
+        # #15 Sensory bar at top
+        if self.sense_text:
+            sf = get_font(13)
+            ss = sf.render(f"[{self.sense_text}]", True, (110, 95, 70))
+            screen.blit(ss, (400 - ss.get_width() // 2, 74))
+
         # Echo text overlay — styled floating panel
         if self.echo_timer > 0 and self.echo_text:
             ef = get_font(17)
-            # Fade: full opacity for first 4s, then fade over 2s
             if self.echo_timer > 2.0:
                 ea = 1.0
             else:
@@ -784,14 +903,40 @@ class FarmScene:
             eh = es.get_height() + 14
             ex = 225 - ew // 2
             ey = 456
-            # Semi-transparent panel background
             panel_surf = pygame.Surface((ew, eh), pygame.SRCALPHA)
             panel_surf.fill((242, 220, 180, int(200 * ea)))
             pygame.draw.rect(panel_surf, (170, 130, 80, int(220 * ea)), (0, 0, ew, eh), 2, border_radius=6)
             screen.blit(panel_surf, (ex, ey))
-            # Text with alpha
             tc = (int(80 * ea), int(60 * ea), int(30 * ea))
             es2 = ef.render(self.echo_text, True, tc)
             screen.blit(es2, (ex + 12, ey + 7))
+
+        # #12 Silent gift overlay
+        if self.gift_timer > 0 and self.gift_text:
+            gf = get_font(16)
+            ga = min(1.0, self.gift_timer / 1.5) if self.gift_timer < 1.5 else 1.0
+            gs = gf.render(self.gift_text, True, (int(160 * ga), int(140 * ga), int(90 * ga)))
+            gw = gs.get_width() + 20
+            gh = gs.get_height() + 10
+            gx = 225 - gw // 2
+            gy = 140
+            gp = pygame.Surface((gw, gh), pygame.SRCALPHA)
+            gp.fill((255, 245, 220, int(180 * ga)))
+            pygame.draw.rect(gp, (180, 150, 100, int(200 * ga)), (0, 0, gw, gh), 2, border_radius=4)
+            screen.blit(gp, (gx, gy))
+            screen.blit(gs, (gx + 10, gy + 5))
+
+        # #6 Weather wisdom overlay
+        if self.wisdom_timer > 0 and self.wisdom_text:
+            wf = get_font(15)
+            wa = min(1.0, self.wisdom_timer / 1.0) if self.wisdom_timer < 1.0 else 1.0
+            ws = wf.render(self.wisdom_text, True, (int(120 * wa), int(100 * wa), int(60 * wa)))
+            screen.blit(ws, (400 - ws.get_width() // 2, 132))
+
+        # #7 Season indicator
+        season_name = get_season(self.growth, self.growth_goal)
+        season_font = get_font(13)
+        season_s = season_font.render(season_name, True, TEXT_MUTED)
+        screen.blit(season_s, (55, 132))
 
         draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")
