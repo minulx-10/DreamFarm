@@ -226,3 +226,39 @@ def draw_tiled_background(screen, w, h):
         pygame.draw.line(screen, DIRT_DARK, (50, y), (w-50, y), 2)
     for x in range(50, w - 50, 40):
         pygame.draw.line(screen, DIRT_DARK, (x, 80), (x, h-170), 2)
+
+
+def draw_weather_icon(screen, weather, x, y, size=20):
+    import math
+    cx, cy = x + size // 2, y + size // 2
+    r = size // 2
+    if weather == '맑음':
+        pygame.draw.circle(screen, (255, 210, 60), (cx, cy), r - 2)
+        pygame.draw.circle(screen, (240, 180, 30), (cx, cy), r - 2, 2)
+        for angle in range(0, 360, 45):
+            dx = int(math.cos(math.radians(angle)) * (r + 1))
+            dy = int(math.sin(math.radians(angle)) * (r + 1))
+            pygame.draw.line(screen, (255, 200, 50), (cx + dx, cy + dy),
+                             (cx + int(dx * 1.4), cy + int(dy * 1.4)), 2)
+    elif weather == '흐림':
+        pygame.draw.ellipse(screen, (180, 180, 190), (x, y + 4, size, size - 6))
+        pygame.draw.ellipse(screen, (160, 160, 170), (x + 4, y, size - 6, size - 4))
+        pygame.draw.ellipse(screen, (200, 200, 210), (x + 2, y + 2, size - 2, size - 6))
+    elif weather == '비':
+        pygame.draw.ellipse(screen, (140, 150, 165), (x, y, size, size // 2))
+        for i in range(3):
+            lx = x + 4 + i * (size // 3)
+            pygame.draw.line(screen, (100, 160, 230), (lx, y + size // 2 + 2),
+                             (lx - 2, y + size - 2), 2)
+    elif weather == '가뭄':
+        pygame.draw.circle(screen, (230, 140, 40), (cx, cy - 2), r - 3)
+        pygame.draw.circle(screen, (200, 100, 20), (cx, cy - 2), r - 3, 2)
+        for i in range(3):
+            wx = x + 2 + i * (size // 3)
+            pygame.draw.line(screen, (180, 80, 20), (wx, y + size - 5),
+                             (wx + 4, y + size - 2), 2)
+    elif weather == '강풍':
+        for i in range(3):
+            ly = y + 3 + i * 6
+            pygame.draw.arc(screen, (120, 150, 130),
+                            (x, ly, size - 4, 8), 0.3, 2.8, 2)

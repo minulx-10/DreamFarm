@@ -1,8 +1,15 @@
 import pygame
 import random
-from core.game_state import append_josa, game_state
+from core.game_state import (
+    append_josa, game_state, pick_action_echo, pick_failure_echo,
+    check_epiphany, advance_weather, get_understanding_stage,
+    WEATHER_DATA, STORY_EVENTS,
+)
 from core.assets import *
-from core.ui import clamp_percent, draw_light_panel, draw_wood_panel, draw_top_bar, draw_bottom_bar
+from core.ui import (
+    clamp_percent, draw_light_panel, draw_wood_panel, draw_top_bar,
+    draw_bottom_bar, draw_understanding_badge,
+)
 
 
 class Button:
@@ -51,6 +58,22 @@ class FarmScene:
         self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
+        # New systems
+        self.combo_count = 0
+        self.story_cooldown = 8
+        self.stories_seen = set()
+        # Dad shadow: smooth fade with drift
+        self.dad_shadow_alpha = 0
+        self.dad_shadow_timer = 0
+        self.dad_shadow_total = 0
+        self.dad_shadow_text = ""
+        self.dad_shadow_x = 0
+        self.dad_shadow_phase = "off"  # off, fade_in, hold, fade_out
+        # Echo: longer display with panel
+        self.echo_text = ""
+        self.echo_timer = 0
+        # Individual crop growth offsets (randomized per plot)
+        self.crop_offsets = [random.randint(-2, 2) for _ in range(6)]
         self.rebuild_buttons()
 
     def rebuild_buttons(self):
@@ -123,7 +146,22 @@ class FarmScene:
         self.last_action = action
         difficulty = 1 + self.growth // 6
         result = self.apply_action(action, difficulty)
+        is_fail = "실패" in result or "효과 낮음" in result
         self.apply_field_pressure(difficulty)
+        self.apply_weather_effects()
+
+        # Combo system
+        if not is_fail:
+            self.combo_count += 1
+        else:
+            self.combo_count = 0
+        if self.combo_count == 3:
+            result += " 감이 잡히는 듯하다."
+            self.growth += 1
+        elif self.combo_count == 5:
+            result += " 아버지의 리듬이 느껴진다."
+            game_state.understanding += 3
+            self.combo_count = 0
 
         if self.health <= 20:
             self.mistakes += 1
@@ -138,10 +176,46 @@ class FarmScene:
                 game_state.understanding += 1
             result += f" 밭일을 이어가며 성장했습니다. (+성장 {gain})"
 
+        # Failure echo (dad's voice)
+        if is_fail:
+            echo = pick_failure_echo(action)
+            if echo:
+                result += f" {echo}"
+
+        # Action echo (longer display)
+        if not is_fail and action not in ("살펴보기",):
+            ae = pick_action_echo(action)
+            if ae and random.random() < 0.45:
+                self.echo_text = ae
+                self.echo_timer = 6.0
+
+        # Dad shadow (smooth fade animation)
+        if not is_fail and random.random() < 0.12 and self.dad_shadow_phase == "off":
+            self.dad_shadow_phase = "fade_in"
+            self.dad_shadow_timer = 0
+            self.dad_shadow_total = 4.0
+            self.dad_shadow_x = random.choice([85, 130, 280, 320])
+            self.dad_shadow_text = random.choice([
+                "같은 동작을 반복하던 누군가의 뒷모습이 스쳐 지나간다.",
+                "어디선가 익숙한 손길이 느껴졌다.",
+                "아버지가 여기 서 있었던 것 같다.",
+            ])
+
         self.message = result
         self.notice = self.build_notice()
         self.clamp_stats()
-        self.try_trigger_memory()
+
+        # Journal every 5 turns
+        if self.day % 5 == 0:
+            self._write_journal()
+
+        # Priority: epiphany > memory > story > minigame
+        if check_epiphany():
+            game_state.current_scene = "epiphany"
+        elif game_state.current_scene == "farm":
+            self.try_trigger_memory()
+        if game_state.current_scene == "farm":
+            self.try_trigger_story()
         if game_state.current_scene == "farm":
             self.try_trigger_minigame(action)
         self.rebuild_buttons()
@@ -236,6 +310,55 @@ class FarmScene:
             self.health -= 6 + difficulty
         if random.random() < 0.18 + difficulty * 0.04:
             self.drainage -= random.randint(4, 10)
+
+        # Weather tick
+        game_state.weather_turns_left -= 1
+        if game_state.weather_turns_left <= 0:
+            advance_weather()
+
+    def apply_weather_effects(self):
+        w = WEATHER_DATA.get(game_state.weather, {})
+        self.moisture += w.get("moisture", 0)
+        self.stress += w.get("stress", 0)
+        self.drainage += w.get("drainage", 0)
+        self.health += w.get("health", 0)
+        self.pests += w.get("pests", 0)
+
+    def try_trigger_story(self):
+        if self.story_cooldown > 0:
+            self.story_cooldown -= 1
+            return
+        if random.random() > 0.15:
+            return
+        available = [e for i, e in enumerate(STORY_EVENTS) if i not in self.stories_seen]
+        if not available:
+            return
+        event = random.choice(available)
+        self.stories_seen.add(STORY_EVENTS.index(event))
+        self.story_cooldown = 10
+        game_state.choice_data = event
+        game_state.current_scene = "story_choice"
+
+    def _write_journal(self):
+        lines = [f"[{self.day}일째 일지]"]
+        if self.moisture > 75:
+            lines.append("오늘 물을 너무 많이 줬다.")
+        elif self.moisture < 25:
+            lines.append("흙이 바짝 말라 있었다.")
+        else:
+            lines.append("수분은 적당했다.")
+        if self.health < 45:
+            lines.append("당근이 많이 힘들어 보였다.")
+        if self.mistakes > 3:
+            lines.append("실수가 잦았다. 아직 모르는 것이 많다.")
+        u = game_state.understanding
+        if u < 20:
+            lines.append("이걸 왜 해야 하는지 아직 모르겠다.")
+        elif u < 40:
+            lines.append("조금씩 알 것 같기도 하다.")
+        else:
+            lines.append("이 일의 무게가 느껴진다.")
+        game_state.journal_entries.append("\n".join(lines))
 
     def is_good_turn(self):
         return (
@@ -406,11 +529,11 @@ class FarmScene:
 
         candidates = []
         if self.weeds > 52:
-            candidates.append(("stage1", 1, "[돌발 상황]\n\n밭에 씨앗과 잡동사니가 뒤섞였습니다.\n필요한 것만 골라 밭을 다시 정리하세요."))
+            candidates.append(("stage1", 1, "[돌발 상황]\n\n밭에 씨앗과 잡동사니가 뒤섞였습니다.\n아버지는 이걸 매일 새벽 혼자 했다.\n이번에는 내가 골라 본다."))
         if self.moisture < 38 or action == "물 주기":
-            candidates.append(("stage2", 3, "[돌발 상황]\n\n흙이 갑자기 물을 빨아들입니다.\n타이밍을 맞춰 알맞은 만큼만 물을 주세요."))
+            candidates.append(("stage2", 3, "[돌발 상황]\n\n흙이 갑자기 물을 빨아들입니다.\n물은 정성껏, 너무 많지도 적지도 않게.\n아버지의 손끝을 떠올리며 맞춰 본다."))
         if self.pests > 34 or self.health < 55:
-            candidates.append(("stage3", 3, "[돌발 상황]\n\n잎 아래에서 해충이 한꺼번에 튀어나왔습니다.\n빠르게 눌러 작물을 지켜내세요."))
+            candidates.append(("stage3", 3, "[돌발 상황]\n\n잎을 뒤집자 해충이 보였다.\n아버지는 이걸 맨손으로 했다.\n이번에는 내가 지켜 본다."))
 
         if not candidates:
             return
@@ -437,6 +560,32 @@ class FarmScene:
         self.minigame_cooldown = 7 if mg == "stage1" else 5
 
     def update(self, dt):
+        # Dad shadow smooth animation
+        if self.dad_shadow_phase != "off":
+            self.dad_shadow_timer += dt
+            t = self.dad_shadow_timer
+            total = self.dad_shadow_total
+            fade_in_dur = 0.8
+            fade_out_start = total - 1.0
+            if self.dad_shadow_phase == "fade_in":
+                self.dad_shadow_alpha = int(min(120, (t / fade_in_dur) * 120))
+                if t >= fade_in_dur:
+                    self.dad_shadow_phase = "hold"
+            elif self.dad_shadow_phase == "hold":
+                self.dad_shadow_alpha = 120
+                self.dad_shadow_x += 0.15 * dt * 60  # slight drift
+                if t >= fade_out_start:
+                    self.dad_shadow_phase = "fade_out"
+            elif self.dad_shadow_phase == "fade_out":
+                remaining = max(0, total - t)
+                self.dad_shadow_alpha = int(120 * (remaining / 1.0))
+                if t >= total:
+                    self.dad_shadow_phase = "off"
+                    self.dad_shadow_alpha = 0
+        # Echo fade
+        if self.echo_timer > 0:
+            self.echo_timer -= dt
+
         if self.health <= 0:
             self.health = 25
             self.stress = 45
@@ -477,7 +626,8 @@ class FarmScene:
         screen.blit(title, (450, 96))
 
         self.draw_labeled_meter(screen, "성장", self.growth, self.growth_goal, 450, 123, 130, (235, 150, 55))
-        self.draw_labeled_meter(screen, "이해도", game_state.understanding, 60, 600, 123, 125, (120, 180, 90))
+        # Understanding badge (moon + stage name) instead of numeric bar
+        draw_understanding_badge(screen, 600, 123, 125)
 
         status_font = get_font(16)
         health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_DARK)
@@ -498,22 +648,26 @@ class FarmScene:
     def crop_positions(self):
         return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
 
-    def draw_crop(self, screen, x, y, growth_stage):
+    def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         mound = pygame.Rect(x - 24, y + 32, 48, 16)
         pygame.draw.rect(screen, DIRT_DARK, mound)
         pygame.draw.rect(screen, DIRT_COLOR, mound.inflate(-8, -6))
 
-        if growth_stage <= 0:
+        # Individual growth variation per crop
+        offset_val = self.crop_offsets[crop_idx] if crop_idx < len(self.crop_offsets) else 0
+        adj_stage = max(0, growth_stage + offset_val)
+
+        if adj_stage <= 0:
             return
-        if growth_stage < 5:
+        if adj_stage < 5:
             sprite, offset = sprites["seed"], (-15, 21)
-        elif growth_stage < 10:
+        elif adj_stage < 10:
             sprite, offset = sprites["sprout1"], (-15, 9)
-        elif growth_stage < 16:
+        elif adj_stage < 16:
             sprite, offset = sprites["sprout2"], (-20, -2)
-        elif growth_stage < 23:
+        elif adj_stage < 23:
             sprite, offset = sprites["sprout3"], (-22, -12)
-        elif growth_stage < self.growth_goal:
+        elif adj_stage < self.growth_goal:
             sprite, offset = sprites["sprout4"], (-24, -18)
         else:
             sprite, offset = sprites["carrot"], (-24, -45)
@@ -549,8 +703,8 @@ class FarmScene:
                 pygame.draw.rect(screen, (95, 130, 150), (x, inner_plot.y + 214, 36, 8))
 
         growth_stage = max(0, min(self.growth, self.growth_goal))
-        for x, y in self.crop_positions():
-            self.draw_crop(screen, x, y, growth_stage)
+        for idx, (x, y) in enumerate(self.crop_positions()):
+            self.draw_crop(screen, x, y, growth_stage, idx)
 
         if self.weeds > 32:
             weed_count = 2 if self.weeds < 55 else 4
@@ -568,18 +722,34 @@ class FarmScene:
         draw_tiled_background(screen, 800, 600)
         self.draw_farm_plot(screen)
 
+        # Dad shadow overlay with narration
+        if self.dad_shadow_alpha > 0:
+            dad = sprites["dad"]
+            shadow_surf = dad.copy()
+            shadow_surf.set_alpha(self.dad_shadow_alpha)
+            sx = int(self.dad_shadow_x)
+            screen.blit(shadow_surf, (sx, 200))
+            # Shadow narration text
+            if self.dad_shadow_text and self.dad_shadow_alpha > 30:
+                sf = get_font(15)
+                ta = min(self.dad_shadow_alpha, 160)
+                tc = (int(ta * 0.5), int(ta * 0.45), int(ta * 0.3))
+                ts = sf.render(self.dad_shadow_text, True, tc)
+                screen.blit(ts, (225 - ts.get_width() // 2, 360))
+
         title_font = get_font(24)
-        title = f"{self.day}일째: 꿈속 당근밭"
+        # Weather in title bar (drawn icon + text)
+        title = f"{self.day}일째  {game_state.weather}"
         title_surf = title_font.render(title, True, TEXT_DARK)
         title_rect = pygame.Rect(50, 82, 350, 48)
         draw_wood_panel(screen, title_rect)
-        screen.blit(
-            title_surf,
-            (
-                title_rect.centerx - title_surf.get_width() // 2,
-                title_rect.centery - title_surf.get_height() // 2,
-            ),
-        )
+        # Center text, then draw weather icon to left of weather name
+        tx = title_rect.centerx - title_surf.get_width() // 2
+        ty = title_rect.centery - title_surf.get_height() // 2
+        screen.blit(title_surf, (tx, ty))
+        # Draw weather icon in the gap (2 spaces before weather name)
+        icon_x = tx + title_font.size(f"{self.day}일째 ")[0]
+        draw_weather_icon(screen, game_state.weather, icon_x, ty + 2, 20)
 
         self.draw_field_summary(screen)
         self.draw_meters(screen)
@@ -588,8 +758,40 @@ class FarmScene:
         action_title = get_font(20).render("오늘 할 일", True, TEXT_DARK)
         screen.blit(action_title, (450, 306))
 
+        # Weather forecast (drawn icon + text, no emoji)
+        forecast_font = get_font(14)
+        fc_text = f"예보: {game_state.next_weather}"
+        fc = forecast_font.render(fc_text, True, TEXT_MUTED)
+        fc_x = 738 - fc.get_width()
+        screen.blit(fc, (fc_x, 308))
+        draw_weather_icon(screen, game_state.next_weather, fc_x - 22, 306, 16)
+
         for btn in self.buttons:
             btn.draw(screen)
 
         draw_top_bar(screen, show_stats=False)
+
+        # Echo text overlay — styled floating panel
+        if self.echo_timer > 0 and self.echo_text:
+            ef = get_font(17)
+            # Fade: full opacity for first 4s, then fade over 2s
+            if self.echo_timer > 2.0:
+                ea = 1.0
+            else:
+                ea = self.echo_timer / 2.0
+            es = ef.render(self.echo_text, True, TEXT_DARK)
+            ew = es.get_width() + 24
+            eh = es.get_height() + 14
+            ex = 225 - ew // 2
+            ey = 456
+            # Semi-transparent panel background
+            panel_surf = pygame.Surface((ew, eh), pygame.SRCALPHA)
+            panel_surf.fill((242, 220, 180, int(200 * ea)))
+            pygame.draw.rect(panel_surf, (170, 130, 80, int(220 * ea)), (0, 0, ew, eh), 2, border_radius=6)
+            screen.blit(panel_surf, (ex, ey))
+            # Text with alpha
+            tc = (int(80 * ea), int(60 * ea), int(30 * ea))
+            es2 = ef.render(self.echo_text, True, tc)
+            screen.blit(es2, (ex + 12, ey + 7))
+
         draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")

@@ -14,6 +14,8 @@ from scenes.stage1_sort import Stage1Scene
 from scenes.stage2_water import Stage2Scene
 from scenes.stage3_pest import Stage3Scene
 from scenes.ending import EndingScene
+from scenes.epiphany import EpiphanyScene
+from scenes.story_choice import StoryChoiceScene
 
 def main():
     pygame.init()
@@ -33,7 +35,9 @@ def main():
         "stage1": Stage1Scene(),
         "stage2": Stage2Scene(),
         "stage3": Stage3Scene(),
-        "ending": EndingScene()
+        "ending": EndingScene(),
+        "epiphany": EpiphanyScene(),
+        "story_choice": StoryChoiceScene(),
     }
 
     current_scene_obj = scenes[game_state.current_scene]
@@ -51,6 +55,8 @@ def main():
             elif target_scene == "ending": scenes["ending"] = EndingScene()
             elif target_scene == "intro": scenes["intro"] = IntroScene()
             elif target_scene == "memory": scenes["memory"] = MemoryScene()
+            elif target_scene == "epiphany": scenes["epiphany"] = EpiphanyScene()
+            elif target_scene == "story_choice": scenes["story_choice"] = StoryChoiceScene()
             
             current_scene_obj = scenes[target_scene]
 

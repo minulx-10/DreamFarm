@@ -5,6 +5,8 @@ from core.ui import draw_light_panel, wrap_text
 
 
 class MemoryScene:
+    """Memory/flashback scene with fade-to-monochrome transition effect."""
+
     def __init__(self):
         self.font_title = get_font(26)
         self.font = get_font(20)
@@ -15,6 +17,10 @@ class MemoryScene:
         self.char_delay = 0.065
         self.finished = False
         self.text_to_print = self.prepare_text(game_state.memory_text)
+        # Transition effect
+        self.phase = "fade_in"
+        self.transition_alpha = 255
+        self.exit_flash = 0
 
     def prepare_text(self, text):
         lines = []
@@ -34,10 +40,23 @@ class MemoryScene:
                     self.printed_text = self.text_to_print
                     self.char_idx = len(self.text_to_print)
                     self.finished = True
-                else:
-                    game_state.current_scene = game_state.memory_next
+                elif self.phase != "fade_out":
+                    self.phase = "fade_out"
+                    self.exit_flash = 180
 
     def update(self, dt):
+        if self.phase == "fade_in":
+            self.transition_alpha = max(0, self.transition_alpha - 280 * dt)
+            if self.transition_alpha <= 0:
+                self.transition_alpha = 0
+                self.phase = "show"
+        elif self.phase == "fade_out":
+            self.exit_flash = max(0, self.exit_flash - 300 * dt)
+            self.transition_alpha = min(255, self.transition_alpha + 200 * dt)
+            if self.transition_alpha >= 255:
+                game_state.current_scene = game_state.memory_next
+            return
+
         if self.finished:
             return
 
@@ -51,11 +70,19 @@ class MemoryScene:
                 self.finished = True
 
     def draw(self, screen):
-        screen.fill((18, 15, 24))
+        # Desaturated background (monochrome feel)
+        screen.fill((22, 20, 28))
 
         for y in range(0, 600, 18):
-            shade = 24 + (y // 18) % 2 * 8
-            pygame.draw.rect(screen, (shade, shade - 5, shade + 8), (0, y, 800, 18))
+            shade = 26 + (y // 18) % 2 * 6
+            pygame.draw.rect(screen, (shade, shade - 2, shade + 4), (0, y, 800, 18))
+
+        # Vignette corners
+        for corner_x, corner_y in [(0, 0), (700, 0), (0, 500), (700, 500)]:
+            vig = pygame.Surface((100, 100), pygame.SRCALPHA)
+            for r in range(100, 0, -2):
+                pygame.draw.circle(vig, (0, 0, 0, 3), (50, 50), r)
+            screen.blit(vig, (corner_x, corner_y))
 
         panel = pygame.Rect(70, 85, 660, 430)
         draw_light_panel(screen, panel)
@@ -76,3 +103,15 @@ class MemoryScene:
         if self.finished:
             prompt = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 470))
+
+        # Fade overlay
+        if self.transition_alpha > 0:
+            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, int(self.transition_alpha)))
+            screen.blit(overlay, (0, 0))
+
+        # Exit flash (brief white flash when leaving memory)
+        if self.exit_flash > 0:
+            flash = pygame.Surface((800, 600), pygame.SRCALPHA)
+            flash.fill((255, 255, 255, int(self.exit_flash)))
+            screen.blit(flash, (0, 0))
