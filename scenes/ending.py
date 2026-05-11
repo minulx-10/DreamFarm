@@ -11,7 +11,7 @@ class EndingScene:
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
-        self.char_delay = 0.04
+        self.char_delay = 0.065
         self.finished = False
         self.ending_data = self.get_ending()
         self.pages = self.build_pages()

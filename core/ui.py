@@ -35,6 +35,12 @@ def wrap_text(text, font, max_width, max_lines=None):
     return lines
 
 
+def clamp_percent(value, max_value=100):
+    if max_value <= 0:
+        return 0
+    return max(0, min(1, value / max_value))
+
+
 def draw_multiline_text(screen, text, font, color, x, y, max_width, line_gap=4, max_lines=None):
     lines = wrap_text(text, font, max_width, max_lines)
     for i, line in enumerate(lines):

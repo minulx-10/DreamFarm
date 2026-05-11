@@ -38,14 +38,14 @@ class SortItem:
 
 class Stage1Scene:
     def __init__(self):
-        game_state.timer = 40.0
+        game_state.timer = 24.0
         game_state.score = 0
         self.items = []
         
-        for _ in range(5): self.spawn_item('seed')
-        for _ in range(3): self.spawn_item('weed')
-        for _ in range(3): self.spawn_item('rock')
-        for _ in range(2): self.spawn_item('leaf')
+        for _ in range(6): self.spawn_item('seed')
+        for _ in range(4): self.spawn_item('weed')
+        for _ in range(4): self.spawn_item('rock')
+        for _ in range(3): self.spawn_item('leaf')
             
         self.dragged_item = None
         self.bin_keep = pygame.Rect(140, 400, 120, 120)
@@ -78,7 +78,7 @@ class Stage1Scene:
                         game_state.score += 100
                         self.hovered_desc = "좋습니다. 씨앗이 제자리를 찾았습니다."
                     else:
-                        game_state.score -= 50
+                        game_state.score -= 80
                         self.hovered_desc = "이건 밭에 두면 당근이 자라기 어렵습니다."
                     self.items.remove(self.dragged_item)
                 elif self.bin_trash.collidepoint(event.pos):
@@ -86,7 +86,7 @@ class Stage1Scene:
                         game_state.score += 100
                         self.hovered_desc = "잘 치웠습니다. 흙이 한결 깨끗해졌습니다."
                     else:
-                        game_state.score -= 50
+                        game_state.score -= 80
                         self.hovered_desc = "씨앗까지 버리면 수확할 것이 없어집니다."
                     self.items.remove(self.dragged_item)
                 self.dragged_item = None

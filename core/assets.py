@@ -98,13 +98,14 @@ def init_sprites():
 ...XX...
 ''', 5)
     sprites['weed'] = create_sprite_from_string('''
-...X.X...
-..XGXGX..
-.XGGGGGX.
-.XgGgGgX.
-..XgggX..
+....X....
+..X.X.X..
+.XGgGgGX.
+..XgGgX..
+.XGgXgGX.
 ...XgX...
 ...XgX...
+..XgXgX..
 ''', 5)
     sprites['rock'] = create_sprite_from_string('''
 ..XXXX..

@@ -1,40 +1,29 @@
 import pygame
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
-from core.ui import draw_light_panel
+from core.ui import draw_light_panel, wrap_text
 
 
 class MemoryScene:
     def __init__(self):
         self.font_title = get_font(26)
-        self.font = get_font(22)
+        self.font = get_font(20)
         self.font_small = get_font(18)
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
-        self.char_delay = 0.04
+        self.char_delay = 0.065
         self.finished = False
-        self.text_to_print = self.wrap_text(game_state.memory_text, self.font, 640)
+        self.text_to_print = self.prepare_text(game_state.memory_text)
 
-    def wrap_text(self, text, font, max_width):
-        wrapped_text = ""
-        current_line = ""
-        for char in text:
-            if char == "\n":
-                wrapped_text += current_line + "\n"
-                current_line = ""
-                continue
-
-            test_line = current_line + char
-            if font.size(test_line)[0] <= max_width:
-                current_line = test_line
+    def prepare_text(self, text):
+        lines = []
+        for paragraph in text.split("\n"):
+            if not paragraph:
+                lines.append("")
             else:
-                wrapped_text += current_line + "\n"
-                current_line = char if char != " " else ""
-
-        if current_line:
-            wrapped_text += current_line
-        return wrapped_text
+                lines.extend(wrap_text(paragraph, self.font, 560))
+        return "\n".join(lines)
 
     def handle_events(self, events):
         for event in events:
@@ -68,22 +57,22 @@ class MemoryScene:
             shade = 24 + (y // 18) % 2 * 8
             pygame.draw.rect(screen, (shade, shade - 5, shade + 8), (0, y, 800, 18))
 
-        panel = pygame.Rect(70, 95, 660, 410)
+        panel = pygame.Rect(70, 85, 660, 430)
         draw_light_panel(screen, panel)
 
         title = game_state.memory_title or "짧은 회상"
         title_surf = self.font_title.render(title, True, TEXT_DARK)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 130))
 
-        line = pygame.Rect(120, 175, 560, 3)
+        line = pygame.Rect(120, 170, 560, 3)
         pygame.draw.rect(screen, WOOD_LIGHT, line)
 
-        y = 210
+        y = 205
         for text_line in self.printed_text.split("\n"):
             surf = self.font.render(text_line, True, TEXT_DARK)
-            screen.blit(surf, (100, y))
-            y += 32
+            screen.blit(surf, (120, y))
+            y += 29
 
         if self.finished:
             prompt = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, TEXT_MUTED)
-            screen.blit(prompt, (400 - prompt.get_width() // 2, 455))
+            screen.blit(prompt, (400 - prompt.get_width() // 2, 470))

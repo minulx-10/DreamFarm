@@ -13,7 +13,7 @@ class IntroScene:
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
-        self.char_delay = 0.04
+        self.char_delay = 0.065
         self.finished = False
         self.text_to_print = self.prepare_page(self.page_index)
 

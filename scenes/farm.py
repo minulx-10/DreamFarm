@@ -2,7 +2,7 @@ import pygame
 import random
 from core.game_state import append_josa, game_state
 from core.assets import *
-from core.ui import draw_light_panel, draw_wood_panel, draw_top_bar, draw_bottom_bar
+from core.ui import clamp_percent, draw_light_panel, draw_wood_panel, draw_top_bar, draw_bottom_bar
 
 
 class Button:
@@ -43,8 +43,8 @@ class FarmScene:
         self.stress = 0
         self.actions_taken = 0
         self.last_action = ""
-        self.message = "꿈속의 밭은 조용하지만, 흙은 이미 목이 말라 보입니다."
-        self.notice = "상태를 살피며 당근을 수확까지 키우세요."
+        self.message = "상태를 확인하세요."
+        self.notice = "추천 행동: 살펴보기"
         self.memory_cooldown = 2
         self.memories_seen = set()
         self.buttons = []
@@ -109,8 +109,8 @@ class FarmScene:
             else:
                 self.health -= 8
                 self.stress += 10
-                self.message = "아직 뽑기에는 이릅니다. 잎이 힘없이 흔들립니다."
-                self.notice = "수확은 성장과 건강이 충분할 때 시도하세요."
+                self.message = "아직 성장 수치가 부족합니다."
+                self.notice = "추천 행동: 수확하지 말고 밭 상태를 먼저 회복하세요."
             return
 
         self.actions_taken += 1
@@ -149,62 +149,62 @@ class FarmScene:
                 self.moisture += 34
                 self.health += 4
                 self.stress = max(0, self.stress - 6)
-                return "마른 흙이 물을 천천히 머금습니다."
+                return "물 주기 성공: 수분이 회복되었습니다."
             if self.moisture > 70:
                 self.moisture += 18
                 self.health -= 12 + difficulty
                 self.stress += 10
-                return "이미 젖은 흙에 물이 고였습니다. 뿌리가 답답해 보입니다."
+                return "물 주기 실패: 수분이 너무 높아 건강이 감소했습니다."
             self.moisture += 18
             self.health += 0
-            return "알맞게 물을 주었습니다. 잎 끝이 조금 살아납니다."
+            return "물 주기 완료: 수분이 증가했습니다."
 
         if action == "잡초 뽑기":
             if self.weeds > 20:
                 self.weeds -= 34
                 self.health += 3
-                return "잡초를 뽑아내자 당근 주변에 숨 쉴 틈이 생겼습니다."
+                return "잡초 뽑기 성공: 잡초 수치가 크게 감소했습니다."
             self.health -= 5
             self.stress += 6
-            return "뽑을 잡초가 거의 없습니다. 괜히 흙만 뒤흔들었습니다."
+            return "잡초 뽑기 실패: 잡초가 적어 건강이 감소했습니다."
 
         if action == "해충 살피기":
             if self.pests > 18:
                 self.pests -= 32
                 self.health += 3
-                return "잎 아래 숨어 있던 해충을 미리 털어냈습니다."
+                return "해충 살피기 성공: 해충 수치가 감소했습니다."
             self.stress = max(0, self.stress - 2)
-            return "큰 해충은 보이지 않습니다. 대신 잎 상태를 차분히 확인했습니다."
+            return "해충 살피기 완료: 큰 해충은 없습니다."
 
         if action == "배수로 정리":
             if self.moisture > 68 or self.drainage < 45:
                 self.moisture -= 22
                 self.drainage += 22
                 self.health += 1
-                return "고인 물길을 터 주자 흙냄새가 한결 가벼워졌습니다."
+                return "배수로 정리 성공: 수분이 낮아지고 배수가 회복되었습니다."
             self.drainage += 8
             self.stress += 5
-            return "지금은 물길보다 흙 상태를 먼저 보는 편이 나아 보입니다."
+            return "배수로 정리 효과 낮음: 지금은 다른 행동이 더 필요합니다."
 
         if action == "흙 북돋기":
             if self.health < 65 or self.stress > 24:
                 self.health += 8
                 self.stress = max(0, self.stress - 10)
                 self.drainage += 4
-                return "흙을 살짝 북돋우자 기울던 줄기가 다시 중심을 잡습니다."
+                return "흙 북돋기 성공: 건강과 스트레스가 회복되었습니다."
             self.health += 2
             self.moisture -= 4
-            return "흙을 다듬었습니다. 큰 변화는 없지만 밭이 단정해졌습니다."
+            return "흙 북돋기 완료: 변화는 작습니다."
 
         if action == "기다리기":
             if self.is_good_turn():
                 self.moisture -= 8
-                return "손대지 않고 기다리자 당근이 조용히 뿌리를 내립니다."
+                return "기다리기 성공: 안정 상태라 성장이 진행됩니다."
             self.health -= 8 + difficulty
             self.stress += 8
-            return "기다리는 사이 밭의 문제가 더 커졌습니다."
+            return "기다리기 실패: 문제가 있는 상태라 건강이 감소했습니다."
 
-        return "잠시 밭을 둘러보았습니다."
+        return "행동을 처리했습니다."
 
     def apply_field_pressure(self, difficulty):
         self.day += 1
@@ -237,38 +237,38 @@ class FarmScene:
     def inspect_message(self):
         warnings = []
         if self.moisture < 30:
-            warnings.append("흙이 바짝 말랐습니다")
+            warnings.append("수분 부족")
         elif self.moisture > 72:
-            warnings.append("물이 조금 고여 있습니다")
+            warnings.append("수분 과다")
         if self.weeds > 45:
-            warnings.append("잡초가 뿌리 가까이 번졌습니다")
+            warnings.append("잡초 많음")
         if self.pests > 38:
-            warnings.append("잎 아래에서 작은 움직임이 보입니다")
+            warnings.append("해충 많음")
         if self.health < 50:
-            warnings.append("줄기가 힘을 잃고 있습니다")
+            warnings.append("건강 낮음")
         if self.drainage < 35:
-            warnings.append("물길이 막혀 있습니다")
+            warnings.append("배수 낮음")
 
         if not warnings:
-            return "밭은 안정적입니다. 지금은 기다려도 괜찮아 보입니다."
-        return "살펴보니 " + ", ".join(warnings[:2]) + "."
+            return "상태 확인: 밭이 안정적입니다."
+        return "상태 확인: " + ", ".join(warnings[:3]) + "."
 
     def build_notice(self):
         if self.growth >= self.growth_goal:
-            return "수확할 수 있습니다. 건강이 너무 낮아지기 전에 거두세요."
+            return "추천 행동: 수확하기"
         if self.health < 45:
-            return "작물이 약해졌습니다. 흙 북돋기로 회복시키는 편이 좋습니다."
+            return "추천 행동: 흙 북돋기"
         if self.moisture < 30:
-            return "흙이 말랐습니다. 물 주기를 우선 고민하세요."
+            return "추천 행동: 물 주기"
         if self.moisture > 72:
-            return "흙이 젖었습니다. 배수로를 정리하면 안정됩니다."
+            return "추천 행동: 배수로 정리"
         if self.weeds > 50:
-            return "잡초가 번졌습니다. 오래 두면 건강이 깎입니다."
+            return "추천 행동: 잡초 뽑기"
         if self.pests > 42:
-            return "해충 조짐이 큽니다. 잎 아래를 살펴야 합니다."
+            return "추천 행동: 해충 살피기"
         if self.is_good_turn():
-            return "밭이 안정적입니다. 기다리면 성장하기 좋은 흐름입니다."
-        return "한 가지 문제가 커지기 전에 균형을 맞추세요."
+            return "추천 행동: 기다리기"
+        return "추천 행동: 살펴보기"
 
     def grade_text(self, value, low_bad=True):
         if low_bad:
@@ -413,12 +413,12 @@ class FarmScene:
             self.rebuild_buttons()
 
     def draw_status_meter(self, screen, label, value, x, y, color):
-        font = get_font(18)
+        font = get_font(17)
         label_surf = font.render(label, True, BLACK)
         screen.blit(label_surf, (x, y - 2))
-        bar = pygame.Rect(x + 62, y, 175, 16)
+        bar = pygame.Rect(x + 58, y, 155, 15)
         pygame.draw.rect(screen, (70, 55, 40), bar)
-        fill = pygame.Rect(bar.x + 2, bar.y + 2, int((bar.w - 4) * value / 100), bar.h - 4)
+        fill = pygame.Rect(bar.x + 2, bar.y + 2, int((bar.w - 4) * clamp_percent(value)), bar.h - 4)
         pygame.draw.rect(screen, color, fill)
         pygame.draw.rect(screen, BLACK, bar, 2)
 
@@ -430,7 +430,7 @@ class FarmScene:
         screen.blit(value_surf, (x + w - value_surf.get_width(), y - 1))
 
         bar = pygame.Rect(x, y + 22, w, 15)
-        fill_w = int((bar.w - 4) * max(0, min(value, max_value)) / max_value)
+        fill_w = int((bar.w - 4) * clamp_percent(value, max_value))
         pygame.draw.rect(screen, (82, 62, 42), bar)
         pygame.draw.rect(screen, color, (bar.x + 2, bar.y + 2, fill_w, bar.h - 4))
         pygame.draw.rect(screen, TEXT_DARK, bar, 2)
@@ -465,9 +465,9 @@ class FarmScene:
         return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
 
     def draw_crop(self, screen, x, y, growth_stage):
-        mound = pygame.Rect(x - 34, y + 30, 68, 24)
-        pygame.draw.ellipse(screen, DIRT_DARK, mound)
-        pygame.draw.ellipse(screen, DIRT_COLOR, mound.inflate(-8, -6))
+        mound = pygame.Rect(x - 24, y + 32, 48, 16)
+        pygame.draw.rect(screen, DIRT_DARK, mound)
+        pygame.draw.rect(screen, DIRT_COLOR, mound.inflate(-8, -6))
 
         if growth_stage <= 0:
             return
@@ -500,10 +500,11 @@ class FarmScene:
         pygame.draw.rect(screen, base_color, inner_plot)
         pygame.draw.rect(screen, DIRT_DARK, inner_plot, 4)
 
-        for y in (inner_plot.y + 82, inner_plot.y + 192):
-            row = pygame.Rect(inner_plot.x + 18, y, inner_plot.w - 36, 52)
-            pygame.draw.ellipse(screen, DIRT_DARK, row)
-            pygame.draw.ellipse(screen, base_color, row.inflate(-10, -10))
+        for y in (inner_plot.y + 72, inner_plot.y + 182):
+            pygame.draw.rect(screen, DIRT_DARK, (inner_plot.x + 20, y, inner_plot.w - 40, 56))
+            pygame.draw.rect(screen, base_color, (inner_plot.x + 28, y + 8, inner_plot.w - 56, 40))
+            for x in range(inner_plot.x + 28, inner_plot.right - 44, 40):
+                pygame.draw.rect(screen, DIRT_DARK, (x, y + 8, 4, 40))
 
         if self.moisture < 28:
             for x in range(inner_plot.x + 35, inner_plot.right - 35, 55):
@@ -511,7 +512,7 @@ class FarmScene:
                 pygame.draw.line(screen, (85, 55, 35), (x + 10, inner_plot.y + 180), (x - 8, inner_plot.y + 198), 2)
         elif self.moisture > 72:
             for x in range(inner_plot.x + 30, inner_plot.right - 40, 65):
-                pygame.draw.ellipse(screen, (95, 130, 150), (x, inner_plot.y + 210, 36, 10))
+                pygame.draw.rect(screen, (95, 130, 150), (x, inner_plot.y + 214, 36, 8))
 
         growth_stage = max(0, min(self.growth, self.growth_goal))
         for x, y in self.crop_positions():
