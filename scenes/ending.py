@@ -7,12 +7,16 @@ from core.ui import draw_centered_lines, wrap_text
 class EndingScene:
     def __init__(self):
         self.font = get_font(23)
+        self.font_result = get_font(42)
         self.font_small = get_font(18)
         self.printed_text = ""
         self.char_idx = 0
         self.char_timer = 0
         self.char_delay = 0.065
         self.finished = False
+        self.show_result = False
+        self.result_y = 620
+        self.result_done = False
         self.ending_data = self.get_ending()
         self.pages = self.build_pages()
         self.page_index = 0
@@ -27,16 +31,19 @@ class EndingScene:
         if final_health < 45 or mistakes >= 8 or u < 20:
             return {
                 "title": "배드엔딩: 아직은 쓰기만 한 맛",
+                "result": "Bad Ending...",
                 "text": f"{name_eun} 수확한 당근을 바라보았지만 끝내 입에 넣지 못한다.\n잠에서 깬 뒤에도 식탁 위 당근 반찬을 가만히 바라볼 뿐이다.\n하지만 예전처럼 무작정 밀어내지는 않는다."
             }
         elif final_health < 70 or mistakes >= 4 or u < 50:
             return {
                 "title": "배드엔딩: 조금은 알 것 같은 마음",
+                "result": "Bad Ending...",
                 "text": f"{name_eun} 수확한 당근을 아주 조금 베어 문다.\n잠에서 깬 뒤 식탁에서 머뭇거리다가 당근 반찬 한 조각을 집어 먹는다.\n아버지는 아무 말 없이 조용히 웃는다."
             }
         else:
             return {
                 "title": "해피엔딩: 가장 달콤한 수확",
+                "result": "Happy Ending!",
                 "text": f"수확한 당근을 베어 문 순간, 꿈속의 세상은 황금빛으로 물든다.\n아버지가 흘린 땀과 오랜 기다림의 무게가 담긴 달콤한 맛이었다.\n잠에서 깬 {name_eun} 식탁 위의 당근을 망설임 없이 입에 넣는다.\n'아빠, 오늘부터 제가 삽질할게요. 다 알려주세요.'"
             }
 
@@ -75,7 +82,7 @@ class EndingScene:
             self.finished = False
             self.text_to_print = self.prepare_page(self.page_index)
         else:
-            game_state.running = False
+            self.show_result = True
 
     def retry(self):
         game_state.understanding = 0
@@ -94,14 +101,28 @@ class EndingScene:
 
     def handle_events(self, events):
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.finished:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and (self.finished or self.show_result):
                 self.retry()
+            elif self.show_result:
+                if self.result_done and (
+                    event.type == pygame.MOUSEBUTTONDOWN
+                    or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE)
+                ):
+                    game_state.running = False
             elif event.type == pygame.MOUSEBUTTONDOWN or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
             ):
                 self.advance()
 
     def update(self, dt):
+        if self.show_result:
+            if self.result_y > 260:
+                self.result_y -= 55 * dt
+            else:
+                self.result_y = 260
+                self.result_done = True
+            return
+
         if self.finished:
             return
 
@@ -116,6 +137,17 @@ class EndingScene:
 
     def draw(self, screen):
         screen.fill(BLACK)
+
+        if self.show_result:
+            result_text = self.ending_data["result"]
+            color = (255, 225, 130) if result_text.startswith("Happy") else (180, 180, 180)
+            result = self.font_result.render(result_text, True, color)
+            screen.blit(result, (400 - result.get_width() // 2, int(self.result_y)))
+
+            if self.result_done:
+                prompt = self.font_small.render("R: 다시하기 / 끝내기: 클릭 또는 스페이스바", True, (150, 150, 150))
+                screen.blit(prompt, (400 - prompt.get_width() // 2, 535))
+            return
 
         dad = sprites["dad"]
         screen.blit(dad, (400 - dad.get_width() // 2, 78))
