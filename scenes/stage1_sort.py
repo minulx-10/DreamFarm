@@ -48,8 +48,8 @@ class Stage1Scene:
         for _ in range(3): self.spawn_item('leaf')
             
         self.dragged_item = None
-        self.bin_keep = pygame.Rect(140, 350, 120, 120)
-        self.bin_trash = pygame.Rect(540, 350, 120, 120)
+        self.bin_keep = pygame.Rect(145, 348, 182, 148)
+        self.bin_trash = pygame.Rect(548, 326, 178, 170)
         self.hovered_name = "밭 준비하기"
         self.hovered_desc = "씨앗은 왼쪽 밭으로, 방해물은 오른쪽 통으로 옮기세요."
         self.stage_clear = False
@@ -61,24 +61,47 @@ class Stage1Scene:
         self.items.append(SortItem(itype, x, y))
 
     def draw_seed_bed(self, screen):
-        frame = self.bin_keep.inflate(18, 18)
-        draw_light_panel(screen, frame)
-        bed = self.bin_keep.inflate(-8, -8)
-        pygame.draw.rect(screen, DIRT_DARK, bed.move(0, 5), border_radius=10)
-        pygame.draw.rect(screen, DIRT_COLOR, bed, border_radius=10)
-        pygame.draw.rect(screen, (92, 61, 42), bed, 3, border_radius=10)
-        for y in range(bed.y + 24, bed.bottom - 18, 24):
-            pygame.draw.line(screen, (105, 69, 45), (bed.x + 12, y), (bed.right - 12, y + 2), 2)
-        for x in range(bed.x + 24, bed.right - 14, 30):
-            pygame.draw.line(screen, (112, 72, 47), (x, bed.y + 14), (x - 8, bed.bottom - 14), 1)
-        for x, y in [(bed.x + 26, bed.y + 36), (bed.x + 58, bed.y + 60), (bed.x + 82, bed.y + 34)]:
-            screen.blit(pygame.transform.scale(sprites["sprout1"], (24, 18)), (x, y))
+        x, y, w, h = self.bin_keep
+        pygame.draw.ellipse(screen, (86, 54, 31), (x + 8, y + 103, w - 16, 34))
+        pygame.draw.rect(screen, (179, 103, 50), (x + 22, y + 48, w - 44, h - 26), border_radius=14)
+        pygame.draw.rect(screen, (103, 58, 34), (x + 22, y + 48, w - 44, h - 26), 4, border_radius=14)
+
+        for i in range(8):
+            by = y + 60 + i * 8
+            pygame.draw.arc(screen, (118, 69, 38), (x + 26, by, w - 52, 30), 3.25, 6.0, 2)
+            pygame.draw.arc(screen, (218, 138, 72), (x + 30, by + 1, w - 60, 24), 3.3, 5.9, 1)
+
+        lip = pygame.Rect(x, y + 22, w, 54)
+        pygame.draw.ellipse(screen, (221, 135, 62), lip)
+        pygame.draw.ellipse(screen, (80, 47, 29), lip, 5)
+        pygame.draw.ellipse(screen, (96, 54, 31), lip.inflate(-24, -16))
+        pygame.draw.ellipse(screen, (61, 37, 25), lip.inflate(-50, -26))
+        pygame.draw.arc(screen, (245, 167, 89), lip.inflate(-12, -10), 3.2, 6.2, 4)
 
     def draw_trash_zone(self, screen):
-        frame = self.bin_trash.inflate(18, 18)
-        draw_light_panel(screen, frame)
-        pygame.draw.ellipse(screen, (65, 62, 56), (self.bin_trash.x + 10, self.bin_trash.bottom - 4, 100, 20))
-        screen.blit(sprites['trashcan'], (self.bin_trash.x, self.bin_trash.y))
+        x, y, w, h = self.bin_trash
+        can_x, can_y = x + 20, y + 70
+        can_w, can_h = 120, 130
+
+        pygame.draw.ellipse(screen, (42, 43, 40), (can_x + 10, can_y + can_h - 8, can_w, 24))
+        body = pygame.Rect(can_x, can_y + 26, can_w, can_h - 32)
+        pygame.draw.rect(screen, (171, 176, 170), body)
+        pygame.draw.rect(screen, (44, 45, 43), body, 4)
+        for stripe_x in (can_x + 18, can_x + 44, can_x + 72):
+            pygame.draw.line(screen, (104, 109, 105), (stripe_x, body.y + 8), (stripe_x + 3, body.bottom - 8), 4)
+            pygame.draw.line(screen, (223, 225, 219), (stripe_x + 5, body.y + 6), (stripe_x + 8, body.bottom - 10), 2)
+
+        rim = pygame.Rect(can_x - 8, can_y, can_w + 16, 40)
+        pygame.draw.ellipse(screen, (220, 223, 217), rim)
+        pygame.draw.ellipse(screen, (37, 38, 37), rim, 5)
+        pygame.draw.ellipse(screen, (18, 19, 18), rim.inflate(-18, -12))
+
+        lid = pygame.Rect(x + 108, y + 8, 72, 126)
+        pygame.draw.ellipse(screen, (194, 198, 192), lid)
+        pygame.draw.ellipse(screen, (43, 44, 42), lid, 5)
+        pygame.draw.arc(screen, (235, 237, 231), lid.inflate(-12, -10), 4.7, 7.5, 3)
+        pygame.draw.line(screen, (43, 44, 42), (x + 124, y + 118), (x + 140, y + 134), 5)
+        pygame.draw.ellipse(screen, (67, 68, 65), (x + 146, y + 84, 18, 42), 3)
 
     def handle_events(self, events):
         if self.stage_clear: return
@@ -152,15 +175,8 @@ class Stage1Scene:
         draw_tiled_background(screen, 800, 600)
         
         self.draw_seed_bed(screen)
-        font = get_font(24)
-        keep_text = font.render("밭에 심기", True, BLACK)
-        draw_light_panel(screen, pygame.Rect(self.bin_keep.centerx - 66, self.bin_keep.y - 40, 132, 34))
-        screen.blit(keep_text, (self.bin_keep.centerx - keep_text.get_width()//2, self.bin_keep.y - 36))
-
         self.draw_trash_zone(screen)
-        trash_text = font.render("쓰레기통", True, BLACK)
-        draw_light_panel(screen, pygame.Rect(self.bin_trash.centerx - 66, self.bin_trash.y - 40, 132, 34))
-        screen.blit(trash_text, (self.bin_trash.centerx - trash_text.get_width()//2, self.bin_trash.y - 36))
+        font = get_font(24)
 
         for item in self.items: item.draw(screen)
         draw_top_bar(screen)
