@@ -1,7 +1,7 @@
 import pygame
 from core.game_state import game_state
 from core.assets import *
-from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel
+from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 class Stage2Scene:
     def __init__(self):
@@ -34,6 +34,7 @@ class Stage2Scene:
                 self.stopped = True
                 self.stop_timer = 1.0
                 self.attempts += 1
+                game_state.water_count += 1
                 
                 cursor_rect = pygame.Rect(self.gauge_x + self.cursor_pos - 5, self.gauge_y - 10, 10, self.gauge_h + 20)
                 if cursor_rect.colliderect(self.target_zone):
@@ -95,13 +96,15 @@ class Stage2Scene:
         draw_wood_panel(screen, panel)
         
         # Gauge bar
-        pygame.draw.rect(screen, BLACK, (self.gauge_x, self.gauge_y, self.gauge_w, self.gauge_h))
-        pygame.draw.rect(screen, GRASS_COLOR, self.target_zone)
+        gauge_rect = pygame.Rect(self.gauge_x, self.gauge_y, self.gauge_w, self.gauge_h)
+        pygame.draw.rect(screen, (36, 47, 50), gauge_rect, border_radius=8)
+        pygame.draw.rect(screen, mix_color(GRASS_COLOR, WHITE, 0.2), self.target_zone, border_radius=6)
+        pygame.draw.rect(screen, (87, 109, 96), gauge_rect, 2, border_radius=8)
         
         # Cursor (Water drop styled)
         cursor_rect = pygame.Rect(self.gauge_x + self.cursor_pos - 10, self.gauge_y - 15, 20, self.gauge_h + 30)
-        pygame.draw.rect(screen, (100, 200, 255), cursor_rect)
-        pygame.draw.rect(screen, WHITE, cursor_rect, 2)
+        pygame.draw.rect(screen, (95, 182, 220), cursor_rect, border_radius=7)
+        pygame.draw.rect(screen, WHITE, cursor_rect, 2, border_radius=7)
         
         draw_top_bar(screen)
         

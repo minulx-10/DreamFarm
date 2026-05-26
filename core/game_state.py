@@ -42,6 +42,11 @@ class GameState:
         # Story choice
         self.choice_data = None
 
+        # Ending credits run records
+        self.water_count = 0
+        self.pest_count = 0
+        self.choice_impacts = []
+
         # ===== NEW SYSTEMS =====
 
         # #11 Attitude tracking
@@ -260,20 +265,44 @@ STORY_EVENTS = [
     {
         "title": "이웃 밭의 물난리",
         "text": "이웃 밭에서 물이 넘쳐 흘러오고 있다.\n우리 밭도 위험할 수 있다.\n어떻게 해야 할까?",
-        "choice_a": ("우리 밭 배수로를 먼저 지킨다", {"understanding": 0, "result_text": "우리 밭은 안전하지만, 이웃 밭이 걱정된다."}),
-        "choice_b": ("이웃 밭의 물길을 함께 막는다", {"understanding": 8, "result_text": "함께 막으니 오히려 물길이 잘 잡혔다. 혼자가 아니었다."}),
+        "choice_a": ("우리 밭 배수로를 먼저 지킨다", {
+            "understanding": 0,
+            "result_text": "우리 밭은 안전하지만, 이웃 밭이 걱정된다.",
+            "impact_text": "이웃 밭의 어린 싹 몇 줄기는 끝내 물에 잠겼다.",
+        }),
+        "choice_b": ("이웃 밭의 물길을 함께 막는다", {
+            "understanding": 8,
+            "result_text": "함께 막으니 오히려 물길이 잘 잡혔다. 혼자가 아니었다.",
+            "impact_text": "함께 막은 물길 덕분에 이웃 밭도 장마를 버텼다.",
+        }),
     },
     {
         "title": "쓰러진 허수아비",
         "text": "강풍에 허수아비가 쓰러졌다.\n새들이 모여들기 시작한다.\n시간이 많지 않다.",
-        "choice_a": ("허수아비를 급히 다시 세운다", {"understanding": 2, "result_text": "허수아비를 세웠지만, 대충 세워서 금방 또 쓰러질 것 같다."}),
-        "choice_b": ("단단히 고정할 수 있게 돌을 모은다", {"understanding": 6, "result_text": "시간은 걸렸지만 튼튼해졌다. 급할수록 돌아가라는 말이 떠오른다."}),
+        "choice_a": ("허수아비를 급히 다시 세운다", {
+            "understanding": 2,
+            "result_text": "허수아비를 세웠지만, 대충 세워서 금방 또 쓰러질 것 같다.",
+            "impact_text": "급히 세운 허수아비는 다시 쓰러졌고, 새들이 밭을 훑고 갔다.",
+        }),
+        "choice_b": ("단단히 고정할 수 있게 돌을 모은다", {
+            "understanding": 6,
+            "result_text": "시간은 걸렸지만 튼튼해졌다. 급할수록 돌아가라는 말이 떠오른다.",
+            "impact_text": "돌로 고정한 허수아비는 강풍 뒤에도 밭을 지켰다.",
+        }),
     },
     {
         "title": "길 잃은 벌",
         "text": "꽃밭을 찾지 못하는 벌 한 마리가\n당근 잎 위에서 힘없이 쉬고 있다.\n해충은 아닌 것 같다.",
-        "choice_a": ("내버려 두고 밭일을 계속한다", {"understanding": 1, "result_text": "밭일은 진행되었지만, 자꾸 벌이 신경 쓰인다."}),
-        "choice_b": ("근처 꽃밭 쪽으로 조심히 옮겨 준다", {"understanding": 7, "result_text": "벌이 날아간 뒤, 밭 위로 따뜻한 바람이 불었다."}),
+        "choice_a": ("내버려 두고 밭일을 계속한다", {
+            "understanding": 1,
+            "result_text": "밭일은 진행되었지만, 자꾸 벌이 신경 쓰인다.",
+            "impact_text": "길 잃은 벌은 꽃밭을 찾지 못했고, 밭가의 꽃도 조용히 시들었다.",
+        }),
+        "choice_b": ("근처 꽃밭 쪽으로 조심히 옮겨 준다", {
+            "understanding": 7,
+            "result_text": "벌이 날아간 뒤, 밭 위로 따뜻한 바람이 불었다.",
+            "impact_text": "옮겨 준 벌은 꽃밭을 찾아갔고, 밭가에는 작은 열매가 맺혔다.",
+        }),
     },
 ]
 
@@ -440,22 +469,22 @@ def get_attitude_ending():
     m = game_state.farm_mistakes
 
     # True ending: high empathy + patience + understanding
-    if u >= 50 and e >= 2 and p >= 3 and h >= 50:
+    if u >= 35 and e >= 2 and p >= 3 and h >= 50:
         return "true"
     # Happy ending: good stats overall
-    if h >= 70 and m < 4 and u >= 50:
+    if h >= 70 and m < 4 and u >= 35:
         return "happy"
     # Growth ending: many failures but recovered
-    if r >= 3 and u >= 30:
+    if r >= 2 and u >= 20:
         return "growth"
     # Skill ending: good health/score but low empathy
-    if h >= 65 and u >= 35 and e <= 1:
+    if h >= 65 and u >= 25 and e <= 1:
         return "skill"
     # Rush ending: too impatient
     if rush >= 4:
         return "rush"
     # Normal ending
-    if h >= 45 and u >= 20:
+    if h >= 45 and u >= 15:
         return "normal"
     # Bad ending
     return "bad"

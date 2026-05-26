@@ -42,6 +42,7 @@ class Stage3Scene:
                     if bug.alive and bug.rect.collidepoint(event.pos):
                         bug.alive = False
                         game_state.score += 50
+                        game_state.pest_count += 1
                         break
 
     def update(self, dt):

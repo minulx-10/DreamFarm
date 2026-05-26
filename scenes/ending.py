@@ -5,8 +5,8 @@ from core.game_state import (
     append_josa, game_state, get_understanding_stage,
     get_attitude_ending, save_progress, JOURNAL_RETROSPECTIVES,
 )
-from core.assets import BLACK, WHITE, get_font, sprites
-from core.ui import draw_centered_lines, wrap_text
+from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
+from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
 
 
 class EndingScene:
@@ -27,7 +27,7 @@ class EndingScene:
         self.page_index = 0
         self.text_to_print = self.prepare_page(self.page_index)
         # Enhanced ending phases
-        self.phase = "narration"  # narration → table → carrot → golden → dad_voice → result → journal
+        self.phase = "narration"  # narration -> table -> carrot -> golden -> dad_voice -> result -> credits -> journal
         self.phase_timer = 0
         self.table_alpha = 0
         self.golden_alpha = 0
@@ -40,6 +40,8 @@ class EndingScene:
         self.show_journal = False
         self.carrot_pulse = 0
         self.letter_written = False
+        self.credit_lines = self.build_credit_lines()
+        self.credits_y = 620
 
     def write_desktop_letter(self):
         try:
@@ -55,10 +57,10 @@ class EndingScene:
         except Exception:
             pass
 
-    def get_ending(self):
+    def get_ending(self, force_type=None):
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
-        ending_type = get_attitude_ending()
+        ending_type = force_type or get_attitude_ending()
         game_state.last_ending = ending_type
 
         endings = {
@@ -147,6 +149,49 @@ class EndingScene:
             "\n".join(text_lines[split_at:]),
         ]
 
+    def build_credit_lines(self):
+        impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "rush") else "이어진 일들"
+        lines = [
+            "몽중농원",
+            "",
+            "이번 꿈에서 남은 기록",
+            f"물 뿌리기: {game_state.water_count}회",
+            f"해충 잡기: {game_state.pest_count}회",
+        ]
+
+        if game_state.choice_impacts:
+            lines.extend(["", impact_heading])
+            for item in game_state.choice_impacts:
+                lines.append(item["title"])
+                lines.append(item["impact"])
+
+        return lines
+
+    def _credit_content_height(self):
+        height = 0
+        for line in self.credit_lines:
+            if not line:
+                height += 26
+                continue
+            font = self.font_result if line == "몽중농원" else self.font_small
+            height += len(wrap_text(line, font, 610)) * (font.get_height() + 6)
+            height += 8
+        return height + 80
+
+    def _start_credits(self):
+        self.credit_lines = self.build_credit_lines()
+        self.credits_y = 620
+        self.phase = "credits"
+        self.phase_timer = 0
+
+    def _finish_after_credits(self):
+        if game_state.journal_entries:
+            self.phase = "journal"
+            self.show_journal = True
+        else:
+            save_progress()
+            game_state.running = False
+
     def prepare_page(self, index):
         lines = []
         for paragraph in self.pages[index].split("\n"):
@@ -204,16 +249,49 @@ class EndingScene:
         game_state.dad_mode_turns = 0
         game_state.dad_mode_triggered = False
         game_state.father_day_seen = set()
+        game_state.water_count = 0
+        game_state.pest_count = 0
+        game_state.choice_impacts = []
         # #14 Save progress before retry
         save_progress()
         game_state.current_scene = "intro"
 
+    def change_ending(self, ending_type):
+        self.ending_data = self.get_ending(ending_type)
+        self.pages = self.build_pages()
+        self.page_index = 0
+        self.text_to_print = self.prepare_page(self.page_index)
+        self.phase = "narration"
+        self.printed_text = ""
+        self.char_idx = 0
+        self.finished = False
+        self.phase_timer = 0
+        self.show_result = False
+        self.result_done = False
+        self.result_y = 620
+        self.show_journal = False
+        self.letter_written = False
+        self.table_alpha = 0
+        self.golden_alpha = 0
+        self.dad_text_alpha = 0
+        self.carrot_pulse = 0
+        self.credit_lines = self.build_credit_lines()
+        self.credits_y = 620
+
     def handle_events(self, events):
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                if self.phase in ("result", "journal") or self.finished:
-                    self.retry()
-                    return
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    if self.phase in ("result", "journal") or self.finished:
+                        self.retry()
+                        return
+                elif event.key == pygame.K_1: self.change_ending("true")
+                elif event.key == pygame.K_2: self.change_ending("happy")
+                elif event.key == pygame.K_3: self.change_ending("growth")
+                elif event.key == pygame.K_4: self.change_ending("skill")
+                elif event.key == pygame.K_5: self.change_ending("rush")
+                elif event.key == pygame.K_6: self.change_ending("normal")
+                elif event.key == pygame.K_7: self.change_ending("bad")
 
             click = (event.type == pygame.MOUSEBUTTONDOWN or
                      (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE))
@@ -235,13 +313,10 @@ class EndingScene:
                     self.phase_timer = 0
             elif self.phase == "result":
                 if self.result_done and click:
-                    if game_state.journal_entries:
-                        self.phase = "journal"
-                        self.show_journal = True
-                    else:
-                        # #14 Save and quit
-                        save_progress()
-                        game_state.running = False
+                    self._start_credits()
+            elif self.phase == "credits":
+                if click and self.phase_timer > 1.0:
+                    self._finish_after_credits()
             elif self.phase == "journal":
                 if click:
                     save_progress()
@@ -294,6 +369,12 @@ class EndingScene:
                     self.write_desktop_letter()
                     self.letter_written = True
 
+        elif self.phase == "credits":
+            self.phase_timer += dt
+            self.credits_y -= 34 * dt
+            if self.credits_y + self._credit_content_height() < 84:
+                self._finish_after_credits()
+
     def draw(self, screen):
         if self.phase == "narration":
             self._draw_narration(screen)
@@ -307,21 +388,26 @@ class EndingScene:
             self._draw_dad_voice(screen)
         elif self.phase == "result":
             self._draw_result(screen)
+        elif self.phase == "credits":
+            self._draw_credits(screen)
         elif self.phase == "journal":
             self._draw_journal(screen)
 
     def _draw_narration(self, screen):
-        screen.fill(BLACK)
+        draw_story_backdrop(screen, "night")
         dad = sprites["dad"]
-        screen.blit(dad, (400 - dad.get_width() // 2, 78))
-        box_rect = pygame.Rect(55, 292, 690, 250)
-        pygame.draw.rect(screen, WHITE, box_rect, 4)
-        draw_centered_lines(screen, self.printed_text.split("\n"), self.font, WHITE, 400, 322, line_gap=5)
-        page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, (130, 130, 130))
+        shadow = dad.copy()
+        shadow.set_alpha(80)
+        screen.blit(shadow, (400 - dad.get_width() // 2 + 6, 74))
+        screen.blit(dad, (400 - dad.get_width() // 2, 68))
+        box_rect = pygame.Rect(58, 286, 684, 256)
+        draw_light_panel(screen, box_rect)
+        draw_centered_lines(screen, self.printed_text.split("\n"), self.font, TEXT_DARK, 400, 318, line_gap=5)
+        page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 548))
         if self.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "계속"
-            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, (150, 150, 150))
+            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 562))
 
     def _draw_table(self, screen):
@@ -452,7 +538,7 @@ class EndingScene:
             screen.blit(prompt, (400 - prompt.get_width() // 2, 450))
 
     def _draw_result(self, screen):
-        screen.fill(BLACK)
+        draw_story_backdrop(screen, "night")
         result_text = self.ending_data["result"]
         color = (255, 225, 130) if self.is_happy else (180, 180, 180)
         result = self.font_result.render(result_text, True, color)
@@ -481,34 +567,64 @@ class EndingScene:
 
         if self.result_done:
             if game_state.journal_entries:
-                prompt = self.font_small.render("R: 다시하기 / 일지 보기: 클릭 또는 스페이스바", True, (150, 150, 150))
+                prompt = self.font_small.render("R: 다시하기 / 크레딧: 스페이스바 / 1~7: 다른 엔딩 보기", True, (150, 150, 150))
             else:
-                prompt = self.font_small.render("R: 다시하기 / 끝내기: 클릭 또는 스페이스바", True, (150, 150, 150))
+                prompt = self.font_small.render("R: 다시하기 / 크레딧: 스페이스바 / 1~7: 다른 엔딩 보기", True, (150, 150, 150))
             screen.blit(prompt, (400 - prompt.get_width() // 2, 535))
 
+    def _draw_credits(self, screen):
+        draw_story_backdrop(screen, "night")
+        overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 88))
+        screen.blit(overlay, (0, 0))
+
+        y = self.credits_y
+        for line in self.credit_lines:
+            if not line:
+                y += 26
+                continue
+
+            is_title = line == "몽중농원"
+            is_section = line in ("이번 꿈에서 남은 기록", "남겨진 일들", "이어진 일들")
+            font = self.font_result if is_title else self.font if is_section else self.font_small
+            color = (255, 226, 150) if is_title else (232, 205, 156) if is_section else (226, 220, 198)
+            max_width = 620 if not is_title else 760
+
+            for wrapped in wrap_text(line, font, max_width):
+                surf = font.render(wrapped, True, color)
+                screen.blit(surf, (400 - surf.get_width() // 2, int(y)))
+                y += font.get_height() + 6
+            y += 8 if is_section else 4
+
+        if self.phase_timer > 1.0:
+            prompt = self.font_small.render("넘기려면 클릭 또는 스페이스바", True, (150, 145, 125))
+            screen.blit(prompt, (400 - prompt.get_width() // 2, 560))
+
     def _draw_journal(self, screen):
-        screen.fill((20, 18, 15))
-        title = self.font.render("밭일 일지", True, (220, 200, 160))
-        screen.blit(title, (400 - title.get_width() // 2, 30))
-        pygame.draw.line(screen, (80, 70, 50), (100, 65), (700, 65), 2)
+        draw_story_backdrop(screen, "night")
+        panel = pygame.Rect(70, 36, 660, 514)
+        draw_light_panel(screen, panel)
+        title = self.font.render("밭일 일지", True, TEXT_DARK)
+        screen.blit(title, (400 - title.get_width() // 2, 64))
+        pygame.draw.line(screen, (180, 141, 82), (120, 98), (680, 98), 2)
 
         retro_font = get_font(14)
-        y = 80
+        y = 118
         for entry in game_state.journal_entries[-6:]:
             for line in entry.split("\n"):
                 if y > 500:
                     break
-                surf = self.font_small.render(line, True, (180, 165, 130))
+                surf = self.font_small.render(line, True, TEXT_DARK)
                 screen.blit(surf, (120, y))
                 y += 24
 
                 # #8 Journal retrospective
                 if self.is_happy and line.strip() in JOURNAL_RETROSPECTIVES:
                     retro = JOURNAL_RETROSPECTIVES[line.strip()]
-                    rs = retro_font.render(retro, True, (140, 120, 80))
+                    rs = retro_font.render(retro, True, TEXT_MUTED)
                     screen.blit(rs, (140, y))
                     y += 20
             y += 12
 
-        prompt = self.font_small.render("R: 다시하기 / 끝내기: 클릭 또는 스페이스바", True, (120, 110, 90))
+        prompt = self.font_small.render("R: 다시하기 / 끝내기: 스페이스바 / 1~7: 다른 엔딩 보기", True, TEXT_MUTED)
         screen.blit(prompt, (400 - prompt.get_width() // 2, 560))

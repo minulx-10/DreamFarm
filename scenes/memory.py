@@ -1,7 +1,7 @@
 import pygame
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
-from core.ui import draw_light_panel, wrap_text
+from core.ui import draw_light_panel, draw_story_backdrop, wrap_text
 
 
 class MemoryScene:
@@ -70,19 +70,7 @@ class MemoryScene:
                 self.finished = True
 
     def draw(self, screen):
-        # Desaturated background (monochrome feel)
-        screen.fill((22, 20, 28))
-
-        for y in range(0, 600, 18):
-            shade = 26 + (y // 18) % 2 * 6
-            pygame.draw.rect(screen, (shade, shade - 2, shade + 4), (0, y, 800, 18))
-
-        # Vignette corners
-        for corner_x, corner_y in [(0, 0), (700, 0), (0, 500), (700, 500)]:
-            vig = pygame.Surface((100, 100), pygame.SRCALPHA)
-            for r in range(100, 0, -2):
-                pygame.draw.circle(vig, (0, 0, 0, 3), (50, 50), r)
-            screen.blit(vig, (corner_x, corner_y))
+        draw_story_backdrop(screen, "night")
 
         panel = pygame.Rect(70, 85, 660, 430)
         draw_light_panel(screen, panel)

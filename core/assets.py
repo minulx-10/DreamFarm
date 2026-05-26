@@ -1,30 +1,36 @@
 import pygame
 
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-DARK_GRAY = (40, 40, 40)
-YELLOW = (255, 215, 0)
-GREEN = (34, 139, 34)
-BROWN = (139, 69, 19)
-RED = (200, 50, 50)
-BLUE = (50, 50, 200)
-GOLD = (235, 190, 70)
-GRAY = (150, 150, 150)
-ORANGE = (255, 150, 50)
+BLACK = (13, 16, 20)
+WHITE = (250, 246, 231)
+DARK_GRAY = (42, 46, 48)
+YELLOW = (245, 200, 88)
+GREEN = (54, 142, 94)
+BROWN = (132, 83, 48)
+RED = (190, 70, 58)
+BLUE = (72, 122, 170)
+GOLD = (232, 178, 84)
+GRAY = (142, 146, 138)
+ORANGE = (232, 132, 58)
 
-# Stardew palette
-DIRT_COLOR = (145, 95, 60)
-DIRT_DARK = (120, 75, 45)
-DIRT_WET = (100, 60, 35)
-GRASS_COLOR = (90, 160, 70)
-GRASS_DARK = (70, 130, 50)
-WOOD_COLOR = (220, 170, 110)
-WOOD_DARK = (170, 120, 70)
-WOOD_LIGHT = (250, 210, 150)
-TEXT_BROWN = (60, 40, 20)
-TEXT_DARK = (35, 24, 14)
-TEXT_MUTED = (95, 72, 48)
-PANEL_PALE = (242, 200, 138)
+# Dream-farm palette
+DIRT_COLOR = (136, 88, 56)
+DIRT_DARK = (92, 60, 43)
+DIRT_WET = (88, 72, 58)
+GRASS_COLOR = (84, 148, 91)
+GRASS_DARK = (48, 104, 73)
+WOOD_COLOR = (177, 123, 72)
+WOOD_DARK = (75, 57, 45)
+WOOD_LIGHT = (238, 201, 137)
+TEXT_BROWN = (75, 52, 34)
+TEXT_DARK = (38, 35, 30)
+TEXT_MUTED = (102, 91, 75)
+PANEL_PALE = (248, 232, 196)
+PANEL_WARM = (255, 242, 213)
+PANEL_DEEP = (55, 61, 58)
+PANEL_EDGE = (121, 94, 68)
+ACCENT_BLUE = (74, 131, 151)
+ACCENT_MINT = (104, 164, 118)
+ACCENT_CORAL = (213, 104, 72)
 
 import os
 import urllib.request
@@ -78,6 +84,14 @@ def create_sprite_from_string(sprite_str, scale=4):
         'r': (120,120,120,255), # Rock dark
         'B': (150,100,60,255),  # Brown
         'b': (100,60,30,255),   # Dark Brown
+        'S': (218,164,112,255), # Skin
+        's': (172,112,76,255),  # Skin shade
+        'N': (66,92,92,255),    # Workwear
+        'n': (42,58,62,255),    # Workwear shade
+        'M': (188,198,194,255), # Metal light
+        'm': (108,124,124,255), # Metal shade
+        'Y': (238,190,92,255),  # Warm accent
+        'y': (178,132,70,255),  # Warm accent shade
     }
     
     for y, line in enumerate(lines):
@@ -167,28 +181,34 @@ XoOOOOOoX
 ....X....
 ''', 5)
     sprites['bug'] = create_sprite_from_string('''
-..X..X..
-.XoXXoX.
-XooooooX
-.XooooX.
-X.XXXX.X
-''', 6)
+...XX....
+..XggX...
+.XgGGgX..
+XgGYYGgX.
+XgGGGGgX.
+.XgGGgX..
+..XgXgX..
+.X..X..X.
+''', 5)
     sprites['dad'] = create_sprite_from_string('''
-..XXXXX..
-.XrrrrrX.
-XrrrrrrrX
-XWWWWWWWX
-XW.W.W.WX
-XWWWWWWWX
-.XWWWWWX.
-..XXXXX..
-.XXXXXXX.
-XX.XXX.XX
-XX.XXX.XX
-...XXX...
-...X.X...
-...X.X...
-''', 10)
+....YYYY....
+...YyyyyY...
+..YYSSSSYY..
+..XSSSSSSX..
+..XSXSSXSX..
+..XSSSSSSX..
+...XssssX...
+..XXNNNNXX..
+.XNNNNNNNNX.
+.XNYNNNNYNX.
+.XNNNNNNNNX.
+..XNnnnnNX..
+...XNNNNX...
+...XBBBX....
+..XB...BX...
+..XB...BX...
+..XX...XX...
+''', 7)
     sprites['basket'] = create_sprite_from_string('''
 ..XXXXXX..
 .XBBBBBBX.
@@ -200,36 +220,67 @@ XbBBbbBBbX
 ..XXXXXX..
 ''', 15)
     sprites['trashcan'] = create_sprite_from_string('''
-..XXXXXX..
-.XRRRRRRX.
-XrrrrrrrrX
-XRRRrrRRRX
-XRRRrrRRRX
-XRRRrrRRRX
-.XRRRRRRX.
-..XXXXXX..
-''', 15)
+...XXXX...
+..XMMMMX..
+.XXXXXXXX.
+.XMmmMMmX.
+.XMmMMmmX.
+.XMmmMMmX.
+.XMmMMmmX.
+.XMmmMMmX.
+..XmmmmX..
+...XXXX...
+''', 12)
+
+def _mix_color(a, b, ratio):
+    return (
+        int(a[0] + (b[0] - a[0]) * ratio),
+        int(a[1] + (b[1] - a[1]) * ratio),
+        int(a[2] + (b[2] - a[2]) * ratio),
+    )
+
 
 def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, dirt_dk=None):
     gc = grass or GRASS_COLOR
     gd = grass_dk or GRASS_DARK
     dc = dirt or DIRT_COLOR
     dd = dirt_dk or DIRT_DARK
-    screen.fill(gc)
-    for y in range(0, h, 40):
-        for x in range(0, w, 40):
-            if (x+y) % 120 == 0:
-                pygame.draw.rect(screen, gd, (x+10, y+10, 8, 4))
-                pygame.draw.rect(screen, gd, (x+14, y+6, 4, 8))
 
-    dirt_rect = pygame.Rect(50, 80, w - 100, h - 250)
-    pygame.draw.rect(screen, dc, dirt_rect)
-    pygame.draw.rect(screen, dd, dirt_rect, 6)
-    
-    for y in range(80, h - 170, 40):
-        pygame.draw.line(screen, dd, (50, y), (w-50, y), 2)
-    for x in range(50, w - 50, 40):
-        pygame.draw.line(screen, dd, (x, 80), (x, h-170), 2)
+    sky_top = (105, 139, 151)
+    sky_bottom = (234, 199, 142)
+    for y in range(h):
+        ratio = min(1, y / max(1, h * 0.62))
+        pygame.draw.line(screen, _mix_color(sky_top, sky_bottom, ratio), (0, y), (w, y))
+
+    pygame.draw.circle(screen, (236, 178, 86), (670, 82), 42)
+    pygame.draw.circle(screen, (255, 226, 154), (670, 82), 30)
+
+    horizon = 166
+    pygame.draw.polygon(screen, (67, 111, 88), [(0, horizon + 28), (110, 118), (260, horizon + 18), (440, 112), (610, horizon + 26), (800, 126), (800, h), (0, h)])
+    pygame.draw.polygon(screen, (45, 93, 72), [(0, horizon + 56), (160, 148), (340, horizon + 48), (520, 142), (800, horizon + 54), (800, h), (0, h)])
+
+    pygame.draw.rect(screen, gc, (0, horizon, w, h - horizon))
+    for y in range(horizon, h, 34):
+        c = _mix_color(gc, gd, 0.35 if (y // 34) % 2 == 0 else 0.55)
+        pygame.draw.line(screen, c, (0, y), (w, y + 18), 2)
+
+    for x in range(0, w, 44):
+        for y in range(horizon + 18, h, 70):
+            if (x + y) % 3 == 0:
+                pygame.draw.line(screen, gd, (x + 10, y + 8), (x + 18, y + 2), 2)
+                pygame.draw.line(screen, gd, (x + 17, y + 3), (x + 22, y + 11), 2)
+
+    dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)
+    pygame.draw.rect(screen, dd, dirt_rect.move(0, 6), border_radius=12)
+    pygame.draw.rect(screen, dc, dirt_rect, border_radius=12)
+    pygame.draw.rect(screen, _mix_color(dc, WHITE, 0.18), dirt_rect.inflate(-14, -14), 2, border_radius=9)
+    pygame.draw.rect(screen, dd, dirt_rect, 3, border_radius=12)
+
+    for row, y in enumerate(range(dirt_rect.y + 38, dirt_rect.bottom - 28, 38)):
+        row_color = _mix_color(dd, dc, 0.28 if row % 2 == 0 else 0.44)
+        pygame.draw.line(screen, row_color, (dirt_rect.x + 24, y), (dirt_rect.right - 24, y + 4), 3)
+    for x in range(dirt_rect.x + 38, dirt_rect.right - 30, 52):
+        pygame.draw.line(screen, _mix_color(dd, BLACK, 0.1), (x, dirt_rect.y + 24), (x - 14, dirt_rect.bottom - 24), 1)
 
 
 def draw_weather_icon(screen, weather, x, y, size=20):

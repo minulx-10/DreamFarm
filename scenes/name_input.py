@@ -1,6 +1,7 @@
 import pygame
 from core.game_state import game_state
-from core.assets import get_font, BLACK, WHITE, YELLOW
+from core.assets import get_font, TEXT_DARK, TEXT_MUTED, GOLD, WHITE
+from core.ui import draw_light_panel, draw_story_backdrop
 
 class NameInputScene:
     def __init__(self):
@@ -35,21 +36,29 @@ class NameInputScene:
         pass
 
     def draw(self, screen):
-        screen.fill(BLACK)
-        
-        prompt = self.font_large.render("꿈속 밭에 남길 이름은?", True, WHITE)
-        screen.blit(prompt, (400 - prompt.get_width()//2, 200))
-        
-        input_rect = pygame.Rect(250, 280, 300, 50)
-        pygame.draw.rect(screen, WHITE, input_rect, 2)
+        draw_story_backdrop(screen, "night")
+
+        card = pygame.Rect(160, 150, 480, 300)
+        draw_light_panel(screen, card)
+
+        prompt = self.font_large.render("꿈속 밭에 남길 이름은?", True, TEXT_DARK)
+        screen.blit(prompt, (400 - prompt.get_width()//2, 196))
+
+        input_rect = pygame.Rect(230, 275, 340, 58)
+        pygame.draw.rect(screen, (255, 249, 230), input_rect, border_radius=8)
+        pygame.draw.rect(screen, (109, 84, 60), input_rect, 2, border_radius=8)
         
         # Cursor blink
         display_text = self.input_text + self.ime_text
         if pygame.time.get_ticks() % 1000 < 500:
             display_text += "_"
             
-        name_surf = self.font_large.render(display_text, True, YELLOW)
-        screen.blit(name_surf, (input_rect.x + 10, input_rect.y + 5))
-        
-        desc = self.font_small.render("이름을 입력하고 Enter를 누르세요", True, (150, 150, 150))
-        screen.blit(desc, (400 - desc.get_width()//2, 400))
+        name_color = GOLD if display_text.strip("_") else TEXT_MUTED
+        name_surf = self.font_large.render(display_text or "이름", True, name_color)
+        screen.blit(name_surf, (input_rect.x + 14, input_rect.y + 8))
+
+        desc = self.font_small.render("입력 후 Enter", True, TEXT_MUTED)
+        screen.blit(desc, (400 - desc.get_width()//2, 378))
+
+        shine = self.font_small.render("몽중농원", True, WHITE)
+        screen.blit(shine, (400 - shine.get_width() // 2, 92))

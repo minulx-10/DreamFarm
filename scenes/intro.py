@@ -1,7 +1,7 @@
 import pygame
 from core.game_state import append_josa, game_state
-from core.assets import BLACK, WHITE, get_font, sprites
-from core.ui import draw_centered_lines, wrap_text
+from core.assets import TEXT_DARK, TEXT_MUTED, WHITE, get_font, sprites
+from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
 
 
 class IntroScene:
@@ -112,21 +112,24 @@ class IntroScene:
                 self.finished = True
 
     def draw(self, screen):
-        screen.fill(BLACK)
+        draw_story_backdrop(screen, "night")
 
         dad = sprites["dad"]
-        screen.blit(dad, (400 - dad.get_width() // 2, 80))
+        shadow = dad.copy()
+        shadow.set_alpha(80)
+        screen.blit(shadow, (400 - dad.get_width() // 2 + 6, 76))
+        screen.blit(dad, (400 - dad.get_width() // 2, 70))
 
-        box_rect = pygame.Rect(55, 265, 690, 260)
-        pygame.draw.rect(screen, WHITE, box_rect, 4)
+        box_rect = pygame.Rect(58, 256, 684, 272)
+        draw_light_panel(screen, box_rect)
 
         lines = self.printed_text.split("\n")
-        draw_centered_lines(screen, lines, self.font, WHITE, 400, 292, line_gap=5)
+        draw_centered_lines(screen, lines, self.font, TEXT_DARK, 400, 288, line_gap=5)
 
-        page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, (130, 130, 130))
-        screen.blit(page, (690, 532))
+        page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
+        screen.blit(page, (690, 538))
 
         if self.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "시작하기"
-            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, (150, 150, 150))
+            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 560))

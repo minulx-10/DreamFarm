@@ -2,7 +2,7 @@ import math
 import pygame
 from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
-from core.ui import wrap_text, draw_centered_lines
+from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
 
 
 class FatherDayScene:
@@ -105,7 +105,7 @@ class FatherDayScene:
                 game_state.current_scene = "transition"
 
     def draw(self, screen):
-        screen.fill(BLACK)
+        draw_story_backdrop(screen, "night")
 
         # Warm amber glow in center
         pulse = 0.8 + 0.2 * math.sin(self.glow_timer * 1.2)

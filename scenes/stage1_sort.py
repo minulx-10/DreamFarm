@@ -2,7 +2,7 @@ import pygame
 import random
 from core.game_state import game_state
 from core.assets import *
-from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel
+from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel
 
 class SortItem:
     def __init__(self, item_type, x, y):
@@ -48,8 +48,8 @@ class Stage1Scene:
         for _ in range(3): self.spawn_item('leaf')
             
         self.dragged_item = None
-        self.bin_keep = pygame.Rect(140, 400, 120, 120)
-        self.bin_trash = pygame.Rect(540, 400, 120, 120)
+        self.bin_keep = pygame.Rect(140, 350, 120, 120)
+        self.bin_trash = pygame.Rect(540, 350, 120, 120)
         self.hovered_name = "밭 준비하기"
         self.hovered_desc = "씨앗은 왼쪽 밭으로, 방해물은 오른쪽 통으로 옮기세요."
         self.stage_clear = False
@@ -59,6 +59,26 @@ class Stage1Scene:
         x = random.randint(100, 700 - 40)
         y = random.randint(100, 350 - 40)
         self.items.append(SortItem(itype, x, y))
+
+    def draw_seed_bed(self, screen):
+        frame = self.bin_keep.inflate(18, 18)
+        draw_light_panel(screen, frame)
+        bed = self.bin_keep.inflate(-8, -8)
+        pygame.draw.rect(screen, DIRT_DARK, bed.move(0, 5), border_radius=10)
+        pygame.draw.rect(screen, DIRT_COLOR, bed, border_radius=10)
+        pygame.draw.rect(screen, (92, 61, 42), bed, 3, border_radius=10)
+        for y in range(bed.y + 24, bed.bottom - 18, 24):
+            pygame.draw.line(screen, (105, 69, 45), (bed.x + 12, y), (bed.right - 12, y + 2), 2)
+        for x in range(bed.x + 24, bed.right - 14, 30):
+            pygame.draw.line(screen, (112, 72, 47), (x, bed.y + 14), (x - 8, bed.bottom - 14), 1)
+        for x, y in [(bed.x + 26, bed.y + 36), (bed.x + 58, bed.y + 60), (bed.x + 82, bed.y + 34)]:
+            screen.blit(pygame.transform.scale(sprites["sprout1"], (24, 18)), (x, y))
+
+    def draw_trash_zone(self, screen):
+        frame = self.bin_trash.inflate(18, 18)
+        draw_light_panel(screen, frame)
+        pygame.draw.ellipse(screen, (65, 62, 56), (self.bin_trash.x + 10, self.bin_trash.bottom - 4, 100, 20))
+        screen.blit(sprites['trashcan'], (self.bin_trash.x, self.bin_trash.y))
 
     def handle_events(self, events):
         if self.stage_clear: return
@@ -131,16 +151,16 @@ class Stage1Scene:
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
         
-        screen.blit(sprites['basket'], (self.bin_keep.x, self.bin_keep.y))
+        self.draw_seed_bed(screen)
         font = get_font(24)
         keep_text = font.render("밭에 심기", True, BLACK)
-        pygame.draw.rect(screen, WOOD_LIGHT, (self.bin_keep.centerx - 60, self.bin_keep.bottom + 10, 120, 30), border_radius=5)
-        screen.blit(keep_text, (self.bin_keep.centerx - keep_text.get_width()//2, self.bin_keep.bottom + 12))
+        draw_light_panel(screen, pygame.Rect(self.bin_keep.centerx - 66, self.bin_keep.y - 40, 132, 34))
+        screen.blit(keep_text, (self.bin_keep.centerx - keep_text.get_width()//2, self.bin_keep.y - 36))
 
-        screen.blit(sprites['trashcan'], (self.bin_trash.x, self.bin_trash.y))
+        self.draw_trash_zone(screen)
         trash_text = font.render("쓰레기통", True, BLACK)
-        pygame.draw.rect(screen, WOOD_LIGHT, (self.bin_trash.centerx - 60, self.bin_trash.bottom + 10, 120, 30), border_radius=5)
-        screen.blit(trash_text, (self.bin_trash.centerx - trash_text.get_width()//2, self.bin_trash.bottom + 12))
+        draw_light_panel(screen, pygame.Rect(self.bin_trash.centerx - 66, self.bin_trash.y - 40, 132, 34))
+        screen.blit(trash_text, (self.bin_trash.centerx - trash_text.get_width()//2, self.bin_trash.y - 36))
 
         for item in self.items: item.draw(screen)
         draw_top_bar(screen)

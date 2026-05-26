@@ -2,7 +2,7 @@ import pygame
 import math
 from core.game_state import game_state
 from core.assets import *
-from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel
+from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
 class Stage4Scene:
@@ -150,17 +150,19 @@ class Stage4Scene:
             gx, gy, gw, gh = 200, 430, 400, 35
             panel = pygame.Rect(gx - 8, gy - 8, gw + 16, gh + 16)
             draw_wood_panel(screen, panel)
-            pygame.draw.rect(screen, BLACK, (gx, gy, gw, gh))
+            gauge_rect = pygame.Rect(gx, gy, gw, gh)
+            pygame.draw.rect(screen, (36, 47, 50), gauge_rect, border_radius=8)
 
             # Target zone (green)
             tz_x = gx + int(gw * self.target_min / 100)
             tz_w = int(gw * (self.target_max - self.target_min) / 100)
-            pygame.draw.rect(screen, (60, 160, 60), (tz_x, gy, tz_w, gh))
+            pygame.draw.rect(screen, mix_color(GRASS_COLOR, WHITE, 0.18), (tz_x, gy, tz_w, gh), border_radius=6)
+            pygame.draw.rect(screen, (87, 109, 96), gauge_rect, 2, border_radius=8)
 
             # Cursor
             cx = gx + int(gw * self.gauge_power / 100)
-            pygame.draw.rect(screen, (255, 220, 100), (cx - 4, gy - 8, 8, gh + 16))
-            pygame.draw.rect(screen, WHITE, (cx - 4, gy - 8, 8, gh + 16), 2)
+            pygame.draw.rect(screen, (244, 197, 80), (cx - 5, gy - 8, 10, gh + 16), border_radius=5)
+            pygame.draw.rect(screen, WHITE, (cx - 5, gy - 8, 10, gh + 16), 2, border_radius=5)
 
             # Labels
             font = get_font(14)

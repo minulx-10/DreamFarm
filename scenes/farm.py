@@ -11,8 +11,9 @@ from core.game_state import (
 )
 from core.assets import *
 from core.ui import (
-    clamp_percent, draw_light_panel, draw_wood_panel, draw_top_bar,
-    draw_bottom_bar, draw_understanding_badge,
+    draw_light_panel, draw_wood_panel, draw_top_bar,
+    draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
+    wrap_text,
 )
 
 
@@ -24,18 +25,7 @@ class Button:
         self.font = get_font(20)
 
     def draw(self, screen):
-        pygame.draw.rect(screen, WOOD_DARK, self.rect.move(3, 3), border_radius=6)
-        pygame.draw.rect(screen, PANEL_PALE, self.rect, border_radius=6)
-        pygame.draw.rect(screen, WOOD_LIGHT, self.rect.inflate(-6, -6), border_radius=4)
-        pygame.draw.rect(screen, TEXT_DARK, self.rect, 2, border_radius=6)
-        text_surf = self.font.render(self.text, True, TEXT_DARK)
-        screen.blit(
-            text_surf,
-            (
-                self.rect.centerx - text_surf.get_width() // 2,
-                self.rect.centery - text_surf.get_height() // 2,
-            ),
-        )
+        draw_button(screen, self.rect, self.text, self.font)
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)
@@ -45,7 +35,7 @@ class FarmScene:
     def __init__(self):
         self.day = 1
         self.growth = 0
-        self.growth_goal = 36
+        self.growth_goal = 18
         self.moisture = 44
         self.health = 66
         self.weeds = 25
@@ -56,23 +46,16 @@ class FarmScene:
         self.last_action = ""
         self.message = "상태를 확인하세요."
         self.notice = "추천 행동: 살펴보기"
-        self.memory_cooldown = 2
-        self.minigame_cooldown = 5
+        self.memory_cooldown = 1
+        self.minigame_cooldown = 2
         self.last_minigame = None
         self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
         # New systems
         self.combo_count = 0
-        self.story_cooldown = 8
+        self.story_cooldown = 4
         self.stories_seen = set()
-        # Dad shadow: smooth fade with drift
-        self.dad_shadow_alpha = 0
-        self.dad_shadow_timer = 0
-        self.dad_shadow_total = 0
-        self.dad_shadow_text = ""
-        self.dad_shadow_x = 0
-        self.dad_shadow_phase = "off"
         # Echo: longer display with panel
         self.echo_text = ""
         self.echo_timer = 0
@@ -173,6 +156,8 @@ class FarmScene:
 
         self.actions_taken += 1
         self.last_action = action
+        if action == "물 주기":
+            game_state.water_count += 1
         difficulty = 1 + self.growth // 6
         result = self.apply_action(action, difficulty)
         is_fail = "실패" in result or "효과 낮음" in result
@@ -189,10 +174,10 @@ class FarmScene:
             self.combo_count = 0
         if self.combo_count == 3:
             result += " 감이 잡히는 듯하다."
-            self.growth += 1
+            self.growth += 2
         elif self.combo_count == 5:
             result += " 아버지의 리듬이 느껴진다."
-            game_state.understanding += 3
+            game_state.understanding += 6
             self.combo_count = 0
 
         if self.health <= 20:
@@ -200,12 +185,12 @@ class FarmScene:
             self.growth = max(0, self.growth - 1)
             result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
         else:
-            gain = 1
+            gain = 2
             if self.is_good_turn() and action == "기다리기":
                 gain += 1
             self.growth += gain
             if self.is_good_turn():
-                game_state.understanding += 1
+                game_state.understanding += 2
             result += f" 밭일을 이어가며 성장했습니다. (+성장 {gain})"
 
         # #5 Failure echo + lesson recording
@@ -233,19 +218,6 @@ class FarmScene:
             if ae and random.random() < 0.45:
                 self.echo_text = ae
                 self.echo_timer = 6.0
-
-        # Dad shadow (smooth fade animation)
-        shadow_chance = 0.20 if game_state.dad_mode else 0.12
-        if not is_fail and random.random() < shadow_chance and self.dad_shadow_phase == "off":
-            self.dad_shadow_phase = "fade_in"
-            self.dad_shadow_timer = 0
-            self.dad_shadow_total = 4.0
-            self.dad_shadow_x = random.choice([85, 130, 280, 320])
-            self.dad_shadow_text = random.choice([
-                "같은 동작을 반복하던 누군가의 뒷모습이 스쳐 지나간다.",
-                "어디선가 익숙한 손길이 느껴졌다.",
-                "아버지가 여기 서 있었던 것 같다.",
-            ])
 
         # #12 Silent gifts every 5 turns
         if self.day % 5 == 0:
@@ -300,7 +272,7 @@ class FarmScene:
 
     def apply_action(self, action, difficulty):
         if action == "살펴보기":
-            game_state.understanding += 1
+            game_state.understanding += 2
             self.stress = max(0, self.stress - 4)
             return self.inspect_message()
 
@@ -644,28 +616,6 @@ class FarmScene:
         self.minigame_cooldown = 7 if mg == "stage1" else 5
 
     def update(self, dt):
-        # Dad shadow smooth animation
-        if self.dad_shadow_phase != "off":
-            self.dad_shadow_timer += dt
-            t = self.dad_shadow_timer
-            total = self.dad_shadow_total
-            fade_in_dur = 0.8
-            fade_out_start = total - 1.0
-            if self.dad_shadow_phase == "fade_in":
-                self.dad_shadow_alpha = int(min(120, (t / fade_in_dur) * 120))
-                if t >= fade_in_dur:
-                    self.dad_shadow_phase = "hold"
-            elif self.dad_shadow_phase == "hold":
-                self.dad_shadow_alpha = 120
-                self.dad_shadow_x += 0.15 * dt * 60
-                if t >= fade_out_start:
-                    self.dad_shadow_phase = "fade_out"
-            elif self.dad_shadow_phase == "fade_out":
-                remaining = max(0, total - t)
-                self.dad_shadow_alpha = int(120 * (remaining / 1.0))
-                if t >= total:
-                    self.dad_shadow_phase = "off"
-                    self.dad_shadow_alpha = 0
         # Echo fade
         if self.echo_timer > 0:
             self.echo_timer -= dt
@@ -686,13 +636,10 @@ class FarmScene:
 
     def draw_status_meter(self, screen, label, value, x, y, color):
         font = get_font(17)
-        label_surf = font.render(label, True, BLACK)
+        label_surf = font.render(label, True, TEXT_DARK)
         screen.blit(label_surf, (x, y - 2))
         bar = pygame.Rect(x + 58, y, 155, 15)
-        pygame.draw.rect(screen, (70, 55, 40), bar)
-        fill = pygame.Rect(bar.x + 2, bar.y + 2, int((bar.w - 4) * clamp_percent(value)), bar.h - 4)
-        pygame.draw.rect(screen, color, fill)
-        pygame.draw.rect(screen, BLACK, bar, 2)
+        draw_meter_bar(screen, bar, value, 100, color)
 
     def draw_labeled_meter(self, screen, label, value, max_value, x, y, w, color):
         font = get_font(16)
@@ -703,10 +650,7 @@ class FarmScene:
         screen.blit(value_surf, (x + w - value_surf.get_width(), y - 1))
 
         bar = pygame.Rect(x, y + 22, w, 15)
-        fill_w = int((bar.w - 4) * clamp_percent(value, max_value))
-        pygame.draw.rect(screen, (82, 62, 42), bar)
-        pygame.draw.rect(screen, color, (bar.x + 2, bar.y + 2, fill_w, bar.h - 4))
-        pygame.draw.rect(screen, TEXT_DARK, bar, 2)
+        draw_meter_bar(screen, bar, value, max_value, color)
 
     def draw_field_summary(self, screen):
         panel = pygame.Rect(430, 82, 320, 100)
@@ -764,9 +708,9 @@ class FarmScene:
         screen.blit(sprite, (x + offset[0], y + offset[1]))
 
     def draw_farm_plot(self, screen):
-        plot_rect = pygame.Rect(50, 145, 350, 305)
-        draw_wood_panel(screen, plot_rect)
-        inner_plot = plot_rect.inflate(-22, -22)
+        plot_rect = pygame.Rect(44, 140, 362, 318)
+        draw_light_panel(screen, plot_rect)
+        inner_plot = pygame.Rect(66, 168, 318, 256)
 
         sc = self.season_colors
         if self.moisture > 72:
@@ -776,14 +720,19 @@ class FarmScene:
         else:
             base_color = sc["dirt"]
 
-        pygame.draw.rect(screen, base_color, inner_plot)
-        pygame.draw.rect(screen, sc["dirt_dark"], inner_plot, 4)
+        pygame.draw.rect(screen, sc["dirt_dark"], inner_plot.move(0, 6), border_radius=14)
+        pygame.draw.rect(screen, base_color, inner_plot, border_radius=14)
+        pygame.draw.rect(screen, (238, 196, 128), inner_plot, 3, border_radius=14)
+        pygame.draw.rect(screen, sc["dirt_dark"], inner_plot.inflate(-10, -10), 2, border_radius=10)
 
         for y in (inner_plot.y + 72, inner_plot.y + 182):
-            pygame.draw.rect(screen, DIRT_DARK, (inner_plot.x + 20, y, inner_plot.w - 40, 56))
-            pygame.draw.rect(screen, base_color, (inner_plot.x + 28, y + 8, inner_plot.w - 56, 40))
+            bed_shadow = pygame.Rect(inner_plot.x + 18, y + 5, inner_plot.w - 36, 58)
+            bed = pygame.Rect(inner_plot.x + 22, y, inner_plot.w - 44, 54)
+            pygame.draw.rect(screen, sc["dirt_dark"], bed_shadow, border_radius=10)
+            pygame.draw.rect(screen, base_color, bed, border_radius=10)
+            pygame.draw.rect(screen, (171, 110, 67), bed, 2, border_radius=10)
             for x in range(inner_plot.x + 28, inner_plot.right - 44, 40):
-                pygame.draw.rect(screen, DIRT_DARK, (x, y + 8, 4, 40))
+                pygame.draw.rect(screen, sc["dirt_dark"], (x, y + 9, 4, 37), border_radius=2)
 
         if self.moisture < 28:
             for x in range(inner_plot.x + 35, inner_plot.right - 35, 55):
@@ -829,21 +778,6 @@ class FarmScene:
         if hour < 7 or hour >= 17:
             screen.blit(tint, (0, 0))
 
-        # Dad shadow overlay with narration
-        if self.dad_shadow_alpha > 0:
-            dad = sprites["dad"]
-            shadow_surf = dad.copy()
-            shadow_surf.set_alpha(self.dad_shadow_alpha)
-            sx = int(self.dad_shadow_x)
-            screen.blit(shadow_surf, (sx, 200))
-            # Shadow narration text
-            if self.dad_shadow_text and self.dad_shadow_alpha > 30:
-                sf = get_font(15)
-                ta = min(self.dad_shadow_alpha, 160)
-                tc = (int(ta * 0.5), int(ta * 0.45), int(ta * 0.3))
-                ts = sf.render(self.dad_shadow_text, True, tc)
-                screen.blit(ts, (225 - ts.get_width() // 2, 360))
-
         title_font = get_font(24)
         # #10 Dad mode title
         if game_state.dad_mode:
@@ -888,8 +822,14 @@ class FarmScene:
         # #15 Sensory bar at top
         if self.sense_text:
             sf = get_font(13)
-            ss = sf.render(f"[{self.sense_text}]", True, (110, 95, 70))
-            screen.blit(ss, (400 - ss.get_width() // 2, 74))
+            line = wrap_text(self.sense_text, sf, 315, max_lines=1)[0]
+            ss = sf.render(line, True, (231, 219, 178))
+            cap_rect = pygame.Rect(30, 43, ss.get_width() + 18, 18)
+            cap_surf = pygame.Surface((cap_rect.w, cap_rect.h), pygame.SRCALPHA)
+            cap_surf.fill((25, 34, 35, 210))
+            pygame.draw.rect(cap_surf, (107, 121, 103, 220), (0, 0, cap_rect.w, cap_rect.h), 1, border_radius=6)
+            screen.blit(cap_surf, cap_rect)
+            screen.blit(ss, (cap_rect.x + 9, cap_rect.y + 2))
 
         # Echo text overlay — styled floating panel
         if self.echo_timer > 0 and self.echo_text:

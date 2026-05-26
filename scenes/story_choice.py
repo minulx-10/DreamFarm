@@ -1,7 +1,7 @@
 import pygame
 from core.game_state import game_state
-from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, WOOD_DARK, WOOD_COLOR, PANEL_PALE, get_font
-from core.ui import draw_light_panel, wrap_text
+from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
+from core.ui import draw_button, draw_light_panel, draw_story_backdrop, wrap_text
 
 
 class StoryChoiceScene:
@@ -51,6 +51,12 @@ class StoryChoiceScene:
                 game_state.understanding += val
             elif key == "result_text":
                 self.result_text = val
+            elif key == "impact_text":
+                game_state.choice_impacts.append({
+                    "title": self.title,
+                    "choice": label,
+                    "impact": val,
+                })
         self.choice_made = True
         self.result_timer = 3.0
 
@@ -95,23 +101,10 @@ class StoryChoiceScene:
                 self.finished = True
 
     def _draw_btn(self, screen, rect, label, hovered):
-        shadow = rect.move(3, 3)
-        pygame.draw.rect(screen, WOOD_DARK, shadow, border_radius=8)
-        bg = WOOD_COLOR if hovered else PANEL_PALE
-        pygame.draw.rect(screen, bg, rect, border_radius=8)
-        pygame.draw.rect(screen, TEXT_DARK, rect, 2, border_radius=8)
-        lines = wrap_text(label, self.font_small, rect.w - 24)
-        y = rect.y + (rect.h - len(lines) * 22) // 2
-        for line in lines:
-            surf = self.font_small.render(line, True, TEXT_DARK)
-            screen.blit(surf, (rect.centerx - surf.get_width() // 2, y))
-            y += 22
+        draw_button(screen, rect, label, self.font_small, hovered=hovered)
 
     def draw(self, screen):
-        screen.fill((18, 15, 24))
-        for y in range(0, 600, 18):
-            shade = 22 + (y // 18) % 2 * 6
-            pygame.draw.rect(screen, (shade, max(0, shade - 3), shade + 5), (0, y, 800, 18))
+        draw_story_backdrop(screen, "night")
 
         panel = pygame.Rect(50, 50, 700, 500)
         draw_light_panel(screen, panel)
