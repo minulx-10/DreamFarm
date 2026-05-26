@@ -18,11 +18,11 @@ from core.ui import (
 
 
 class Button:
-    def __init__(self, x, y, w, h, text, value):
+    def __init__(self, x, y, w, h, text, value, font_size=20):
         self.rect = pygame.Rect(x, y, w, h)
         self.text = text
         self.value = value
-        self.font = get_font(20)
+        self.font = get_font(font_size)
 
     def draw(self, screen):
         draw_button(screen, self.rect, self.text, self.font)
@@ -52,6 +52,8 @@ class FarmScene:
         self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
+        self.action_menu_open = False
+        self.action_scroll = 0
         # New systems
         self.combo_count = 0
         self.story_cooldown = 4
@@ -80,39 +82,71 @@ class FarmScene:
         self.rebuild_buttons()
 
     def rebuild_buttons(self):
-        actions = self.get_available_actions()
         self.buttons = []
         start_x = 440
         start_y = 330
-        for i, action in enumerate(actions):
-            bx = start_x + (i % 2) * 160
-            by = start_y + (i // 2) * 72
-            self.buttons.append(Button(bx, by, 140, 54, action, action))
+        if self.is_harvest_ready():
+            self.buttons.append(Button(start_x, start_y, 300, 126, "수확하기", "수확하기", font_size=30))
+            return
 
-    def get_available_actions(self):
-        if self.growth >= self.growth_goal:
-            return ["수확하기", "살펴보기", "기다리기", "흙 북돋기"]
+        if not self.action_menu_open:
+            self.buttons.append(Button(start_x, start_y, 300, 126, "행동하기", "__open_actions__", font_size=30))
+            return
 
-        priority = ["살펴보기"]
+        actions = self.get_action_choices()
+        max_scroll = max(0, len(actions) - 4)
+        self.action_scroll = max(0, min(self.action_scroll, max_scroll))
+        for i, action in enumerate(actions[self.action_scroll:self.action_scroll + 4]):
+            by = start_y + i * 31
+            self.buttons.append(Button(start_x, by, 284, 28, action, action, font_size=17))
+
+    def is_harvest_ready(self):
+        return self.growth >= self.growth_goal and self.health >= 35
+
+    def get_needed_actions(self):
+        needs = []
+
+        def add(action, score, order):
+            if score > 0:
+                needs.append((action, score, order))
+
         if self.moisture < 35:
-            priority.append("물 주기")
+            add("물 주기", 35 - self.moisture, 0)
         if self.moisture > 72 or self.drainage < 35:
-            priority.append("배수로 정리")
-        if self.weeds > 28:
-            priority.append("잡초 뽑기")
-        if self.pests > 24:
-            priority.append("해충 살피기")
+            add("배수로 정리", max(self.moisture - 72, 35 - self.drainage), 1)
+        if self.weeds > 20:
+            weed_score = self.weeds - 20
+            if self.weeds > 32:
+                weed_score += 12
+            add("잡초 뽑기", weed_score, 2)
+        if self.pests > 18:
+            pest_score = self.pests - 18
+            if self.pests > 32:
+                pest_score += 12
+            add("해충 살피기", pest_score, 3)
         if self.health < 55 or self.stress > 35:
-            priority.append("흙 북돋기")
+            add("흙 북돋기", max(55 - self.health, self.stress - 35), 4)
+
+        needs.sort(key=lambda item: (-item[1], item[2]))
+        return [action for action, _score, _order in needs]
+
+    def get_action_choices(self):
+        choices = ["살펴보기"]
+        for action in self.get_needed_actions():
+            if action not in choices:
+                choices.append(action)
 
         fillers = ["기다리기", "물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
         for action in fillers:
-            if len(priority) >= 4:
-                break
-            if action not in priority:
-                priority.append(action)
+            if action not in choices:
+                choices.append(action)
 
-        return priority[:4]
+        return choices
+
+    def get_available_actions(self):
+        if self.is_harvest_ready():
+            return ["수확하기"]
+        return self.get_action_choices()
 
     def clamp_stats(self):
         self.moisture = max(0, min(100, self.moisture))
@@ -124,15 +158,38 @@ class FarmScene:
 
     def handle_events(self, events):
         for event in events:
+            if event.type == pygame.MOUSEWHEEL and self.action_menu_open:
+                max_scroll = max(0, len(self.get_action_choices()) - 4)
+                self.action_scroll = max(0, min(max_scroll, self.action_scroll - event.y))
+                self.rebuild_buttons()
+                continue
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                clicked = False
                 for btn in self.buttons:
                     if btn.is_clicked(event.pos):
-                        self.do_action(btn.value)
+                        clicked = True
+                        if btn.value == "__open_actions__":
+                            self.action_menu_open = True
+                            self.action_scroll = 0
+                            self.rebuild_buttons()
+                        else:
+                            self.action_menu_open = False
+                            self.do_action(btn.value)
                         break
+                if self.action_menu_open and not clicked:
+                    self.action_menu_open = False
+                    self.rebuild_buttons()
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and self.action_menu_open and event.button in (4, 5):
+                max_scroll = max(0, len(self.get_action_choices()) - 4)
+                delta = -1 if event.button == 4 else 1
+                self.action_scroll = max(0, min(max_scroll, self.action_scroll + delta))
+                self.rebuild_buttons()
 
     def do_action(self, action):
         if action == "수확하기":
-            if self.growth >= self.growth_goal and self.health >= 35:
+            if self.is_harvest_ready():
                 game_state.understanding += 12
                 game_state.final_health = self.health
                 game_state.farm_mistakes = self.mistakes
@@ -150,7 +207,7 @@ class FarmScene:
                 self.health -= 8
                 self.stress += 10
                 self.mistakes += 1
-                self.message = "아직 성장 수치가 부족합니다."
+                self.message = "아직 수확할 상태가 아닙니다."
                 self.notice = "추천 행동: 수확하지 말고 밭 상태를 먼저 회복하세요."
             return
 
@@ -445,8 +502,10 @@ class FarmScene:
         return "상태 확인: " + ", ".join(warnings[:3]) + "."
 
     def build_notice(self):
-        if self.growth >= self.growth_goal:
+        if self.is_harvest_ready():
             return "추천 행동: 수확하기"
+        if self.growth >= self.growth_goal:
+            return "수확 전 건강을 회복하세요."
         if self.health < 45:
             return "추천 행동: 흙 북돋기"
         if self.moisture < 30:
@@ -667,7 +726,7 @@ class FarmScene:
         health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_DARK)
         screen.blit(health_text, (450, 162))
 
-        if self.growth >= self.growth_goal:
+        if self.is_harvest_ready():
             ready = status_font.render("수확 가능", True, (145, 55, 0))
             screen.blit(ready, (640, 162))
 
@@ -678,6 +737,19 @@ class FarmScene:
         self.draw_status_meter(screen, "건강", self.health, 452, 228, (90, 185, 95))
         self.draw_status_meter(screen, "잡초", self.weeds, 452, 251, (80, 140, 55))
         self.draw_status_meter(screen, "해충", self.pests, 452, 274, (210, 110, 60))
+
+    def draw_action_scrollbar(self, screen):
+        actions = self.get_action_choices()
+        if not self.action_menu_open or len(actions) <= 4:
+            return
+
+        track = pygame.Rect(732, 330, 8, 121)
+        pygame.draw.rect(screen, (198, 166, 118), track, border_radius=4)
+        thumb_h = max(22, int(track.h * 4 / len(actions)))
+        max_scroll = max(1, len(actions) - 4)
+        thumb_y = track.y + int((track.h - thumb_h) * self.action_scroll / max_scroll)
+        thumb = pygame.Rect(track.x, thumb_y, track.w, thumb_h)
+        pygame.draw.rect(screen, (123, 92, 65), thumb, border_radius=4)
 
     def crop_positions(self):
         return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
@@ -816,6 +888,7 @@ class FarmScene:
 
         for btn in self.buttons:
             btn.draw(screen)
+        self.draw_action_scrollbar(screen)
 
         draw_top_bar(screen, show_stats=False)
 
