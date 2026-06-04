@@ -28,7 +28,7 @@ class SortItem:
             self.is_good = False
         elif item_type == 'leaf':
             self.name = "썩은 잎"
-            self.desc = "병이 옮을 수 있습니다. 치워야 합니다."
+            self.desc = "병을 옮길 수 있습니다. 치워야 합니다."
             self.is_good = False
 
     def draw(self, screen):
