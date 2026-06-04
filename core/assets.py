@@ -286,6 +286,20 @@ X.....X....X.X..X
             raw_img = pygame.image.load(field_bed_path).convert_alpha()
             cropped = raw_img.subsurface(pygame.Rect(59, 74, 904, 763))
             sprites['field_bed'] = pygame.transform.scale(cropped, (362, 318))
+
+            # 4 모퉁이의 흰색/베이지색 여백 픽셀을 투명 처리하여 둥글게 마감
+            w, h = 362, 318
+            for cx, cy in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
+                dx_dir = 1 if cx == 0 else -1
+                dy_dir = 1 if cy == 0 else -1
+                for dy in range(16):
+                    for dx in range(16):
+                        px = cx + dx * dx_dir
+                        py = cy + dy * dy_dir
+                        if 0 <= px < w and 0 <= py < h:
+                            color = sprites['field_bed'].get_at((px, py))
+                            if color.r > 200 and color.g > 195 and color.b > 170:
+                                sprites['field_bed'].set_at((px, py), (0, 0, 0, 0))
         except Exception as e:
             print("Failed to load field_bed image:", e)
 
