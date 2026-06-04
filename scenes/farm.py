@@ -793,6 +793,12 @@ class FarmScene:
         bar = pygame.Rect(x, y + 22, w, 15)
         draw_meter_bar(screen, bar, value, max_value, color)
 
+        if label == "성장":
+            fill_w = int(bar.w * (shown_value / max_value))
+            carrot_x = max(bar.x, bar.x + fill_w - 3)
+            # Render a cute mini carrot moving along with the growth progress
+            screen.blit(sprites["mini_carrot"], (carrot_x, bar.y - 1))
+
     def draw_field_summary(self, screen):
         panel = pygame.Rect(430, 82, 320, 100)
         draw_light_panel(screen, panel)

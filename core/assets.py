@@ -116,6 +116,16 @@ DddlddddD
 ..DddD...
 ...DD....
 ''', 3)
+    sprites['mini_carrot'] = create_sprite_from_string('''
+.G.
+gGg
+.X.
+XOX
+XOX
+XoX
+.X.
+.X.
+''', 2)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
 ..XooX..
@@ -178,19 +188,20 @@ XgGGGGGgX
 ''', 6)
     sprites['carrot'] = create_sprite_from_string('''
 ...X.X...
-..XGXGX..
-.XGGGGGX.
+..XGgGgX.
+.XGgGgGgX
 ..XgXgX..
 .XXXXXXX.
-XOOOOOOOX
-XOOOOOOOX
-XoOOOOOoX
-.XOOOOOX.
-.XoOOOoX.
-..XOOOX..
-..XoOoX..
-...XXX...
+XoOOOOOOX
+XoOOYOOOX
+XoOOYOOOX
+.XoOOOOX.
+.XoOOOOX.
+..XoOOX..
+..XoOOX..
 ...XoX...
+...XoX...
+....X....
 ....X....
 ''', 5)
     sprites['bug'] = create_sprite_from_string('''

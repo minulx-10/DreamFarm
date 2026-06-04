@@ -51,6 +51,7 @@ class Stage4Scene:
 
         self.stage_clear = False
         self.clear_timer = 2.0
+        self.dirt_particles = []
 
     def handle_events(self, events):
         if self.stage_clear or self.phase == "intro":
@@ -126,6 +127,18 @@ class Stage4Scene:
                 # Safe speed limit is roughly 120 pixels per second
                 tension_gain = max(0.0, (speed - 110.0) * 0.16)
                 self.tension = min(100.0, self.tension + tension_gain)
+                
+                # Generate dirt particles based on drag displacement
+                for _ in range(int(dy // 1.5) + 1):
+                    self.dirt_particles.append({
+                        'x': random.uniform(370, 430),
+                        'y': random.uniform(330, 360),
+                        'vx': random.uniform(-65, 65),
+                        'vy': random.uniform(-40, 20),
+                        'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                        'size': random.randint(2, 5),
+                        'life': random.uniform(0.3, 0.6)
+                    })
             else:
                 # Idle or moving down decreases tension
                 self.tension = max(0.0, self.tension - 60.0 * dt)
@@ -167,6 +180,15 @@ class Stage4Scene:
                     self.carrot_y = self.carrot_start_y
                     self.tension = 0.0
 
+        # Update dirt particles
+        for p in self.dirt_particles[:]:
+            p['x'] += p['vx'] * dt
+            p['y'] += p['vy'] * dt
+            p['vy'] += 380.0 * dt  # Gravity
+            p['life'] -= dt
+            if p['life'] <= 0:
+                self.dirt_particles.remove(p)
+
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
 
@@ -183,10 +205,23 @@ class Stage4Scene:
             # Draw individual background crops slightly buried
             screen.blit(bg_sprout, (cx - bsw // 2 + sx, cy + 12 - bsh // 2))
 
-        # 2. Main target carrot dirt mound (3D Styled)
+        # 2. Main target carrot dirt mound (3D Styled with pixel texture)
         mound_y = 350
         pygame.draw.ellipse(screen, DIRT_COLOR, (260 + sx, mound_y, 280, 70))
         pygame.draw.ellipse(screen, DIRT_DARK, (260 + sx, mound_y, 280, 70), 3)
+        # 입체 흙 질감 라인들
+        pygame.draw.ellipse(screen, DIRT_DARK, (280 + sx, mound_y + 12, 240, 46), 2)
+        pygame.draw.ellipse(screen, (165, 110, 70), (300 + sx, mound_y + 6, 200, 24), 2)
+        # 흙 알갱이 묘사
+        rng = random.Random(123)
+        for _ in range(15):
+            rx = rng.randint(285, 515)
+            ry = rng.randint(358, 398)
+            pygame.draw.rect(screen, DIRT_DARK, (rx + sx, ry, 3, 3))
+
+        # Draw falling dirt particles
+        for p in self.dirt_particles:
+            pygame.draw.rect(screen, p['color'], (int(p['x'] + sx), int(p['y']), p['size'], p['size']))
 
         # 3. Draw target carrot sprout leaves & body
         carrot = sprites["carrot"]

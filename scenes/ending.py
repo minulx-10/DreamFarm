@@ -390,14 +390,23 @@ class EndingScene:
             screen.blit(prompt, (400 - prompt.get_width() // 2, 562))
 
     def _draw_table(self, screen):
-        bg_r = min(60, int(self.phase_timer * 30))
-        bg_g = min(40, int(self.phase_timer * 20))
-        bg_b = min(25, int(self.phase_timer * 12))
-        screen.fill((bg_r, bg_g, bg_b))
-        
-        # Table surface
+        # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
+        draw_story_backdrop(screen, "night")
+        dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+        dark_overlay.fill((15, 10, 5, 140))
+        screen.blit(dark_overlay, (0, 0))
+
+        tc = min(255, self.table_alpha)
+
+        # 은은한 등불 조명 (Radial Warm Glow)
+        if tc > 50:
+            glow_surf = pygame.Surface((340, 340), pygame.SRCALPHA)
+            for r in range(160, 0, -8):
+                alpha = int(45 * (1.0 - r / 160.0) * (tc / 255.0))
+                pygame.draw.circle(glow_surf, (255, 210, 120, alpha), (170, 170), r)
+            screen.blit(glow_surf, (400 - 170, 320 - 170))
+
         if self.table_alpha > 50:
-            tc = min(255, self.table_alpha)
             
             # 1. Table Drawing (Wooden Texture Bevel)
             table_rect = pygame.Rect(100, 350, 600, 150)
@@ -455,7 +464,18 @@ class EndingScene:
                 pygame.draw.line(screen, (min(tc, 185), min(tc, 155), min(tc, 110)), (494, 362), (502, 363), 2)
 
     def _draw_carrot_click(self, screen):
-        screen.fill((60, 40, 25))
+        # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
+        draw_story_backdrop(screen, "night")
+        dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+        dark_overlay.fill((15, 10, 5, 140))
+        screen.blit(dark_overlay, (0, 0))
+
+        # 은은한 등불 조명 (Radial Warm Glow)
+        glow_surf = pygame.Surface((340, 340), pygame.SRCALPHA)
+        for r in range(160, 0, -8):
+            alpha = int(45 * (1.0 - r / 160.0))
+            pygame.draw.circle(glow_surf, (255, 210, 120, alpha), (170, 170), r)
+        screen.blit(glow_surf, (400 - 170, 320 - 170))
         
         # 1. Table
         pygame.draw.rect(screen, (165, 115, 70), (100, 350, 600, 150), border_radius=4)
@@ -475,17 +495,32 @@ class EndingScene:
         pygame.draw.ellipse(screen, (190, 182, 170), (plate_x, plate_y, pw, ph), 2)
         pygame.draw.ellipse(screen, (208, 202, 190), (plate_x + 12, plate_y + 6, pw - 24, ph - 12), 1)
 
-        # 3. Carrot sprite pulsing in center (Aligned properly inside the plate)
+        # 3. Golden Dream Sparkle Particles around the carrot
+        import random
+        import math
+        random.seed(42) # 고정된 위치에 반짝이 배치
+        for i in range(8):
+            angle = i * (2 * math.pi / 8) + self.carrot_pulse * 1.5
+            dist = 42 + 8 * math.sin(self.carrot_pulse * 4 + i)
+            px = int(400 + dist * math.cos(angle))
+            py = int(270 + dist * math.sin(angle) * 0.7)
+            size = max(2, int(4 + 2 * math.sin(self.carrot_pulse * 5 + i)))
+            alpha = int(150 + 100 * math.sin(self.carrot_pulse * 6 + i))
+            
+            sparkle = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+            pygame.draw.circle(sparkle, (255, 235, 140, alpha), (size, size), size)
+            screen.blit(sparkle, (px - size, py - size))
+
+        # 4. Carrot sprite pulsing in center (Aligned properly inside the plate)
         carrot = sprites["carrot"]
         scale = 1.0 + 0.06 * math.sin(self.carrot_pulse * 3)
         cw = int(carrot.get_width() * scale)
         ch = int(carrot.get_height() * scale)
         scaled = pygame.transform.scale(carrot, (cw, ch))
-        # Grounded on plate surface (Y: 336 instead of floating at 280)
         screen.blit(scaled, (400 - cw // 2, 336 - ch))
         
         # Prompt
-        prompt = self.font_small.render("당근을 클릭하세요", True, (200, 180, 140))
+        prompt = self.font_small.render("당근을 클릭하세요", True, (255, 225, 130))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 430))
 
     def _draw_golden(self, screen):
