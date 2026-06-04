@@ -92,6 +92,9 @@ def create_sprite_from_string(sprite_str, scale=4):
         'm': (108,124,124,255), # Metal shade
         'Y': (238,190,92,255),  # Warm accent
         'y': (178,132,70,255),  # Warm accent shade
+        'd': (87, 51, 25, 255),   # Pit base brown
+        'D': (56, 33, 15, 255),   # Pit dark shadow
+        'l': (110, 65, 30, 255),  # Pit light brown speckle
     }
     
     for y, line in enumerate(lines):
@@ -103,6 +106,16 @@ def create_sprite_from_string(sprite_str, scale=4):
 sprites = {}
 def init_sprites():
     if 'seed' in sprites: return
+    sprites['dirt_patch'] = create_sprite_from_string('''
+...DDD...
+..DdddD..
+.DddlddD.
+DdddddldD
+DddlddddD
+.DdddddD.
+..DddD...
+...DD....
+''', 3)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
 ..XooX..
