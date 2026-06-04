@@ -51,6 +51,7 @@ def main():
 
     while game_state.running:
         dt = clock.tick(60) / 1000.0
+        game_state.play_time += dt
         
         target_scene = game_state.current_scene
 

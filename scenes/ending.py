@@ -151,10 +151,17 @@ class EndingScene:
 
     def build_credit_lines(self):
         impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "rush") else "이어진 일들"
+        
+        # 플레이 타임 포맷팅 (분, 초)
+        m = int(game_state.play_time // 60)
+        s = int(game_state.play_time % 60)
+        play_time_str = f"플레이 시간: {m}분 {s}초" if m > 0 else f"플레이 시간: {s}초"
+
         lines = [
             "몽중농원",
             "",
             "이번 꿈에서 남은 기록",
+            play_time_str,
             f"물 뿌리기: {game_state.water_count}회",
             f"잡초 뽑기: {game_state.weed_count}회",
             f"해충 잡기: {game_state.pest_count}회",
@@ -191,7 +198,10 @@ class EndingScene:
             self.show_journal = True
         else:
             save_progress()
-            game_state.running = False
+            # 꺼지지 않고 다시 결과 화면으로 가서 리트라이나 다른 엔딩 구경을 할 수 있게 함
+            self.phase = "result"
+            self.result_done = True
+            self.phase_timer = 0
 
     def prepare_page(self, index):
         lines = []
@@ -322,7 +332,7 @@ class EndingScene:
             elif self.phase == "journal":
                 if click:
                     save_progress()
-                    game_state.running = False
+                    self.retry()
 
     def update(self, dt):
         self.carrot_pulse += dt

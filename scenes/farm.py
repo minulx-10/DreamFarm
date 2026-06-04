@@ -834,7 +834,8 @@ class FarmScene:
         pygame.draw.rect(screen, (123, 92, 65), thumb, border_radius=4)
 
     def crop_positions(self):
-        return [(112, 235), (210, 235), (308, 235), (112, 345), (210, 345), (308, 345)]
+        # 밭 이미지(field_bed)의 6개 흙구덩이 중앙 픽셀 위치에 맞게 조율됨 (offset (44, 140) 기준)
+        return [(126, 241), (223, 241), (322, 241), (126, 360), (223, 360), (322, 360)]
 
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         mound = pygame.Rect(x - 24, y + 32, 48, 16)
@@ -863,87 +864,52 @@ class FarmScene:
 
     def draw_farm_plot(self, screen):
         plot_rect = pygame.Rect(44, 140, 362, 318)
+        
+        # Draw base panel backplate
         draw_light_panel(screen, plot_rect)
-        inner_plot = pygame.Rect(66, 168, 318, 256)
-
-        sc = self.season_colors
-        if self.moisture > 72:
-            base_color = (110, 75, 45)       # Wet mud color
-        elif self.moisture < 28:
-            base_color = (135, 92, 60)       # Dry light dirt color
+        
+        # 1. Render user's custom pixel field_bed image if available, else draw fallback
+        if "field_bed" in sprites:
+            screen.blit(sprites["field_bed"], (plot_rect.x, plot_rect.y))
         else:
-            base_color = sc["dirt"]          # Normal dirt
+            # Fallback 3D-ish drawing in case file fails to load
+            inner_plot = pygame.Rect(66, 168, 318, 256)
+            sc = self.season_colors
+            base_color = (110, 75, 45) if self.moisture > 72 else (135, 92, 60) if self.moisture < 28 else sc["dirt"]
+            frame_rect = inner_plot.inflate(16, 16)
+            pygame.draw.rect(screen, (40, 30, 25), frame_rect.move(0, 4), border_radius=18)
+            pygame.draw.rect(screen, (132, 83, 48), frame_rect, border_radius=18)
+            pygame.draw.rect(screen, (185, 125, 80), frame_rect, 3, border_radius=18)
+            pygame.draw.rect(screen, (65, 42, 28), inner_plot.inflate(2, 2), 2, border_radius=14)
+            bed_bg_color = (80, 52, 36) if self.moisture > 72 else (100, 66, 46) if self.moisture < 28 else sc["dirt_dark"]
+            pygame.draw.rect(screen, bed_bg_color, inner_plot, border_radius=12)
+            pw, ph = 88, 92
+            for idx, (x, y) in enumerate(self.crop_positions()):
+                px, py = x - pw // 2, y + 12 - ph // 2
+                patch_rect = pygame.Rect(px, py, pw, ph)
+                pygame.draw.rect(screen, sc["dirt_dark"], patch_rect.move(0, 3), border_radius=12)
+                pygame.draw.rect(screen, base_color, patch_rect, border_radius=12)
+                pygame.draw.rect(screen, mix_color(base_color, (255, 235, 180), 0.16), patch_rect, 2, border_radius=12)
 
-        # 1. Draw outer 3D wood frame surrounding the inner plot
-        # WOOD_DARK = (75, 57, 45), WOOD_COLOR = (177, 123, 72), WOOD_LIGHT = (238, 201, 137)
-        frame_rect = inner_plot.inflate(16, 16)
-        # Drop shadow for the frame
-        pygame.draw.rect(screen, (40, 30, 25), frame_rect.move(0, 4), border_radius=18)
-        # Frame main body
-        pygame.draw.rect(screen, (132, 83, 48), frame_rect, border_radius=18)
-        # Highlight top/left borders for 3D bevel look
-        pygame.draw.rect(screen, (185, 125, 80), frame_rect, 3, border_radius=18)
-        # Deep inner rim shadow
-        pygame.draw.rect(screen, (65, 42, 28), inner_plot.inflate(2, 2), 2, border_radius=14)
-
-        # 2. Fill the main farm bed background (the space between soil patches)
-        # Made slightly darker than patches to emphasize the grid mounds
-        bed_bg_color = (80, 52, 36) if self.moisture > 72 else (100, 66, 46) if self.moisture < 28 else sc["dirt_dark"]
-        pygame.draw.rect(screen, bed_bg_color, inner_plot, border_radius=12)
-
-        # 3. Draw natural decorations (grass clumps and soil pebbles)
-        for dec in self.plot_decorations:
-            dx, dy = dec['x'], dec['y']
-            if dec['type'] == 'grass':
-                # Draw tiny 3-blade green pixel grass clump
-                pygame.draw.line(screen, (92, 148, 80), (dx, dy), (dx - 2, dy - 5), 2)
-                pygame.draw.line(screen, (92, 148, 80), (dx, dy), (dx, dy - 7), 2)
-                pygame.draw.line(screen, (74, 122, 64), (dx, dy), (dx + 3, dy - 5), 2)
-            elif dec['type'] == 'pebble':
-                # Draw small dark soil pebble with a tiny highlight dot
-                pygame.draw.circle(screen, (55, 36, 25), (dx, dy), 2)
-                pygame.draw.circle(screen, (135, 95, 70), (dx - 1, dy - 1), 1)
-
-        # 4. Draw 6 individual rounded 3D soil patches (2x3 Grid)
-        pw, ph = 88, 92
-        for idx, (x, y) in enumerate(self.crop_positions()):
-            px = x - pw // 2
-            py = y + 12 - ph // 2
-            patch_rect = pygame.Rect(px, py, pw, ph)
-            
-            # Patch shadow
-            pygame.draw.rect(screen, sc["dirt_dark"], patch_rect.move(0, 3), border_radius=12)
-            # Patch main body
-            pygame.draw.rect(screen, base_color, patch_rect, border_radius=12)
-            # Patch top highlighted edge (sunset reflection)
-            highlight_color = mix_color(base_color, (255, 235, 180), 0.16)
-            pygame.draw.rect(screen, highlight_color, patch_rect, 2, border_radius=12)
-
-            # Draw a few tiny texturing spots inside the patch to give soil texture
-            pygame.draw.circle(screen, sc["dirt_dark"], (px + 18, py + 22), 1)
-            pygame.draw.circle(screen, sc["dirt_dark"], (px + 68, py + 30), 1)
-            pygame.draw.circle(screen, sc["dirt_dark"], (px + 32, py + 72), 1)
-            pygame.draw.circle(screen, sc["dirt_dark"], (px + 58, py + 64), 1)
-
-        # Draw moisture-specific visual clues on patches if extreme
+        # 2. Draw moisture-specific visual clues over the patches
         if self.moisture < 28:
-            # Draw tiny cracking lines in the soil
+            # Draw tiny cracking lines in the soil patches
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x, y + 12
-                pygame.draw.line(screen, (90, 60, 42), (px - 26, py - 18), (px - 14, py - 12), 2)
-                pygame.draw.line(screen, (90, 60, 42), (px + 14, py + 18), (px + 28, py + 22), 2)
+                pygame.draw.line(screen, (82, 53, 35), (px - 22, py - 14), (px - 10, py - 8), 2)
+                pygame.draw.line(screen, (82, 53, 35), (px + 10, py + 14), (px + 22, py + 18), 2)
         elif self.moisture > 72:
-            # Draw small wet puddle reflections on mounds
+            # Draw wet puddle reflections under crops
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x - 18, y + 36
                 pygame.draw.ellipse(screen, (95, 130, 155), (px, py, 36, 6))
 
-        # 5. Draw actual crop sprites
+        # 3. Draw actual crop sprites
         growth_stage = max(0, min(self.growth, self.growth_goal))
         for idx, (x, y) in enumerate(self.crop_positions()):
             self.draw_crop(screen, x, y, growth_stage, idx)
 
-        # 6. Draw weeds & bugs on top of the scene
+        # 4. Draw weeds & bugs on top of the scene
         if self.weeds > 32:
             weed_count = 2 if self.weeds < 55 else 4
             weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]

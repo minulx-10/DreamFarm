@@ -255,6 +255,16 @@ X.....X....X.X..X
 ...XXX......X....
 ''', 3)
 
+    # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
+    field_bed_path = os.path.join(os.path.dirname(__file__), "field_bed.jpg")
+    if os.path.exists(field_bed_path):
+        try:
+            raw_img = pygame.image.load(field_bed_path).convert_alpha()
+            cropped = raw_img.subsurface(pygame.Rect(59, 74, 904, 763))
+            sprites['field_bed'] = pygame.transform.scale(cropped, (362, 318))
+        except Exception as e:
+            print("Failed to load field_bed image:", e)
+
 def _mix_color(a, b, ratio):
     return (
         int(a[0] + (b[0] - a[0]) * ratio),

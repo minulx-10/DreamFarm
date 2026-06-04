@@ -86,6 +86,9 @@ class GameState:
 
         # Ending type for save
         self.last_ending = ""
+        
+        # 플레이 시간 측정용 변수 (초 단위)
+        self.play_time = 0.0
 
 
 game_state = GameState()
