@@ -427,48 +427,96 @@ class EndingScene:
         bg_g = min(40, int(self.phase_timer * 20))
         bg_b = min(25, int(self.phase_timer * 12))
         screen.fill((bg_r, bg_g, bg_b))
+        
         # Table surface
         if self.table_alpha > 50:
             tc = min(255, self.table_alpha)
-            # Table
+            
+            # 1. Table Drawing (Wooden Texture Bevel)
             table_rect = pygame.Rect(100, 350, 600, 150)
-            pygame.draw.rect(screen, (min(tc, 180), min(tc, 130), min(tc, 80)), table_rect)
-            pygame.draw.rect(screen, (min(tc, 120), min(tc, 80), min(tc, 40)), table_rect, 4)
-            # #2 Plate
-            plate_x, plate_y = 340, 320
-            pygame.draw.ellipse(screen, (min(tc, 230), min(tc, 225), min(tc, 215)),
-                                (plate_x, plate_y, 120, 50))
-            pygame.draw.ellipse(screen, (min(tc, 200), min(tc, 195), min(tc, 185)),
-                                (plate_x, plate_y, 120, 50), 2)
-            # Carrot pieces on plate
+            pygame.draw.rect(screen, (min(tc, 165), min(tc, 115), min(tc, 70)), table_rect, border_radius=4)
+            pygame.draw.rect(screen, (min(tc, 110), min(tc, 75), min(tc, 40)), table_rect, 4, border_radius=4)
+            # Subtle wood grain line
+            pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (110, 365), (690, 365), 2)
+            pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (120, 420), (680, 420), 2)
+
+            # 2. Plate Drawing (3D Ceramic Style with Rim and Shadow)
+            plate_x, plate_y, pw, ph = 340, 320, 120, 50
+            # Under-plate shadow
+            shadow_surf = pygame.Surface((pw + 10, ph + 10), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow_surf, (0, 0, 0, min(85, tc)), (0, 0, pw, ph))
+            screen.blit(shadow_surf, (plate_x - 3, plate_y + 4))
+
+            # Plate base
+            pygame.draw.ellipse(screen, (min(tc, 225), min(tc, 220), min(tc, 208)), (plate_x, plate_y, pw, ph))
+            # Outer rim border
+            pygame.draw.ellipse(screen, (min(tc, 190), min(tc, 182), min(tc, 170)), (plate_x, plate_y, pw, ph), 2)
+            # Inner plate recess (Rim line)
+            pygame.draw.ellipse(screen, (min(tc, 208), min(tc, 202), min(tc, 190)), (plate_x + 12, plate_y + 6, pw - 24, ph - 12), 1)
+
+            # 3. Carrot Pieces on Plate (Individually shaped chunks with highlights/shading)
             if tc > 120:
-                for i in range(3):
-                    cx = plate_x + 30 + i * 25
-                    cy = plate_y + 12
-                    pygame.draw.rect(screen, (min(tc, 255), min(tc, 140), min(tc, 40)),
-                                     (cx, cy, 18, 8), border_radius=3)
-            # Chopsticks
+                # Chunk 1 (Left)
+                c1_pts = [(plate_x + 28, plate_y + 20), (plate_x + 44, plate_y + 14), (plate_x + 48, plate_y + 24), (plate_x + 32, plate_y + 28)]
+                pygame.draw.polygon(screen, (min(tc, 245), min(tc, 125), min(tc, 30)), c1_pts)
+                pygame.draw.polygon(screen, (min(tc, 205), min(tc, 85), min(tc, 15)), c1_pts, 1) # Shade border
+                # Chunk 2 (Middle)
+                c2_pts = [(plate_x + 50, plate_y + 14), (plate_x + 68, plate_y + 10), (plate_x + 72, plate_y + 20), (plate_x + 54, plate_y + 24)]
+                pygame.draw.polygon(screen, (min(tc, 255), min(tc, 140), min(tc, 40)), c2_pts)
+                pygame.draw.polygon(screen, (min(tc, 215), min(tc, 95), min(tc, 20)), c2_pts, 1)
+                # Chunk 3 (Right)
+                c3_pts = [(plate_x + 72, plate_y + 22), (plate_x + 88, plate_y + 16), (plate_x + 94, plate_y + 26), (plate_x + 78, plate_y + 30)]
+                pygame.draw.polygon(screen, (min(tc, 235), min(tc, 115), min(tc, 25)), c3_pts)
+                pygame.draw.polygon(screen, (min(tc, 195), min(tc, 75), min(tc, 10)), c3_pts, 1)
+                
+                # Small shiny glaze dots
+                pygame.draw.circle(screen, (255, 255, 255), (plate_x + 40, plate_y + 18), 1)
+                pygame.draw.circle(screen, (255, 255, 255), (plate_x + 60, plate_y + 14), 1)
+
+            # 4. Chopsticks resting naturally on the table (with shadow)
             if tc > 150:
-                pygame.draw.line(screen, (min(tc, 140), min(tc, 110), min(tc, 70)),
-                                 (490, 310), (520, 380), 3)
-                pygame.draw.line(screen, (min(tc, 140), min(tc, 110), min(tc, 70)),
-                                 (500, 310), (530, 380), 3)
+                # Chopsticks shadow
+                pygame.draw.line(screen, (0, 0, 0, min(60, tc)), (490, 362), (570, 372), 3)
+                pygame.draw.line(screen, (0, 0, 0, min(60, tc)), (496, 368), (576, 378), 3)
+                
+                # Chopstick 1
+                pygame.draw.line(screen, (min(tc, 132), min(tc, 102), min(tc, 62)), (488, 356), (568, 366), 3)
+                # Chopstick 2
+                pygame.draw.line(screen, (min(tc, 132), min(tc, 102), min(tc, 62)), (494, 362), (574, 372), 3)
+                # Chopstick tips highlight
+                pygame.draw.line(screen, (min(tc, 185), min(tc, 155), min(tc, 110)), (488, 356), (496, 357), 2)
+                pygame.draw.line(screen, (min(tc, 185), min(tc, 155), min(tc, 110)), (494, 362), (502, 363), 2)
 
     def _draw_carrot_click(self, screen):
         screen.fill((60, 40, 25))
-        # Table
-        pygame.draw.rect(screen, (180, 130, 80), (100, 350, 600, 150))
-        pygame.draw.rect(screen, (120, 80, 40), (100, 350, 600, 150), 4)
-        # Plate
-        pygame.draw.ellipse(screen, (230, 225, 215), (340, 320, 120, 50))
-        pygame.draw.ellipse(screen, (200, 195, 185), (340, 320, 120, 50), 2)
-        # Carrot sprite pulsing in center
+        
+        # 1. Table
+        pygame.draw.rect(screen, (165, 115, 70), (100, 350, 600, 150), border_radius=4)
+        pygame.draw.rect(screen, (110, 75, 40), (100, 350, 600, 150), 4, border_radius=4)
+        pygame.draw.line(screen, (140, 95, 55), (110, 365), (690, 365), 2)
+        pygame.draw.line(screen, (140, 95, 55), (120, 420), (680, 420), 2)
+        
+        # 2. Plate (Same ceramic style)
+        plate_x, plate_y, pw, ph = 340, 320, 120, 50
+        # Plate shadow
+        shadow_surf = pygame.Surface((pw + 10, ph + 10), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 85), (0, 0, pw, ph))
+        screen.blit(shadow_surf, (plate_x - 3, plate_y + 4))
+        
+        # Plate body
+        pygame.draw.ellipse(screen, (225, 220, 208), (plate_x, plate_y, pw, ph))
+        pygame.draw.ellipse(screen, (190, 182, 170), (plate_x, plate_y, pw, ph), 2)
+        pygame.draw.ellipse(screen, (208, 202, 190), (plate_x + 12, plate_y + 6, pw - 24, ph - 12), 1)
+
+        # 3. Carrot sprite pulsing in center (Aligned properly inside the plate)
         carrot = sprites["carrot"]
         scale = 1.0 + 0.06 * math.sin(self.carrot_pulse * 3)
         cw = int(carrot.get_width() * scale)
         ch = int(carrot.get_height() * scale)
         scaled = pygame.transform.scale(carrot, (cw, ch))
-        screen.blit(scaled, (400 - cw // 2, 280 - ch // 2))
+        # Grounded on plate surface (Y: 336 instead of floating at 280)
+        screen.blit(scaled, (400 - cw // 2, 336 - ch))
+        
         # Prompt
         prompt = self.font_small.render("당근을 클릭하세요", True, (200, 180, 140))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 430))

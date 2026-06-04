@@ -22,6 +22,20 @@ class Stage4Scene:
         self.max_attempts = 3
         self.results = []
 
+        # 배경 데코용 당근들 (밭이랑 Y좌표에 맞춰 주변에 심어진 형태 연출)
+        self.bg_crops = []
+        bg_positions = [
+            (90, 210, 12), (180, 205, 8), (280, 215, 11), (520, 210, 9), (620, 215, 13), (710, 205, 10),
+            (120, 290, 13), (230, 285, 12), (600, 290, 11), (710, 285, 13),
+            (150, 375, 13), (250, 385, 9), (570, 380, 12), (670, 385, 13)
+        ]
+        for bx, by, bstage in bg_positions:
+            self.bg_crops.append({
+                'x': bx,
+                'y': by,
+                'stage': bstage
+            })
+
         # Carrot physics
         self.carrot_y = 360.0
         self.carrot_start_y = 360.0
@@ -160,12 +174,21 @@ class Stage4Scene:
         if self.shake > 0:
             sx = random.randint(-4, 4)
 
-        # Dirt mound (3D Styled)
+        # 1. Draw background carrots to look like a full carrot patch
+        bg_sprout = sprites["sprout4"]
+        bsw = bg_sprout.get_width()
+        bsh = bg_sprout.get_height()
+        for crop in self.bg_crops:
+            cx, cy = crop['x'], crop['y']
+            # Draw individual background crops slightly buried
+            screen.blit(bg_sprout, (cx - bsw // 2 + sx, cy + 12 - bsh // 2))
+
+        # 2. Main target carrot dirt mound (3D Styled)
         mound_y = 350
         pygame.draw.ellipse(screen, DIRT_COLOR, (260 + sx, mound_y, 280, 70))
         pygame.draw.ellipse(screen, DIRT_DARK, (260 + sx, mound_y, 280, 70), 3)
 
-        # Draw carrot sprout leaves & body
+        # 3. Draw target carrot sprout leaves & body
         carrot = sprites["carrot"]
         cw = carrot.get_width()
         cy = self.carrot_y - 20
@@ -179,7 +202,7 @@ class Stage4Scene:
         else:
             screen.blit(carrot, (400 - cw // 2 + sx, cy))
 
-        # Tension gauge (only shown when dragging and pulling)
+        # 4. Tension gauge (only shown when dragging and pulling)
         if self.pull_phase == "pulling" and not self.stage_clear:
             gx, gy, gw, gh = 250, 444, 300, 16
             pygame.draw.rect(screen, (40, 35, 30), (gx, gy, gw, gh), border_radius=4)
@@ -196,7 +219,7 @@ class Stage4Scene:
             surf = font_t.render(txt, True, color)
             screen.blit(surf, (400 - surf.get_width() // 2, gy + 22))
 
-        # Feedback text
+        # 5. Feedback text
         if self.pull_phase == "feedback" and self.feedback_text:
             font = get_font(24)
             color = (255, 220, 120) if "쏙" in self.feedback_text else (210, 100, 80)
@@ -207,10 +230,15 @@ class Stage4Scene:
             draw_wood_panel(screen, panel)
             screen.blit(surf, (400 - surf.get_width() // 2, 178))
 
-        # Attempt counter
-        font_s = get_font(18)
-        att = font_s.render(f"수확 시도: {self.attempts}/{self.max_attempts}", True, TEXT_DARK)
-        screen.blit(att, (610, 440))
+        # 6. Relocated Attempt Counter (High visibility wood panel above the gauge)
+        if not self.stage_clear and self.phase != "intro":
+            att_font = get_font(16)
+            # Display current attempt index clearly (e.g. 1/3)
+            cur_attempt = min(self.attempts + 1, self.max_attempts)
+            att_panel = pygame.Rect(400 - 80, 396, 160, 30)
+            draw_wood_panel(screen, att_panel)
+            att_text = att_font.render(f"수확 시도: {cur_attempt}/{self.max_attempts}", True, (255, 240, 210))
+            screen.blit(att_text, (400 - att_text.get_width() // 2, 402))
 
         draw_top_bar(screen)
 
