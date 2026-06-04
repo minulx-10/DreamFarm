@@ -838,18 +838,13 @@ class FarmScene:
         return [(126, 241), (223, 241), (322, 241), (126, 360), (223, 360), (322, 360)]
 
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
-        mound = pygame.Rect(x - 24, y + 32, 48, 16)
-        pygame.draw.rect(screen, DIRT_DARK, mound)
-        pygame.draw.rect(screen, DIRT_COLOR, mound.inflate(-8, -6))
-
         # Individual growth variation per crop
         offset_val = self.crop_offsets[crop_idx] if crop_idx < len(self.crop_offsets) else 0
         adj_stage = max(0, growth_stage + offset_val)
 
-        if adj_stage <= 0:
-            return
+        # 밭 이미지 자체에 씨앗이 이미 그려져 있으므로, 싹(stage >= 5)이 나기 전에는 그리지 않고 대기
         if adj_stage < 5:
-            sprite, offset = sprites["seed"], (-15, 21)
+            return
         elif adj_stage < 10:
             sprite, offset = sprites["sprout1"], (-15, 9)
         elif adj_stage < 16:
