@@ -48,14 +48,19 @@ class NameInputScene:
         pygame.draw.rect(screen, (255, 249, 230), input_rect, border_radius=8)
         pygame.draw.rect(screen, (109, 84, 60), input_rect, 2, border_radius=8)
         
-        # Cursor blink
         display_text = self.input_text + self.ime_text
+        if not display_text:
+            name_surf = self.font_large.render("이름", True, TEXT_MUTED)
+            screen.blit(name_surf, (input_rect.x + 14, input_rect.y + 8))
+            cursor_x = input_rect.x + 14
+        else:
+            name_surf = self.font_large.render(display_text, True, GOLD)
+            screen.blit(name_surf, (input_rect.x + 14, input_rect.y + 8))
+            cursor_x = input_rect.x + 14 + self.font_large.size(display_text)[0]
+
+        # Draw smooth vertical line cursor instead of appending text characters
         if pygame.time.get_ticks() % 1000 < 500:
-            display_text += "_"
-            
-        name_color = GOLD if display_text.strip("_") else TEXT_MUTED
-        name_surf = self.font_large.render(display_text or "이름", True, name_color)
-        screen.blit(name_surf, (input_rect.x + 14, input_rect.y + 8))
+            pygame.draw.line(screen, (109, 84, 60), (cursor_x, input_rect.y + 12), (cursor_x, input_rect.bottom - 12), 2)
 
         desc = self.font_small.render("입력 후 Enter", True, TEXT_MUTED)
         screen.blit(desc, (400 - desc.get_width()//2, 378))
