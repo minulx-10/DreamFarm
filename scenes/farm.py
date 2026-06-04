@@ -134,7 +134,7 @@ class FarmScene:
             self.buttons.append(Button(start_x, by, 284, 28, action, action, font_size=17))
 
     def is_harvest_ready(self):
-        return self.growth >= self.growth_goal and self.health >= 35
+        return self.growth >= self.growth_goal
 
     def get_needed_actions(self):
         needs = []

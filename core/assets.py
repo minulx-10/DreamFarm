@@ -253,7 +253,7 @@ X.....X....X.X..X
 .X....XXXXXX.XX..
 ..X...X....X.....
 ...XXX......X....
-''', 3)
+''', 6)
 
     # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
     field_bed_path = os.path.join(os.path.dirname(__file__), "field_bed.jpg")

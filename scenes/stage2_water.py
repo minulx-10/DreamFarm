@@ -80,10 +80,10 @@ class Stage2Scene:
         if self.is_watering:
             target_angle = 35.0  # Tilts forward to pour water
             
-            # Position of the spout (adjust relative to can center)
+            # Position of the spout (adjust relative to can center - can is scaled to 6)
             # The can is drawn centered at (can_x, can_y). When tilted, the nozzle is roughly to the right and down.
-            spout_x = self.can_x + 28
-            spout_y = self.can_y + 8
+            spout_x = self.can_x + 52
+            spout_y = self.can_y + 16
 
             # Spawn 2-3 drops of water
             for _ in range(random.randint(2, 4)):
@@ -153,13 +153,14 @@ class Stage2Scene:
             # Draw sprouts on top
             screen.blit(sprites['sprout2'], (x - 20, y - 28))
 
-            # Draw moisture progress bar
-            bar_rect = pygame.Rect(x - 30, y + 26, 60, 8)
-            pygame.draw.rect(screen, (50, 45, 40), bar_rect, border_radius=3)
-            fill_w = int(56 * (mound['moisture'] / 100.0))
+            # Draw moisture progress bar (Enlarged for high visibility)
+            bar_rect = pygame.Rect(x - 40, y + 26, 80, 12)
+            pygame.draw.rect(screen, (40, 35, 30), bar_rect, border_radius=4)
+            pygame.draw.rect(screen, (100, 95, 90), bar_rect, 1, border_radius=4) # Light outer border
+            fill_w = int(74 * (mound['moisture'] / 100.0))
             if fill_w > 0:
                 # Glowing blue/cyan moisture color
-                pygame.draw.rect(screen, (74, 151, 213), (bar_rect.x + 2, bar_rect.y + 2, fill_w, 4), border_radius=2)
+                pygame.draw.rect(screen, (60, 160, 240), (bar_rect.x + 3, bar_rect.y + 3, fill_w, 6), border_radius=2)
 
         # Draw falling water drops particles
         for p in self.particles:
