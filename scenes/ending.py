@@ -156,6 +156,7 @@ class EndingScene:
             "",
             "이번 꿈에서 남은 기록",
             f"물 뿌리기: {game_state.water_count}회",
+            f"잡초 뽑기: {game_state.weed_count}회",
             f"해충 잡기: {game_state.pest_count}회",
         ]
 
@@ -250,6 +251,7 @@ class EndingScene:
         game_state.dad_mode_triggered = False
         game_state.father_day_seen = set()
         game_state.water_count = 0
+        game_state.weed_count = 0
         game_state.pest_count = 0
         game_state.choice_impacts = []
         # #14 Save progress before retry

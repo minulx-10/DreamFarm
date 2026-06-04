@@ -253,13 +253,13 @@ def draw_top_bar(screen, show_stats=True):
 
 
 def draw_bottom_bar(screen, obj_name, obj_desc):
-    panel_rect = pygame.Rect(18, 496, 764, 88)
+    panel_rect = pygame.Rect(18, 486, 764, 98)
     draw_panel(screen, panel_rect, fill=(252, 238, 211), border=(119, 90, 64), radius=10)
 
     font_name = get_font(22)
     font_desc = get_font(16)
 
     name_surf = font_name.render(obj_name, True, TEXT_DARK)
-    screen.blit(name_surf, (40, 512))
-    pygame.draw.rect(screen, (221, 173, 96), (40, 541, min(170, name_surf.get_width() + 16), 3), border_radius=2)
-    draw_multiline_text(screen, obj_desc, font_desc, TEXT_DARK, 40, 552, 718, line_gap=1, max_lines=2)
+    screen.blit(name_surf, (40, 498))
+    pygame.draw.rect(screen, (221, 173, 96), (40, 527, min(170, name_surf.get_width() + 16), 3), border_radius=2)
+    draw_multiline_text(screen, obj_desc, font_desc, TEXT_DARK, 40, 536, 718, line_gap=1, max_lines=2)

@@ -190,7 +190,19 @@ XgGGGGgX.
 ..XgXgX..
 .X..X..X.
 ''', 5)
-    sprites['dad'] = create_sprite_from_string('''
+    dad_path = os.path.join(os.path.dirname(__file__), "dad.jpg")
+    loaded_dad = False
+    if os.path.exists(dad_path):
+        try:
+            dad_img = pygame.image.load(dad_path).convert()
+            dad_img.set_colorkey(dad_img.get_at((0, 0)))
+            sprites['dad'] = pygame.transform.scale(dad_img, (112, 112))
+            loaded_dad = True
+        except Exception as e:
+            print("Failed to load custom dad sprite:", e)
+
+    if not loaded_dad:
+        sprites['dad'] = create_sprite_from_string('''
 ....YYYY....
 ...YyyyyY...
 ..YYSSSSYY..

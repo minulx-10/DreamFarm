@@ -56,7 +56,7 @@ class Stage4Scene:
         if self.target_min <= power <= self.target_max:
             self.results.append("perfect")
             game_state.score += 300
-            self.feedback_text = "아삭. 완벽하게 뽑혔다."
+            self.feedback_text = "쏙! 완벽하게 뽑혔다."
             self.carrot_y_offset = -40
         elif power > self.target_max:
             self.results.append("broken")

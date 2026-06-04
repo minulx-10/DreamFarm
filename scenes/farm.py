@@ -215,6 +215,8 @@ class FarmScene:
         self.last_action = action
         if action == "물 주기":
             game_state.water_count += 1
+        elif action == "잡초 뽑기":
+            game_state.weed_count += 1
         difficulty = 1 + self.growth // 6
         result = self.apply_action(action, difficulty)
         is_fail = "실패" in result or "효과 낮음" in result
@@ -497,9 +499,18 @@ class FarmScene:
         if self.drainage < 35:
             warnings.append("배수 낮음")
 
-        if not warnings:
-            return "상태 확인: 밭이 안정적입니다."
-        return "상태 확인: " + ", ".join(warnings[:3]) + "."
+        # 날씨 가이드 팁 추가
+        weather_tips = {
+            "맑음": "맑음(수분 서서히 감소)",
+            "흐림": "흐림(특별한 영향 없음)",
+            "비": "비(수분 큰 폭 상승, 과습 주의)",
+            "가뭄": "가뭄(수분 큰 폭 하락, 건강 감소)",
+            "강풍": "강풍(해충 감소, 스트레스 증가)"
+        }
+        tip = weather_tips.get(game_state.weather, "영향 없음")
+        
+        status_str = ", ".join(warnings[:3]) if warnings else "밭이 안정적입니다"
+        return f"밭: {status_str}. 날씨: {tip} (지속: {game_state.weather_turns_left}일, 다음 예보: {game_state.next_weather})."
 
     def build_notice(self):
         if self.is_harvest_ready():
@@ -850,15 +861,17 @@ class FarmScene:
         if hour < 7 or hour >= 17:
             screen.blit(tint, (0, 0))
 
-        title_font = get_font(24)
+        title_font = get_font(20)
+        season_name = get_season(self.growth, self.growth_goal)
         # #10 Dad mode title
         if game_state.dad_mode:
-            prefix = "아버지의 밭 "
+            prefix = f"[{season_name}] 아버지의 밭 "
         else:
-            prefix = f"{self.day}일째 "
+            prefix = f"[{season_name}] {self.day}일째 "
             
         prefix_surf = title_font.render(prefix, True, TEXT_DARK)
-        weather_surf = title_font.render(game_state.weather, True, TEXT_DARK)
+        weather_text = f"{game_state.weather} ({game_state.weather_turns_left}일간)"
+        weather_surf = title_font.render(weather_text, True, TEXT_DARK)
         
         title_rect = pygame.Rect(50, 82, 350, 48)
         draw_wood_panel(screen, title_rect)
@@ -880,7 +893,7 @@ class FarmScene:
 
         # Weather forecast (drawn icon + text, no emoji)
         forecast_font = get_font(14)
-        fc_text = f"예보: {game_state.next_weather}"
+        fc_text = f"예보: {game_state.next_weather} ({game_state.weather_turns_left}일 뒤)"
         fc = forecast_font.render(fc_text, True, TEXT_MUTED)
         fc_x = 738 - fc.get_width()
         screen.blit(fc, (fc_x, 308))
@@ -939,17 +952,16 @@ class FarmScene:
             screen.blit(gp, (gx, gy))
             screen.blit(gs, (gx + 10, gy + 5))
 
-        # #6 Weather wisdom overlay
+        # #6 Weather wisdom overlay (wrapped to prevent overlapping with right cards)
         if self.wisdom_timer > 0 and self.wisdom_text:
-            wf = get_font(15)
+            wf = get_font(14)
             wa = min(1.0, self.wisdom_timer / 1.0) if self.wisdom_timer < 1.0 else 1.0
-            ws = wf.render(self.wisdom_text, True, (int(120 * wa), int(100 * wa), int(60 * wa)))
-            screen.blit(ws, (400 - ws.get_width() // 2, 132))
-
-        # #7 Season indicator
-        season_name = get_season(self.growth, self.growth_goal)
-        season_font = get_font(13)
-        season_s = season_font.render(season_name, True, TEXT_MUTED)
-        screen.blit(season_s, (55, 132))
+            color = (int(120 * wa), int(100 * wa), int(60 * wa))
+            lines = wrap_text(self.wisdom_text, wf, 320)
+            y_offset = 132
+            for line in lines:
+                ws = wf.render(line, True, color)
+                screen.blit(ws, (225 - ws.get_width() // 2, y_offset))
+                y_offset += wf.get_height() + 2
 
         draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")

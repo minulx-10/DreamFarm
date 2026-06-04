@@ -44,6 +44,7 @@ class GameState:
 
         # Ending credits run records
         self.water_count = 0
+        self.weed_count = 0
         self.pest_count = 0
         self.choice_impacts = []
 
