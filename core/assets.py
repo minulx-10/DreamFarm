@@ -190,13 +190,12 @@ XgGGGGgX.
 ..XgXgX..
 .X..X..X.
 ''', 5)
-    dad_path = os.path.join(os.path.dirname(__file__), "dad.jpg")
+    dad_path = os.path.join(os.path.dirname(__file__), "dad.png")
     loaded_dad = False
     if os.path.exists(dad_path):
         try:
-            dad_img = pygame.image.load(dad_path).convert()
-            dad_img.set_colorkey(dad_img.get_at((0, 0)))
-            sprites['dad'] = pygame.transform.scale(dad_img, (112, 112))
+            dad_img = pygame.image.load(dad_path).convert_alpha()
+            sprites['dad'] = pygame.transform.scale(dad_img, (160, 160))
             loaded_dad = True
         except Exception as e:
             print("Failed to load custom dad sprite:", e)
@@ -243,6 +242,18 @@ XbBBbbBBbX
 ..XmmmmX..
 ...XXXX...
 ''', 12)
+    sprites['watering_can'] = create_sprite_from_string('''
+......XXXXXX.....
+....XX......X....
+...X..X.....X....
+..X...XXXXXX.XXX.
+.X....X....X.X..X
+X.....X....X.X..X
+X.....X....X.X..X
+.X....XXXXXX.XX..
+..X...X....X.....
+...XXX......X....
+''', 3)
 
 def _mix_color(a, b, ratio):
     return (
@@ -253,23 +264,25 @@ def _mix_color(a, b, ratio):
 
 
 def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, dirt_dk=None):
-    gc = grass or GRASS_COLOR
-    gd = grass_dk or GRASS_DARK
+    gc = grass or (60, 95, 85)     # Twilight teal-green grass
+    gd = grass_dk or (45, 75, 65)  # Dark grass shadow
     dc = dirt or DIRT_COLOR
     dd = dirt_dk or DIRT_DARK
 
-    sky_top = (105, 139, 151)
-    sky_bottom = (234, 199, 142)
+    sky_top = (45, 24, 78)       # Twilight purple sky
+    sky_bottom = (245, 125, 65)  # Twilight orange sunset
     for y in range(h):
         ratio = min(1, y / max(1, h * 0.62))
         pygame.draw.line(screen, _mix_color(sky_top, sky_bottom, ratio), (0, y), (w, y))
 
-    pygame.draw.circle(screen, (236, 178, 86), (670, 82), 42)
-    pygame.draw.circle(screen, (255, 226, 154), (670, 82), 30)
+    # Glowing twilight sun
+    pygame.draw.circle(screen, (245, 140, 70), (670, 82), 42)
+    pygame.draw.circle(screen, (255, 210, 120), (670, 82), 30)
 
     horizon = 166
-    pygame.draw.polygon(screen, (67, 111, 88), [(0, horizon + 28), (110, 118), (260, horizon + 18), (440, 112), (610, horizon + 26), (800, 126), (800, h), (0, h)])
-    pygame.draw.polygon(screen, (45, 93, 72), [(0, horizon + 56), (160, 148), (340, horizon + 48), (520, 142), (800, horizon + 54), (800, h), (0, h)])
+    # Misty twilight mountains
+    pygame.draw.polygon(screen, (75, 45, 90), [(0, horizon + 28), (110, 118), (260, horizon + 18), (440, 112), (610, horizon + 26), (800, 126), (800, h), (0, h)])
+    pygame.draw.polygon(screen, (50, 75, 80), [(0, horizon + 56), (160, 148), (340, horizon + 48), (520, 142), (800, horizon + 54), (800, h), (0, h)])
 
     pygame.draw.rect(screen, gc, (0, horizon, w, h - horizon))
     for y in range(horizon, h, 34):
@@ -282,17 +295,19 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
                 pygame.draw.line(screen, gd, (x + 10, y + 8), (x + 18, y + 2), 2)
                 pygame.draw.line(screen, gd, (x + 17, y + 3), (x + 22, y + 11), 2)
 
+    # Farming soil bed
     dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)
     pygame.draw.rect(screen, dd, dirt_rect.move(0, 6), border_radius=12)
     pygame.draw.rect(screen, dc, dirt_rect, border_radius=12)
     pygame.draw.rect(screen, _mix_color(dc, WHITE, 0.18), dirt_rect.inflate(-14, -14), 2, border_radius=9)
     pygame.draw.rect(screen, dd, dirt_rect, 3, border_radius=12)
 
-    for row, y in enumerate(range(dirt_rect.y + 38, dirt_rect.bottom - 28, 38)):
-        row_color = _mix_color(dd, dc, 0.28 if row % 2 == 0 else 0.44)
-        pygame.draw.line(screen, row_color, (dirt_rect.x + 24, y), (dirt_rect.right - 24, y + 4), 3)
-    for x in range(dirt_rect.x + 38, dirt_rect.right - 30, 52):
-        pygame.draw.line(screen, _mix_color(dd, BLACK, 0.1), (x, dirt_rect.y + 24), (x - 14, dirt_rect.bottom - 24), 1)
+    # 3D Horizontal farming ridges (furrows) instead of grid lines
+    for y in range(dirt_rect.y + 36, dirt_rect.bottom - 20, 42):
+        # Ridge shadow
+        pygame.draw.rect(screen, dd, (dirt_rect.x + 16, y, dirt_rect.w - 32, 8), border_radius=3)
+        # Ridge highlight (sunset glow reflection)
+        pygame.draw.rect(screen, _mix_color(dc, (255, 200, 150), 0.15), (dirt_rect.x + 16, y - 4, dirt_rect.w - 32, 4), border_radius=2)
 
 
 def draw_weather_icon(screen, weather, x, y, size=20):

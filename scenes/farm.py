@@ -79,6 +79,20 @@ class FarmScene:
         self.sense_text = game_state.current_sense
         # #10 Dad mode turn counter
         self.dad_turns_done = 0
+        
+        # UI & Animation additions
+        self.scrollbar_dragging = False
+        self.fireflies = []
+        for _ in range(18):
+            self.fireflies.append({
+                'x': random.randint(10, 790),
+                'y': random.randint(20, 160),
+                'speed_x': random.uniform(-12.0, 12.0),
+                'speed_y': random.uniform(-6.0, 6.0),
+                'scale_timer': random.uniform(0.0, 6.28),
+                'size': random.uniform(2.0, 4.5)
+            })
+
         self.rebuild_buttons()
 
     def rebuild_buttons(self):
@@ -156,6 +170,19 @@ class FarmScene:
         self.drainage = max(0, min(100, self.drainage))
         self.stress = max(0, min(100, self.stress))
 
+    def drag_scrollbar(self, mouse_y):
+        actions = self.get_action_choices()
+        if len(actions) <= 4:
+            return
+        track_y = 330
+        track_h = 121
+        thumb_h = max(22, int(track_h * 4 / len(actions)))
+        max_scroll = max(1, len(actions) - 4)
+        relative_y = mouse_y - track_y - thumb_h / 2
+        ratio = max(0.0, min(1.0, relative_y / (track_h - thumb_h)))
+        self.action_scroll = int(ratio * max_scroll)
+        self.rebuild_buttons()
+
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.MOUSEWHEEL and self.action_menu_open:
@@ -165,6 +192,14 @@ class FarmScene:
                 continue
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.action_menu_open:
+                    # Scrollbar click & drag detection
+                    track_rect_clickable = pygame.Rect(722, 330, 24, 121)
+                    if track_rect_clickable.collidepoint(event.pos):
+                        self.scrollbar_dragging = True
+                        self.drag_scrollbar(event.pos[1])
+                        continue
+
                 clicked = False
                 for btn in self.buttons:
                     if btn.is_clicked(event.pos):
@@ -180,6 +215,13 @@ class FarmScene:
                 if self.action_menu_open and not clicked:
                     self.action_menu_open = False
                     self.rebuild_buttons()
+
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self.scrollbar_dragging = False
+
+            elif event.type == pygame.MOUSEMOTION:
+                if self.scrollbar_dragging and self.action_menu_open:
+                    self.drag_scrollbar(event.pos[1])
 
             elif event.type == pygame.MOUSEBUTTONDOWN and self.action_menu_open and event.button in (4, 5):
                 max_scroll = max(0, len(self.get_action_choices()) - 4)
@@ -686,6 +728,16 @@ class FarmScene:
         self.minigame_cooldown = 7 if mg == "stage1" else 5
 
     def update(self, dt):
+        # Update firefly particles
+        for f in self.fireflies:
+            f['x'] += f['speed_x'] * dt
+            f['y'] += f['speed_y'] * dt
+            f['scale_timer'] += 2.2 * dt
+            if f['x'] < 10 or f['x'] > 790:
+                f['speed_x'] *= -1
+            if f['y'] < 20 or f['y'] > 160:
+                f['speed_y'] *= -1
+
         # Echo fade
         if self.echo_timer > 0:
             self.echo_timer -= dt
@@ -846,6 +898,20 @@ class FarmScene:
         sc = self.season_colors
         draw_tiled_background(screen, 800, 600, sc["grass"], sc["grass_dark"],
                               sc["dirt"], sc["dirt_dark"])
+
+        # Draw glowing fireflies (dream particles) in the sky
+        import math
+        for f in self.fireflies:
+            # Alpha changes smoothly using Sine
+            alpha = int(120 + 80 * math.sin(f['scale_timer']))
+            alpha = max(0, min(255, alpha))
+            
+            glow_color = (255, 235, 140)
+            glow_surf = pygame.Surface((int(f['size'] * 6), int(f['size'] * 6)), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (glow_color[0], glow_color[1], glow_color[2], int(alpha * 0.45)), (int(f['size'] * 3), int(f['size'] * 3)), int(f['size'] * 2.5))
+            pygame.draw.circle(glow_surf, (255, 255, 200, alpha), (int(f['size'] * 3), int(f['size'] * 3)), int(f['size'] * 1.1))
+            screen.blit(glow_surf, (int(f['x'] - f['size'] * 3), int(f['y'] - f['size'] * 3)))
+
         self.draw_farm_plot(screen)
 
         # Real-world time tint

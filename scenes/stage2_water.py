@@ -1,71 +1,65 @@
 import pygame
+import random
+import math
 from core.game_state import game_state
 from core.assets import *
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 class Stage2Scene:
+    """Interactive watering minigame.
+    Follows the cursor with a watering can. Click and drag to tilt and spray water droplets.
+    Water 5 circular soil mounds to 100% moisture to clear the stage."""
+
     def __init__(self):
-        game_state.timer = 20.0
-        game_state.score = 0
-        self.attempts = 0
-        self.max_attempts = 3
-        
-        self.gauge_x = 200
-        self.gauge_y = 350
-        self.gauge_w = 400
-        self.gauge_h = 40
-        self.target_zone = pygame.Rect(self.gauge_x + 150, self.gauge_y, 100, self.gauge_h)
-        
-        self.cursor_pos = 0.0
-        self.cursor_speed = 500.0
-        self.cursor_dir = 1
-        
+        game_state.timer = 24.0
+        game_state.score = 600
         self.stage_clear = False
         self.clear_timer = 2.0
-        
-        self.status_msg = "물방울이 초록 구간에 닿는 순간 클릭하거나 스페이스바를 누르세요."
-        self.stopped = False
-        self.stop_timer = 0
+
+        # Spawn 5 rounded soil mounds
+        self.mounds = []
+        for i in range(5):
+            self.mounds.append({
+                'x': 140 + i * 130,
+                'y': 310,
+                'moisture': 0.0
+            })
+
+        # Water droplets particles list
+        self.particles = []
+
+        # Watering can physics
+        self.can_x = 400.0
+        self.can_y = 150.0
+        self.can_angle = 0.0
+        self.is_watering = False
 
     def handle_events(self, events):
-        if self.stage_clear or self.stopped: return
+        if self.stage_clear:
+            return
         for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
-                self.stopped = True
-                self.stop_timer = 1.0
-                self.attempts += 1
-                game_state.water_count += 1
-                
-                cursor_rect = pygame.Rect(self.gauge_x + self.cursor_pos - 5, self.gauge_y - 10, 10, self.gauge_h + 20)
-                if cursor_rect.colliderect(self.target_zone):
-                    game_state.score += 200
-                    self.status_msg = f"알맞게 스며들었습니다. (시도: {self.attempts}/{self.max_attempts})"
-                else:
-                    self.status_msg = f"물이 너무 급하게 흘렀습니다. (시도: {self.attempts}/{self.max_attempts})"
+            # We track click/space bar to trigger spraying
+            pass
+        
+        # Check mouse press state
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+        keys = pygame.key.get_pressed()
+        self.is_watering = mouse_pressed or keys[pygame.K_SPACE]
 
     def update(self, dt):
         if self.stage_clear:
             self.clear_timer -= dt
             if self.clear_timer <= 0:
-                bonus = 0
-                if game_state.score >= 500: bonus = 20
-                elif game_state.score >= 200: bonus = 10
-                elif game_state.score >= 100: bonus = 5
-                
+                bonus = 15
                 game_state.understanding += bonus
-                game_state.transition_text = f"물 주기 완료!\n\n획득 점수: {game_state.score}점\n물을 기다리는 때를 배웠습니다. 이해도 +{bonus}"
+                game_state.transition_text = (
+                    "물 주기 완료!\n\n"
+                    "모든 흙이 충분히 물을 흡수했습니다.\n"
+                    f"생명의 근원을 전했습니다. 이해도 +{bonus}"
+                )
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
-            return
-
-        if self.stopped:
-            self.stop_timer -= dt
-            if self.stop_timer <= 0:
-                self.stopped = False
-                self.cursor_pos = 0
-                if self.attempts >= self.max_attempts:
-                    self.stage_clear = True
             return
 
         game_state.timer -= dt
@@ -73,47 +67,120 @@ class Stage2Scene:
             game_state.timer = 0
             self.stage_clear = True
 
-        self.cursor_pos += self.cursor_speed * self.cursor_dir * dt
-        if self.cursor_pos >= self.gauge_w:
-            self.cursor_pos = self.gauge_w
-            self.cursor_dir = -1
-        elif self.cursor_pos <= 0:
-            self.cursor_pos = 0
-            self.cursor_dir = 1
+        # Slowly decrease score as time ticks
+        game_state.score = max(100, game_state.score - int(10 * dt))
+
+        # Smoothly follow mouse
+        mx, my = pygame.mouse.get_pos()
+        self.can_x += (mx - self.can_x) * 14.0 * dt
+        self.can_y += (my - self.can_y) * 14.0 * dt
+
+        # Watering can rotation & particle spawning
+        target_angle = 0.0
+        if self.is_watering:
+            target_angle = 35.0  # Tilts forward to pour water
+            
+            # Position of the spout (adjust relative to can center)
+            # The can is drawn centered at (can_x, can_y). When tilted, the nozzle is roughly to the right and down.
+            spout_x = self.can_x + 28
+            spout_y = self.can_y + 8
+
+            # Spawn 2-3 drops of water
+            for _ in range(random.randint(2, 4)):
+                self.particles.append({
+                    'x': spout_x + random.uniform(-4, 4),
+                    'y': spout_y + random.uniform(-4, 4),
+                    'vx': random.uniform(40.0, 90.0),   # Flows forward
+                    'vy': random.uniform(-40.0, 10.0), # Sprays out
+                    'life': 0.7
+                })
+            
+            # Count watering turn stats randomly while spraying
+            if random.random() < 0.08:
+                game_state.water_count += 1
+        else:
+            target_angle = 0.0
+
+        # Interpolate angle
+        self.can_angle += (target_angle - self.can_angle) * 10.0 * dt
+
+        # Update water droplets particles
+        for p in self.particles:
+            p['x'] += p['vx'] * dt
+            p['y'] += p['vy'] * dt
+            p['vy'] += 320 * dt  # Gravity effect
+            p['life'] -= dt
+
+            # Check collision with each mound
+            for mound in self.mounds:
+                # Mound bounding circle detection
+                dx = p['x'] - mound['x']
+                dy = p['y'] - (mound['y'] - 5)
+                # Approximate mound ellipse collision: (dx/45)^2 + (dy/18)^2 <= 1.0
+                if (dx*dx) / (45*45) + (dy*dy) / (18*18) <= 1.0:
+                    mound['moisture'] = min(100.0, mound['moisture'] + 6.0)
+                    p['life'] = 0.0  # Kill particle on hit
+
+        # Filter dead particles
+        self.particles = [p for p in self.particles if p['life'] > 0]
+
+        # Check if all mounds are fully watered
+        all_watered = True
+        for mound in self.mounds:
+            if mound['moisture'] < 100.0:
+                all_watered = False
+                break
+        if all_watered:
+            self.stage_clear = True
+            self.clear_timer = 2.0
 
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
+
+        # Draw 5 rounded soil mounds (이랑 / 두둑)
+        for i, mound in enumerate(self.mounds):
+            x, y = mound['x'], mound['y']
+            
+            # Outer dark shadow of the soil mound
+            pygame.draw.ellipse(screen, (38, 25, 18), (x - 48, y - 8, 96, 38))
+            
+            # Inner dirt color fades from DIRT_DARK to wet mud color as moisture increases
+            # DIRT_DARK = (92, 60, 43), Wet Mud = (66, 44, 30)
+            mud_color = (66, 44, 30)
+            mound_color = mix_color(DIRT_DARK, mud_color, mound['moisture'] / 100.0)
+            pygame.draw.ellipse(screen, mound_color, (x - 44, y - 11, 88, 32))
+            
+            # Draw sprouts on top
+            screen.blit(sprites['sprout2'], (x - 20, y - 28))
+
+            # Draw moisture progress bar
+            bar_rect = pygame.Rect(x - 30, y + 26, 60, 8)
+            pygame.draw.rect(screen, (50, 45, 40), bar_rect, border_radius=3)
+            fill_w = int(56 * (mound['moisture'] / 100.0))
+            if fill_w > 0:
+                # Glowing blue/cyan moisture color
+                pygame.draw.rect(screen, (74, 151, 213), (bar_rect.x + 2, bar_rect.y + 2, fill_w, 4), border_radius=2)
+
+        # Draw falling water drops particles
+        for p in self.particles:
+            pygame.draw.circle(screen, (90, 185, 240), (int(p['x']), int(p['y'])), 3)
+
+        # Draw watering can (tilts when clicking)
+        can_sprite = sprites['watering_can']
+        rotated_can = pygame.transform.rotate(can_sprite, -self.can_angle)
         
-        # Carrot sprouts
-        for i in range(5):
-            x = 200 + i * 80
-            y = 200
-            pygame.draw.rect(screen, DIRT_WET if self.attempts > 0 else DIRT_DARK, (x-30, y-10, 60, 40))
-            screen.blit(sprites['sprout1'], (x-15, y-30))
-        
-        # Gauge background
-        panel = pygame.Rect(self.gauge_x - 10, self.gauge_y - 10, self.gauge_w + 20, self.gauge_h + 20)
-        draw_wood_panel(screen, panel)
-        
-        # Gauge bar
-        gauge_rect = pygame.Rect(self.gauge_x, self.gauge_y, self.gauge_w, self.gauge_h)
-        pygame.draw.rect(screen, (36, 47, 50), gauge_rect, border_radius=8)
-        pygame.draw.rect(screen, mix_color(GRASS_COLOR, WHITE, 0.2), self.target_zone, border_radius=6)
-        pygame.draw.rect(screen, (87, 109, 96), gauge_rect, 2, border_radius=8)
-        
-        # Cursor (Water drop styled)
-        cursor_rect = pygame.Rect(self.gauge_x + self.cursor_pos - 10, self.gauge_y - 15, 20, self.gauge_h + 30)
-        pygame.draw.rect(screen, (95, 182, 220), cursor_rect, border_radius=7)
-        pygame.draw.rect(screen, WHITE, cursor_rect, 2, border_radius=7)
-        
+        # Draw centered at physics coordinates
+        screen.blit(rotated_can, (self.can_x - rotated_can.get_width() // 2, self.can_y - rotated_can.get_height() // 2))
+
         draw_top_bar(screen)
-        
+
         if self.stage_clear:
             font = get_font(30)
             clear_text = font.render("물 주기 완료!", True, (200, 100, 0))
-            panel_clear = pygame.Rect(400 - 150, 250 - 30, 300, 60)
+            panel_clear = pygame.Rect(400 - 150, 210, 300, 60)
             draw_wood_panel(screen, panel_clear)
-            screen.blit(clear_text, (400 - clear_text.get_width()//2, 250 - clear_text.get_height()//2))
+            screen.blit(clear_text, (400 - clear_text.get_width()//2, 220))
             draw_bottom_bar(screen, "결과", f"얻은 점수: {game_state.score}")
         else:
-            draw_bottom_bar(screen, "물 주기", self.status_msg)
+            status_desc = "마우스 클릭/드래그하여 물뿌리개로 흙 두둑을 100% 듬뿍 젖게 하세요."
+            draw_bottom_bar(screen, "물 주기", status_desc)

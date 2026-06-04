@@ -400,8 +400,8 @@ class EndingScene:
         dad = sprites["dad"]
         shadow = dad.copy()
         shadow.set_alpha(80)
-        screen.blit(shadow, (400 - dad.get_width() // 2 + 6, 74))
-        screen.blit(dad, (400 - dad.get_width() // 2, 68))
+        screen.blit(shadow, (400 - dad.get_width() // 2 + 5, 55))
+        screen.blit(dad, (400 - dad.get_width() // 2, 50))
         box_rect = pygame.Rect(58, 286, 684, 256)
         draw_light_panel(screen, box_rect)
         draw_centered_lines(screen, self.printed_text.split("\n"), self.font, TEXT_DARK, 400, 318, line_gap=5)
