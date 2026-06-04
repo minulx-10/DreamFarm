@@ -230,42 +230,9 @@ class EndingScene:
             self.phase_timer = 0
 
     def retry(self):
-        game_state.understanding = 0
-        game_state.score = 0
-        game_state.timer = 0
-        game_state.transition_text = ""
-        game_state.transition_next = ""
-        game_state.is_clear_transition = False
-        game_state.return_scene = "farm"
-        game_state.memory_title = ""
-        game_state.memory_text = ""
-        game_state.memory_next = "farm"
-        game_state.final_health = 100
-        game_state.farm_mistakes = 0
-        game_state.journal_entries = []
-        game_state.epiphanies_seen = set()
-        game_state.weather = "맑음"
-        game_state.weather_turns_left = 3
-        # Reset new systems
-        game_state.patience_score = 0
-        game_state.care_score = 0
-        game_state.empathy_choices = 0
-        game_state.recovery_count = 0
-        game_state.rush_count = 0
-        game_state.last_failure_action = ""
-        game_state.dad_lessons = {}
-        game_state.gifts_revealed = 0
-        game_state.current_sense = "낯선 흙냄새가 코끝을 스친다."
-        game_state.dad_mode = False
-        game_state.dad_mode_turns = 0
-        game_state.dad_mode_triggered = False
-        game_state.father_day_seen = set()
-        game_state.water_count = 0
-        game_state.weed_count = 0
-        game_state.pest_count = 0
-        game_state.choice_impacts = []
         # #14 Save progress before retry
         save_progress()
+        game_state.reset()
         game_state.current_scene = "intro"
 
     def change_ending(self, ending_type):

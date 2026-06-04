@@ -845,7 +845,14 @@ class FarmScene:
         # 밭 이미지 자체에 씨앗이 이미 그려져 있으므로, 싹(stage >= 5)이 나기 전에는 그리지 않고 대기
         if adj_stage < 5:
             return
-        elif adj_stage < 10:
+
+        # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 타원 마스킹 렌더링
+        sc = self.season_colors
+        base_color = (110, 75, 45) if self.moisture > 72 else (135, 92, 60) if self.moisture < 28 else sc["dirt"]
+        pygame.draw.ellipse(screen, sc["dirt_dark"], pygame.Rect(x - 14, y - 7, 28, 14))
+        pygame.draw.ellipse(screen, base_color, pygame.Rect(x - 12, y - 5, 24, 10))
+
+        if adj_stage < 10:
             sprite, offset = sprites["sprout1"], (-15, 9)
         elif adj_stage < 16:
             sprite, offset = sprites["sprout2"], (-20, -2)

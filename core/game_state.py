@@ -90,6 +90,57 @@ class GameState:
         # 플레이 시간 측정용 변수 (초 단위)
         self.play_time = 0.0
 
+    def reset(self):
+        self.understanding = 0
+        self.score = 0
+        self.timer = 0
+        self.transition_text = ""
+        self.transition_next = ""
+        self.is_clear_transition = False
+        self.return_scene = "farm"
+
+        self.memory_title = ""
+        self.memory_text = ""
+        self.memory_next = "farm"
+
+        self.final_health = 100
+        self.farm_mistakes = 0
+
+        self.weather = "맑음"
+        self.weather_turns_left = 3
+        self.next_weather = "흐림"
+
+        self.journal_entries = []
+        self.epiphanies_seen = set()
+        self.pending_epiphany = None
+        self.action_echo = ""
+        self.choice_data = None
+
+        self.water_count = 0
+        self.weed_count = 0
+        self.pest_count = 0
+        self.choice_impacts = []
+
+        self.patience_score = 0
+        self.care_score = 0
+        self.empathy_choices = 0
+        self.recovery_count = 0
+        self.rush_count = 0
+        self.last_failure_action = ""
+
+        self.dad_lessons = {}
+        self.gifts_revealed = 0
+        self.current_sense = "낯선 흙냄새가 코끝을 스친다."
+
+        self.dad_mode = False
+        self.dad_mode_turns = 0
+        self.dad_mode_triggered = False
+        self.father_day_seen = set()
+
+        self.wait_active = False
+        self.wait_timer = 0.0
+        self.play_time = 0.0
+
 
 game_state = GameState()
 

@@ -62,7 +62,9 @@ def main():
             elif target_scene == "stage3": scenes["stage3"] = Stage3Scene()
             elif target_scene == "stage4": scenes["stage4"] = Stage4Scene()
             elif target_scene == "ending": scenes["ending"] = EndingScene()
-            elif target_scene == "intro": scenes["intro"] = IntroScene()
+            elif target_scene == "intro": 
+                scenes["farm"] = FarmScene()
+                scenes["intro"] = IntroScene()
             elif target_scene == "memory": scenes["memory"] = MemoryScene()
             elif target_scene == "epiphany": scenes["epiphany"] = EpiphanyScene()
             elif target_scene == "story_choice": scenes["story_choice"] = StoryChoiceScene()
