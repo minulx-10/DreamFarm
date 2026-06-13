@@ -61,6 +61,164 @@ class Button:
         return self.rect.collidepoint(pos)
 
 
+class WaterPour:
+    """밭 위에서 직접 물을 붓는 손맛 인터랙션 — 씬 전환 없이 farm 위에 오버레이로 뜬다.
+    꾹 누르면 물이 차오르고, '적정' 밴드에서 떼면 알맞게, 넘기면 과습(실패).
+    플레이어의 실행이 결과 품질을 가른다 → '버튼 딸깍'이 진짜 행위가 됨."""
+
+    PLOT = pygame.Rect(44, 140, 362, 318)
+    PER_LEVEL = 0.7          # 게이지 1당 더해지는 수분
+    FILL_RATE = 55.0         # 누르고 있을 때 초당 차오르는 양
+    GAUGE_MAX = 112.0
+
+    def __init__(self, farm):
+        self.farm = farm
+        m = farm.moisture
+        self.level = 0.0
+        self.pouring = False
+        self.done = False
+        self.result = None
+        self.settle = 0.0        # 결과 보여주는 짧은 여운
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.drops = []          # 떨어지는 물방울 연출
+        self.pour_played = False
+        # 적정/넘침 경계를 '게이지 레벨'로 환산 (현재 수분에서 결과 수분이 닿는 지점)
+        def lvl_for(target):
+            return max(0.0, (target - m) / self.PER_LEVEL)
+        self.good_low = lvl_for(38)
+        self.good_high = lvl_for(72)
+        self.overflow = lvl_for(78)
+        if self.good_high <= self.good_low:   # 이미 충분히 젖음 → 거의 즉시 떼야 함
+            self.good_high = self.good_low + 6
+
+    # --- input ---
+    def handle(self, event):
+        if self.done:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.pouring = True
+            if not self.pour_played:
+                audio.play("water")
+                self.pour_played = True
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.pouring:
+                self.pouring = False
+                self._resolve()
+
+    # --- update ---
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        if self.pouring:
+            self.level += self.FILL_RATE * dt
+            # 분출구에서 물방울 생성
+            sx = self.PLOT.x + 150 + 70
+            self.drops.append([sx, 210.0, 40.0 + random.uniform(-12, 12), 120.0])
+            if self.level >= self.GAUGE_MAX:        # 흘러넘침 — 손 떼기 전에 터짐
+                self.pouring = False
+                self._resolve()
+        # 물방울 낙하
+        for d in self.drops:
+            d[0] += d[2] * dt
+            d[1] += d[3] * dt
+        self.drops = [d for d in self.drops if d[1] < 430]
+
+    def _resolve(self):
+        result_moisture = self.farm.moisture + self.level * self.PER_LEVEL
+        add = self.level * self.PER_LEVEL
+        if self.level > self.overflow:
+            quality = "over"
+            self.feedback = "너무 많아! 물이 흥건하다."
+            self.feedback_color = (235, 120, 90)
+            audio.play("break")
+        elif self.level < self.good_low:
+            quality = "under"
+            self.feedback = "조금 모자란 듯…"
+            self.feedback_color = (220, 205, 140)
+            audio.play("page")
+        else:
+            quality = "good"
+            self.feedback = "딱 알맞게 적셨다!"
+            self.feedback_color = (150, 230, 150)
+            audio.play("success")
+        self.result = {"quality": quality, "moisture_add": add, "result_moisture": result_moisture}
+        self.settle = 1.1
+
+    # --- draw ---
+    def draw(self, screen):
+        # 은은한 집중 틴트 (밭은 그대로 보이게 약하게)
+        veil = pygame.Surface((800, 600), pygame.SRCALPHA)
+        veil.fill((10, 14, 22, 70))
+        screen.blit(veil, (0, 0))
+
+        plot = self.PLOT
+        # 물뿌리개를 기울여 붓는 모습 (누를수록 더 기운다)
+        can = sprites["watering_can"]
+        tilt = 28 + (22 if self.pouring else 0)
+        rotated = pygame.transform.rotate(can, tilt)
+        can_x = plot.x + 150 - rotated.get_width() // 2
+        can_y = 150
+        screen.blit(rotated, (can_x, can_y))
+
+        # 물줄기 + 물방울
+        spout_x = plot.x + 150 + 64
+        if self.pouring:
+            pygame.draw.line(screen, (150, 205, 235), (spout_x, 196), (spout_x + 18, 240), 3)
+        for d in self.drops:
+            pygame.draw.circle(screen, (170, 215, 240), (int(d[0]), int(d[1])), 3)
+            pygame.draw.circle(screen, (210, 238, 252), (int(d[0]), int(d[1])), 1)
+
+        # 두둑이 젖어드는 표시 (레벨에 비례해 파랗게)
+        wet = min(1.0, self.level / max(1.0, self.overflow))
+        if wet > 0:
+            for (cx, cy) in self.farm.crop_positions():
+                a = int(70 * wet) if self.level <= self.overflow else 150
+                col = (90, 150, 190, a) if self.level <= self.overflow else (70, 110, 200, a)
+                puddle = pygame.Surface((54, 18), pygame.SRCALPHA)
+                pygame.draw.ellipse(puddle, col, (0, 0, 54, 18))
+                screen.blit(puddle, (cx - 27, cy + 20))
+
+        # 세로 게이지 (오른쪽 가장자리)
+        gx, gtop, gh, gw = plot.right - 26, 178, 252, 18
+        gbot = gtop + gh
+        pygame.draw.rect(screen, (40, 34, 28), (gx - 2, gtop - 2, gw + 4, gh + 4), border_radius=5)
+        pygame.draw.rect(screen, (24, 30, 36), (gx, gtop, gw, gh), border_radius=4)
+
+        def y_for(lv):
+            return gbot - min(lv, self.GAUGE_MAX) / self.GAUGE_MAX * gh
+        # 적정 밴드 (초록) = 성공 범위 그대로: 최소량~넘치기 직전
+        band_top = y_for(self.overflow)
+        band_bot = y_for(self.good_low)
+        pygame.draw.rect(screen, (70, 150, 80), (gx, band_top, gw, band_bot - band_top))
+        # 가장 알맞은 지점(스위트 스폿) 눈금
+        sweet = y_for(self.good_high)
+        pygame.draw.rect(screen, (180, 240, 170), (gx, sweet - 1, gw, 2))
+        # 넘침 구간 (빨강)
+        ov_y = y_for(self.GAUGE_MAX)
+        ov_bot = y_for(self.overflow)
+        pygame.draw.rect(screen, (150, 60, 55), (gx, ov_y, gw, ov_bot - ov_y))
+        # 현재 물 (파랑)
+        cur_y = y_for(self.level)
+        pygame.draw.rect(screen, (90, 170, 220), (gx, cur_y, gw, gbot - cur_y), border_radius=4)
+        pygame.draw.rect(screen, (210, 235, 250), (gx, cur_y, gw, 3))
+        pygame.draw.rect(screen, (90, 78, 60), (gx, gtop, gw, gh), 2, border_radius=4)
+
+        # 안내 / 결과 문구 (밭 아래)
+        font = get_font(20)
+        small = get_font(15)
+        if self.result is None:
+            tip = "꾹 눌러 물을 붓고, 초록 칸에서 손을 떼세요" if not self.pouring else "지금! 알맞을 때 떼기"
+            t = small.render(tip, True, (236, 228, 206))
+            screen.blit(t, (plot.centerx - t.get_width() // 2, 470))
+        else:
+            t = font.render(self.feedback, True, self.feedback_color)
+            screen.blit(t, (plot.centerx - t.get_width() // 2, 466))
+
+
 class FarmScene:
     # 첫 플레이 온보딩 카드 (제목, 본문)
     TUTORIAL_PAGES = [
@@ -99,6 +257,9 @@ class FarmScene:
         self.buttons = []
         self.action_menu_open = False
         self.action_scroll = 0
+        # 손맛 인터랙션 (씬 전환 없이 밭 위 오버레이). 헤드리스/시뮬은 끄고 즉시 적용.
+        self.interaction = None
+        self.interactions_enabled = True
         self.story_cooldown = 2
         self.stories_seen = set()
         # 통합 '속마음' 표시 채널 — 메아리/감각/선물/날씨지혜를 하나로 묶어
@@ -241,6 +402,12 @@ class FarmScene:
         self.rebuild_buttons()
 
     def handle_events(self, events):
+        # 손맛 인터랙션이 떠 있으면 입력은 전부 거기로 (다른 클릭 차단)
+        if self.interaction:
+            for event in events:
+                self.interaction.handle(event)
+            return
+
         # 온보딩이 떠 있는 동안에는 클릭/스페이스로 카드만 넘긴다 (게임 입력 차단)
         if self.tutorial_active:
             for event in events:
@@ -325,6 +492,15 @@ class FarmScene:
                 self.notice = "밭부터 돌보며 더 기다리자."
             return
 
+        # 물 주기는 밭 위에서 직접 붓는 손맛 인터랙션으로 — 잘 부으면 잘 되고 넘치면 실패.
+        # (헤드리스/시뮬은 interactions_enabled=False라 즉시 상태기반 적용)
+        if action == "물 주기" and self.interactions_enabled and not self.tutorial_active:
+            self.interaction = WaterPour(self)
+            return
+
+        self._run_action(action)
+
+    def _run_action(self, action, quality=None):
         self.actions_taken += 1
         self.last_action = action
         audio.play(ACTION_SFX.get(action, "click"))
@@ -333,7 +509,7 @@ class FarmScene:
         elif action == "잡초 뽑기":
             game_state.weed_count += 1
         difficulty = 1 + self.growth // 6
-        result, is_fail = self.apply_action(action, difficulty)
+        result, is_fail = self.apply_action(action, difficulty, quality)
         self.apply_field_pressure(difficulty)
         self.apply_weather_effects()
 
@@ -433,14 +609,28 @@ class FarmScene:
         if len(self.thought_queue) > 2:
             self.thought_queue = self.thought_queue[-2:]
 
-    def apply_action(self, action, difficulty):
-        """행동을 적용하고 (짧은 결과 메시지, 실패 여부)를 돌려준다."""
+    def apply_action(self, action, difficulty, quality=None):
+        """행동을 적용하고 (짧은 결과 메시지, 실패 여부)를 돌려준다.
+        quality: 손맛 인터랙션의 결과(dict). 있으면 플레이어 실행이 결과를 가른다."""
         if action == "살펴보기":
             game_state.understanding += 2
             self.stress = max(0, self.stress - 4)
             return self.inspect_message(), False
 
         if action == "물 주기":
+            if quality is not None:
+                add = quality["moisture_add"]
+                self.moisture += add
+                if quality["quality"] == "over":
+                    self.health -= 12 + difficulty
+                    self.stress += 10
+                    self.mistakes += 1
+                    return "물이 흥건하다. 뿌리가 숨을 못 쉰다.", True
+                if quality["quality"] == "under":
+                    return "조금 모자란 듯, 흙이 아직 마르다.", False
+                self.health += 4
+                self.stress = max(0, self.stress - 6)
+                return "딱 알맞게, 흙이 촉촉해졌다.", False
             if self.moisture < 35:
                 self.moisture += 34
                 self.health += 4
@@ -803,6 +993,15 @@ class FarmScene:
         self.actions_since_minigame = 0
 
     def update(self, dt):
+        # 손맛 인터랙션 진행 중에는 그것만 갱신 (나머지 밭은 잠시 멈춤)
+        if self.interaction:
+            self.interaction.update(dt)
+            if self.interaction.done:
+                result = self.interaction.result
+                self.interaction = None
+                self._run_action("물 주기", result)
+            return
+
         # 버튼 호버 상태 갱신 + 새로 올라탄 버튼에 호버 효과음
         if not self.tutorial_active:
             mouse_pos = pygame.mouse.get_pos()
@@ -1098,6 +1297,10 @@ class FarmScene:
 
         # 하단바: 1줄 = 방금 일어난 일, 2줄 = 지금 밭의 증상
         draw_bottom_bar(screen, "농장 일지", f"{self.message}\n{self.notice}")
+
+        # 손맛 인터랙션 오버레이 (모든 것 위에)
+        if self.interaction:
+            self.interaction.draw(screen)
 
         if self.tutorial_active:
             self.draw_tutorial(screen)
