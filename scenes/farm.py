@@ -62,7 +62,7 @@ class FarmScene:
     def __init__(self):
         self.day = 1
         self.growth = 0
-        self.growth_goal = 18
+        self.growth_goal = 20
         self.moisture = 44
         self.health = 66
         self.weeds = 25
@@ -83,7 +83,7 @@ class FarmScene:
         self.action_scroll = 0
         # New systems
         self.combo_count = 0
-        self.story_cooldown = 4
+        self.story_cooldown = 2
         self.stories_seen = set()
         # 통합 '속마음' 표시 채널 — 메아리/감각/선물/날씨지혜를 하나로 묶어
         # 겹치지 않는 한 곳에서 차례로 보여준다.
@@ -541,17 +541,21 @@ class FarmScene:
         self.pests += w.get("pests", 0)
 
     def try_trigger_story(self):
-        if self.story_cooldown > 0:
-            self.story_cooldown -= 1
-            return
-        if random.random() > 0.15:
-            return
+        # 성장 마일스톤에서 최소 2회는 보장 발생(쿨다운 무시) → 공감 선택 기회를 RNG에 맡기지 않는다.
+        seen = len(self.stories_seen)
+        forced = (self.growth >= 5 and seen == 0) or (self.growth >= 11 and seen < 2)
+        if not forced:
+            if self.story_cooldown > 0:
+                self.story_cooldown -= 1
+                return
+            if random.random() > 0.32:
+                return
         available = [e for i, e in enumerate(STORY_EVENTS) if i not in self.stories_seen]
         if not available:
             return
         event = random.choice(available)
         self.stories_seen.add(STORY_EVENTS.index(event))
-        self.story_cooldown = 10
+        self.story_cooldown = 4
         game_state.choice_data = event
         game_state.current_scene = "story_choice"
 

@@ -523,25 +523,25 @@ def get_attitude_ending():
     h = game_state.final_health
     m = game_state.farm_mistakes
 
-    # True ending: high empathy + patience + understanding
-    if u >= 35 and e >= 2 and p >= 3 and h >= 50:
+    # 진엔딩: 솜씨·이해·인내·공감이 모두 무르익고 실수도 적음
+    if u >= 40 and e >= 2 and p >= 3 and h >= 55 and m < 3:
         return "true"
-    # Happy ending: good stats overall
-    if h >= 70 and m < 4 and u >= 35:
+    # 해피: 따뜻한 성공 — 마음의 흔적(공감 또는 인내)이 하나라도 있음
+    if h >= 65 and u >= 30 and m < 4 and (e >= 1 or p >= 2):
         return "happy"
-    # Growth ending: many failures but recovered
-    if r >= 2 and u >= 20:
-        return "growth"
-    # Skill ending: good health/score but low empathy
-    if h >= 65 and u >= 25 and e <= 1:
+    # 기술: 잘 길렀지만 마음은 헤아리지 못함 (공감 0 · 거의 안 기다림)
+    if h >= 60 and u >= 25 and e == 0 and p <= 1:
         return "skill"
-    # Rush ending: too impatient
+    # 성장: 실수가 많았지만 다시 일어선 손
+    if r >= 2 and u >= 18:
+        return "growth"
+    # 조급함: 끝내 기다리지 못함
     if rush >= 4:
         return "rush"
-    # Normal ending
+    # 노멀
     if h >= 45 and u >= 15:
         return "normal"
-    # Bad ending
+    # 배드
     return "bad"
 
 
