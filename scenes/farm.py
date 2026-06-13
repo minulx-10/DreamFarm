@@ -45,6 +45,19 @@ class Button:
 
 
 class FarmScene:
+    # 첫 플레이 온보딩 카드 (제목, 본문)
+    TUTORIAL_PAGES = [
+        ("꿈속의 밭에 도착했습니다",
+         "오른쪽의 여섯 스탯으로 밭의 상태를 읽으세요. "
+         "수분·건강·잡초·해충·배수·스트레스 — 이 모든 것이 당근의 건강을 좌우합니다."),
+        ("정답은 알려주지 않습니다",
+         "아래 '농장 일지'는 밭의 증상만 알려줄 뿐, 무엇을 할지는 직접 판단해야 합니다. "
+         "막막하면 '살펴보기'로 정밀 진단과 날씨 예보를 받을 수 있어요."),
+        ("서두르지 마세요",
+         "작물은 제대로 된 돌봄과, 밭이 평온할 때의 '기다리기'에서 자랍니다. "
+         "조급함은 당근을 상하게 합니다.  (M 키: 음소거)"),
+    ]
+
     def __init__(self):
         self.day = 1
         self.growth = 0
@@ -124,6 +137,10 @@ class FarmScene:
         ]
         for px, py in pebbles:
             self.plot_decorations.append({'type': 'pebble', 'x': px, 'y': py})
+
+        # 첫 플레이 온보딩 (재플레이 시 생략)
+        self.tutorial_step = 0
+        self.tutorial_active = not game_state.is_second_run
 
         self.rebuild_buttons()
 
@@ -216,6 +233,18 @@ class FarmScene:
         self.rebuild_buttons()
 
     def handle_events(self, events):
+        # 온보딩이 떠 있는 동안에는 클릭/스페이스로 카드만 넘긴다 (게임 입력 차단)
+        if self.tutorial_active:
+            for event in events:
+                advance = (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or (
+                    event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN))
+                if advance:
+                    audio.play("page")
+                    self.tutorial_step += 1
+                    if self.tutorial_step >= len(self.TUTORIAL_PAGES):
+                        self.tutorial_active = False
+            return
+
         for event in events:
             if event.type == pygame.MOUSEWHEEL and self.action_menu_open:
                 max_scroll = max(0, len(self.get_action_choices()) - 4)
@@ -1097,3 +1126,31 @@ class FarmScene:
                 y_offset += wf.get_height() + 2
 
         draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")
+
+        if self.tutorial_active:
+            self.draw_tutorial(screen)
+
+    def draw_tutorial(self, screen):
+        overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+        overlay.fill((10, 12, 18, 185))
+        screen.blit(overlay, (0, 0))
+
+        title, body = self.TUTORIAL_PAGES[self.tutorial_step]
+        card = pygame.Rect(150, 195, 500, 210)
+        draw_light_panel(screen, card)
+
+        title_surf = get_font(23).render(title, True, TEXT_DARK)
+        screen.blit(title_surf, (card.centerx - title_surf.get_width() // 2, card.y + 26))
+        pygame.draw.rect(screen, (221, 173, 96),
+                         (card.centerx - 60, card.y + 58, 120, 3), border_radius=2)
+
+        body_font = get_font(17)
+        y = card.y + 78
+        for line in wrap_text(body, body_font, card.w - 56):
+            ls = body_font.render(line, True, TEXT_DARK)
+            screen.blit(ls, (card.x + 28, y))
+            y += body_font.get_height() + 7
+
+        step_txt = f"{self.tutorial_step + 1} / {len(self.TUTORIAL_PAGES)}   ·   클릭하여 계속"
+        ss = get_font(14).render(step_txt, True, TEXT_MUTED)
+        screen.blit(ss, (card.centerx - ss.get_width() // 2, card.bottom - 32))
