@@ -258,6 +258,27 @@ class EndingScene:
         self.credit_lines = self.build_credit_lines()
         self.credits_y = 620
 
+    # 엔딩 갤러리 키 (1회 클리어 이후에만 활성화 — 첫 플레이에서는 엔딩을 직접 얻어야 함)
+    GALLERY_KEYS = {
+        pygame.K_1: "true", pygame.K_2: "happy", pygame.K_3: "growth",
+        pygame.K_4: "skill", pygame.K_5: "rush", pygame.K_6: "normal",
+        pygame.K_7: "bad",
+    }
+
+    def gallery_unlocked(self):
+        return game_state.is_second_run
+
+    # 각 엔딩에 이르게 한 까닭을 한 줄로 — 결과가 '왜' 나왔는지 보여준다
+    ENDING_REASONS = {
+        "true": "깊은 이해와 공감, 그리고 기다림이 모두 무르익었습니다.",
+        "happy": "밭을 건강하게 지켜냈고, 마음도 함께 자랐습니다.",
+        "growth": "서툴러 실수했지만, 매번 다시 흙을 만졌습니다.",
+        "skill": "솜씨는 좋았지만, 마음을 헤아리는 일은 아직 남았습니다.",
+        "rush": "조급함이 기다림을 앞질렀습니다.",
+        "normal": "조금은 알 것 같은, 그런 하루였습니다.",
+        "bad": "아직은 그 마음과의 거리를 좁히지 못했습니다.",
+    }
+
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.KEYDOWN:
@@ -265,13 +286,10 @@ class EndingScene:
                     if self.phase in ("result", "journal") or self.finished:
                         self.retry()
                         return
-                elif event.key == pygame.K_1: self.change_ending("true")
-                elif event.key == pygame.K_2: self.change_ending("happy")
-                elif event.key == pygame.K_3: self.change_ending("growth")
-                elif event.key == pygame.K_4: self.change_ending("skill")
-                elif event.key == pygame.K_5: self.change_ending("rush")
-                elif event.key == pygame.K_6: self.change_ending("normal")
-                elif event.key == pygame.K_7: self.change_ending("bad")
+                elif (event.key in self.GALLERY_KEYS
+                      and self.gallery_unlocked()
+                      and self.phase in ("result", "journal")):
+                    self.change_ending(self.GALLERY_KEYS[event.key])
 
             click = (event.type == pygame.MOUSEBUTTONDOWN or
                      (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE))
@@ -630,11 +648,17 @@ class EndingScene:
             att_surf = att_font.render(att_text, True, (140, 130, 100))
             screen.blit(att_surf, (400 - att_surf.get_width() // 2, att_y))
 
+        # 이 엔딩에 이른 까닭 한 줄
+        reason = self.ENDING_REASONS.get(game_state.last_ending, "")
+        if reason:
+            reason_surf = att_font.render(reason, True, (158, 146, 116))
+            screen.blit(reason_surf, (400 - reason_surf.get_width() // 2, att_y + 24))
+
         if self.result_done:
-            if game_state.journal_entries:
-                prompt = self.font_small.render("R: 다시하기 / 크레딧: 스페이스바 / 1~7: 다른 엔딩 보기", True, (150, 150, 150))
-            else:
-                prompt = self.font_small.render("R: 다시하기 / 크레딧: 스페이스바 / 1~7: 다른 엔딩 보기", True, (150, 150, 150))
+            hint = "R: 다시하기 / 크레딧: 스페이스바"
+            if self.gallery_unlocked():
+                hint += " / 1~7: 엔딩 갤러리"
+            prompt = self.font_small.render(hint, True, (150, 150, 150))
             screen.blit(prompt, (400 - prompt.get_width() // 2, 535))
 
     def _draw_credits(self, screen):
@@ -691,5 +715,8 @@ class EndingScene:
                     y += 20
             y += 12
 
-        prompt = self.font_small.render("R: 다시하기 / 끝내기: 스페이스바 / 1~7: 다른 엔딩 보기", True, TEXT_MUTED)
+        hint = "R: 다시하기 / 끝내기: 스페이스바"
+        if self.gallery_unlocked():
+            hint += " / 1~7: 엔딩 갤러리"
+        prompt = self.font_small.render(hint, True, TEXT_MUTED)
         screen.blit(prompt, (400 - prompt.get_width() // 2, 560))

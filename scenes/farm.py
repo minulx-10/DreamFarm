@@ -323,13 +323,19 @@ class FarmScene:
             self.growth = max(0, self.growth - 1)
             result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
         else:
-            gain = 2
-            if self.is_good_turn() and action == "기다리기":
-                gain += 1
-            self.growth += gain
-            if self.is_good_turn():
-                game_state.understanding += 2
-            result += f" 밭일을 이어가며 성장했습니다. (+성장 {gain})"
+            # 성장은 '제대로 된 돌봄'과 '안정된 상태에서의 기다림'에서만 일어난다.
+            # 관찰(살펴보기)이나 실패한 행동으로는 자라지 않는다 → 살펴보기 남발 지배 전략 차단.
+            if action == "살펴보기" or is_fail:
+                gain = 0
+            elif action == "기다리기":
+                gain = 3 if self.is_good_turn() else 0
+            else:
+                gain = 2
+            if gain > 0:
+                self.growth += gain
+                if self.is_good_turn():
+                    game_state.understanding += 2
+                result += f" 작물이 한 뼘 자랐습니다. (+성장 {gain})"
 
         # #5 Failure echo + lesson recording
         if is_fail:
@@ -592,23 +598,27 @@ class FarmScene:
         return f"밭: {status_str}. 날씨: {tip} (지속: {game_state.weather_turns_left}일, 다음 예보: {game_state.next_weather})."
 
     def build_notice(self):
+        # 정답을 떠먹여주는 대신 '증상'을 묘사한다 — 플레이어가 직접 읽고 판단하도록.
+        # (정밀 진단과 날씨 예보는 '살펴보기'로만 얻을 수 있어 관찰 행동의 가치를 살린다.)
         if self.is_harvest_ready():
-            return "추천 행동: 수확하기"
-        if self.growth >= self.growth_goal:
-            return "수확 전 건강을 회복하세요."
+            return "다 자랐다. 이제 수확할 때다."
         if self.health < 45:
-            return "추천 행동: 흙 북돋기"
+            return "당근이 축 처져 기운이 없어 보인다."
         if self.moisture < 30:
-            return "추천 행동: 물 주기"
+            return "흙이 바짝 말라 손끝이 버석거린다."
         if self.moisture > 72:
-            return "추천 행동: 배수로 정리"
+            return "흙이 질척이고 물이 고여 있다."
+        if self.drainage < 35:
+            return "물길이 막혀 물이 잘 빠지지 않는다."
         if self.weeds > 50:
-            return "추천 행동: 잡초 뽑기"
+            return "잡초가 빼곡히 올라와 있다."
         if self.pests > 42:
-            return "추천 행동: 해충 살피기"
+            return "잎 뒤가 어쩐지 분주하다."
+        if self.stress > 55:
+            return "밭 전체가 예민하게 곤두서 있다."
         if self.is_good_turn():
-            return "추천 행동: 기다리기"
-        return "추천 행동: 살펴보기"
+            return "밭이 평온하다. 잠시 기다려도 좋겠다."
+        return "딱히 급해 보이는 곳은 없다."
 
     def grade_text(self, value, low_bad=True):
         if low_bad:
@@ -793,11 +803,11 @@ class FarmScene:
             self.message = "당근이 크게 시들었습니다. 다시 흙을 다독이며 회복시켜야 합니다."
             self.rebuild_buttons()
 
-    def draw_status_meter(self, screen, label, value, x, y, color):
-        font = get_font(17)
+    def draw_compact_meter(self, screen, label, value, x, y, color):
+        font = get_font(14)
         label_surf = font.render(label, True, TEXT_DARK)
-        screen.blit(label_surf, (x, y - 2))
-        bar = pygame.Rect(x + 58, y, 155, 15)
+        screen.blit(label_surf, (x, y - 1))
+        bar = pygame.Rect(x + 48, y, 86, 13)
         draw_meter_bar(screen, bar, value, 100, color)
 
     def draw_labeled_meter(self, screen, label, value, max_value, x, y, w, color):
@@ -839,10 +849,14 @@ class FarmScene:
     def draw_meters(self, screen):
         panel = pygame.Rect(430, 190, 320, 106)
         draw_light_panel(screen, panel)
-        self.draw_status_meter(screen, "수분", self.moisture, 452, 205, (80, 170, 240))
-        self.draw_status_meter(screen, "건강", self.health, 452, 228, (90, 185, 95))
-        self.draw_status_meter(screen, "잡초", self.weeds, 452, 251, (80, 140, 55))
-        self.draw_status_meter(screen, "해충", self.pests, 452, 274, (210, 110, 60))
+        # 6개 스탯을 2열로 — 건강을 좌우하는 배수·스트레스까지 모두 노출
+        c1, c2 = 450, 600
+        self.draw_compact_meter(screen, "수분", self.moisture, c1, 205, (80, 170, 240))
+        self.draw_compact_meter(screen, "건강", self.health, c2, 205, (90, 185, 95))
+        self.draw_compact_meter(screen, "잡초", self.weeds, c1, 232, (150, 160, 60))
+        self.draw_compact_meter(screen, "해충", self.pests, c2, 232, (210, 110, 60))
+        self.draw_compact_meter(screen, "배수", self.drainage, c1, 259, (90, 160, 185))
+        self.draw_compact_meter(screen, "스트레스", self.stress, c2, 259, (210, 95, 95))
 
     def draw_action_scrollbar(self, screen):
         actions = self.get_action_choices()
