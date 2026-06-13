@@ -70,8 +70,8 @@ class FarmScene:
         self.stress = 0
         self.actions_taken = 0
         self.last_action = ""
-        self.message = "상태를 확인하세요."
-        self.notice = "추천 행동: 살펴보기"
+        self.message = "낯선 밭에서 눈을 떴다."
+        self.notice = "밭의 상태부터 천천히 살펴보자."
         self.memory_cooldown = 1
         self.minigame_cooldown = 2
         self.last_minigame = None
@@ -84,25 +84,15 @@ class FarmScene:
         self.combo_count = 0
         self.story_cooldown = 4
         self.stories_seen = set()
-        # Echo: longer display with panel
-        self.echo_text = ""
-        self.echo_timer = 0
+        # 통합 '속마음' 표시 채널 — 메아리/감각/선물/날씨지혜를 하나로 묶어
+        # 겹치지 않는 한 곳에서 차례로 보여준다.
+        self.thought_text = ""
+        self.thought_timer = 0.0
+        self.thought_queue = []
         # Individual crop growth offsets (randomized per plot)
         self.crop_offsets = [random.randint(-2, 2) for _ in range(6)]
-        # #12 Silent gift display
-        self.gift_text = ""
-        self.gift_timer = 0
-        # #6 Weather wisdom display
-        self.wisdom_text = ""
-        self.wisdom_timer = 0
-        # #13 Wait animation
-        self.wait_phase = "off"  # off, waiting, done
-        self.wait_elapsed = 0
-        self.wait_dots = 0
         # #7 Seasonal colors cache
         self.season_colors = get_season_colors(self.growth, self.growth_goal)
-        # #15 Sensory text
-        self.sense_text = game_state.current_sense
         # #10 Dad mode turn counter
         self.dad_turns_done = 0
         
@@ -313,8 +303,8 @@ class FarmScene:
                 self.health -= 8
                 self.stress += 10
                 self.mistakes += 1
-                self.message = "아직 수확할 상태가 아닙니다."
-                self.notice = "추천 행동: 수확하지 말고 밭 상태를 먼저 회복하세요."
+                self.message = "아직 덜 자랐다. 성급하면 다 망친다."
+                self.notice = "밭부터 돌보며 더 기다리자."
             return
 
         self.actions_taken += 1
@@ -325,32 +315,31 @@ class FarmScene:
         elif action == "잡초 뽑기":
             game_state.weed_count += 1
         difficulty = 1 + self.growth // 6
-        result = self.apply_action(action, difficulty)
-        is_fail = "실패" in result or "효과 낮음" in result
+        result, is_fail = self.apply_action(action, difficulty)
         self.apply_field_pressure(difficulty)
         self.apply_weather_effects()
 
         # #11 Attitude tracking
         track_attitude(action, is_fail, self.is_good_turn())
 
-        # Combo system
+        # Combo system — 연출 문구는 하단바 대신 '속마음' 채널로 보낸다
         if not is_fail:
             self.combo_count += 1
         else:
             self.combo_count = 0
         if self.combo_count == 3:
-            result += " 감이 잡히는 듯하다."
             self.growth += 2
+            self.push_thought("감이 잡히는 듯하다.")
         elif self.combo_count == 5:
-            result += " 아버지의 리듬이 느껴진다."
             game_state.understanding += 6
             self.combo_count = 0
             audio.play("success")
+            self.push_thought("아버지의 리듬이 느껴진다.")
 
         if self.health <= 20:
             self.mistakes += 1
             self.growth = max(0, self.growth - 1)
-            result += " 작물이 버티지 못해 성장이 조금 늦어졌습니다."
+            result += " 당근이 버티지 못하고 시든다."
         else:
             # 성장은 '제대로 된 돌봄'과 '안정된 상태에서의 기다림'에서만 일어난다.
             # 관찰(살펴보기)이나 실패한 행동으로는 자라지 않는다 → 살펴보기 남발 지배 전략 차단.
@@ -364,41 +353,29 @@ class FarmScene:
                 self.growth += gain
                 if self.is_good_turn():
                     game_state.understanding += 2
-                result += f" 작물이 한 뼘 자랐습니다. (+성장 {gain})"
 
-        # #5 Failure echo + lesson recording
+        # 한 턴에 '속마음' 하나만 — 우선순위로 골라 통합 채널로 보낸다.
+        recovery_msg = check_recovery(action, is_fail)  # 항상 호출(회복 추적 + 실패 기록)
+        thought = ""
         if is_fail:
-            echo = pick_failure_echo(action)
-            if echo:
-                result += f" {echo}"
-        else:
-            # #5 Check recovery from previous failure
-            recovery_msg = check_recovery(action, is_fail)
-            if recovery_msg:
-                self.echo_text = recovery_msg
-                self.echo_timer = 6.0
-
-        # #15 Sensory update
-        if action not in ("살펴보기",):
-            sense = pick_sensory(action)
-            if sense:
-                self.sense_text = sense
-                game_state.current_sense = sense
-
-        # Action echo (longer display)
-        if not is_fail and action not in ("살펴보기",) and not self.echo_text:
-            ae = pick_action_echo(action)
-            if ae and random.random() < 0.45:
-                self.echo_text = ae
-                self.echo_timer = 6.0
-
-        # #12 Silent gifts every 5 turns
-        if self.day % 5 == 0:
+            thought = pick_failure_echo(action)          # 실패 시 아버지의 말 (교훈)
+        elif recovery_msg:
+            thought = recovery_msg
+        if not thought and self.day % 5 == 0:
             gift = get_silent_gift()
             if gift:
-                self.gift_text = gift
-                self.gift_timer = 5.0
                 reveal_gift()
+                thought = gift
+        if not thought and action != "살펴보기":
+            ae = pick_action_echo(action)
+            if ae and random.random() < 0.5:
+                thought = ae
+            else:
+                sense = pick_sensory(action)
+                if sense:
+                    game_state.current_sense = sense
+                    thought = sense
+        self.push_thought(thought)
 
         self.message = result
         self.notice = self.build_notice()
@@ -443,77 +420,86 @@ class FarmScene:
             self.try_trigger_minigame(action)
         self.rebuild_buttons()
 
+    def push_thought(self, text, dur=4.5):
+        """통합 '속마음' 채널에 한 줄 추가. 여러 개면 순서대로 표시(겹치지 않음)."""
+        if not text:
+            return
+        self.thought_queue.append((text, dur))
+        # 백로그가 길어지지 않도록 최근 2개만 유지
+        if len(self.thought_queue) > 2:
+            self.thought_queue = self.thought_queue[-2:]
+
     def apply_action(self, action, difficulty):
+        """행동을 적용하고 (짧은 결과 메시지, 실패 여부)를 돌려준다."""
         if action == "살펴보기":
             game_state.understanding += 2
             self.stress = max(0, self.stress - 4)
-            return self.inspect_message()
+            return self.inspect_message(), False
 
         if action == "물 주기":
             if self.moisture < 35:
                 self.moisture += 34
                 self.health += 4
                 self.stress = max(0, self.stress - 6)
-                return "물 주기 성공: 수분이 회복되었습니다."
+                return "흙이 촉촉해졌다.", False
             if self.moisture > 70:
                 self.moisture += 18
                 self.health -= 12 + difficulty
                 self.stress += 10
                 self.mistakes += 1
-                return "물 주기 실패: 수분이 너무 높아 건강이 감소했습니다."
+                return "물이 너무 많았다. 뿌리가 숨을 못 쉰다.", True
             self.moisture += 18
-            self.health += 0
-            return "물 주기 완료: 수분이 증가했습니다."
+            return "물을 주었다.", False
 
         if action == "잡초 뽑기":
             if self.weeds > 20:
                 self.weeds -= 34
                 self.health += 3
-                return "잡초 뽑기 성공: 잡초 수치가 크게 감소했습니다."
+                return "잡초를 걷어냈다.", False
             self.health -= 5
             self.stress += 6
             self.mistakes += 1
-            return "잡초 뽑기 실패: 잡초가 적어 건강이 감소했습니다."
+            return "뽑을 잡초도 없는데 애꿎은 흙만 헤집었다.", True
 
         if action == "해충 살피기":
             if self.pests > 18:
                 self.pests -= 32
                 self.health += 3
-                return "해충 살피기 성공: 해충 수치가 감소했습니다."
+                return "잎 뒤의 벌레를 잡아냈다.", False
             self.stress = max(0, self.stress - 2)
-            return "해충 살피기 완료: 큰 해충은 없습니다."
+            return "살펴보니 큰 벌레는 없다.", False
 
         if action == "배수로 정리":
             if self.moisture > 68 or self.drainage < 45:
                 self.moisture -= 22
                 self.drainage += 22
                 self.health += 1
-                return "배수로 정리 성공: 수분이 낮아지고 배수가 회복되었습니다."
+                return "물길을 터주니 물이 잘 빠진다.", False
             self.drainage += 8
             self.stress += 5
             self.mistakes += 1
-            return "배수로 정리 효과 낮음: 지금은 다른 행동이 더 필요합니다."
+            return "지금은 배수로를 손볼 때가 아니다.", True
 
         if action == "흙 북돋기":
             if self.health < 65 or self.stress > 24:
                 self.health += 8
                 self.stress = max(0, self.stress - 10)
                 self.drainage += 4
-                return "흙 북돋기 성공: 건강과 스트레스가 회복되었습니다."
+                return "흙을 다독이니 한결 생기가 돈다.", False
             self.health += 2
             self.moisture -= 4
-            return "흙 북돋기 완료: 변화는 작습니다."
+            return "흙을 만졌지만 큰 변화는 없다.", False
 
         if action == "기다리기":
             if self.is_good_turn():
                 self.moisture -= 8
-                return "기다리기 성공: 안정 상태라 성장이 진행됩니다."
+                return "조용히 기다린다. 당근이 제 속도로 자란다.", False
             self.health -= 8 + difficulty
             self.stress += 8
             self.mistakes += 1
-            return "기다리기 실패: 문제가 있는 상태라 건강이 감소했습니다."
+            return "기다리기엔 밭이 너무 불안하다.", True
 
-        return "행동을 처리했습니다."
+        return "...", False
 
     def apply_field_pressure(self, difficulty):
         self.day += 1
@@ -539,11 +525,10 @@ class FarmScene:
         if game_state.weather_turns_left <= 0:
             old_weather = game_state.weather
             advance_weather()
-            # #6 Weather wisdom on change
+            # #6 Weather wisdom on change → 통합 속마음 채널로
             new_weather = game_state.weather
             if new_weather != old_weather and new_weather in WEATHER_WISDOM:
-                self.wisdom_text = WEATHER_WISDOM[new_weather]
-                self.wisdom_timer = 4.0
+                self.push_thought(WEATHER_WISDOM[new_weather], dur=5.0)
 
     def apply_weather_effects(self):
         w = WEATHER_DATA.get(game_state.weather, {})
@@ -613,18 +598,17 @@ class FarmScene:
         if self.drainage < 35:
             warnings.append("배수 낮음")
 
-        # 날씨 가이드 팁 추가
+        # 날씨가 '무엇을 하는지'만 짚어 준다 (날씨 이름·예보·지속일은 상단 HUD에 이미 표시됨).
         weather_tips = {
-            "맑음": "맑음(수분 서서히 감소)",
-            "흐림": "흐림(특별한 영향 없음)",
-            "비": "비(수분 큰 폭 상승, 과습 주의)",
-            "가뭄": "가뭄(수분 큰 폭 하락, 건강 감소)",
-            "강풍": "강풍(해충 감소, 스트레스 증가)"
+            "맑음": "맑은 날엔 수분이 천천히 마른다.",
+            "흐림": "흐린 날은 큰 영향이 없다.",
+            "비": "비엔 수분이 크게 오른다 — 과습 주의.",
+            "가뭄": "가뭄엔 수분이 뚝 떨어진다.",
+            "강풍": "강풍은 해충을 날리지만 밭을 들쑤신다.",
         }
-        tip = weather_tips.get(game_state.weather, "영향 없음")
-        
-        status_str = ", ".join(warnings[:3]) if warnings else "밭이 안정적입니다"
-        return f"밭: {status_str}. 날씨: {tip} (지속: {game_state.weather_turns_left}일, 다음 예보: {game_state.next_weather})."
+        tip = weather_tips.get(game_state.weather, "")
+        status_str = ", ".join(warnings[:3]) if warnings else "밭이 안정적이다"
+        return f"자세히 보니 — {status_str}. {tip}"
 
     def build_notice(self):
         # 정답을 떠먹여주는 대신 '증상'을 묘사한다 — 플레이어가 직접 읽고 판단하도록.
@@ -814,22 +798,22 @@ class FarmScene:
             if f['y'] < 20 or f['y'] > 160:
                 f['speed_y'] *= -1
 
-        # Echo fade
-        if self.echo_timer > 0:
-            self.echo_timer -= dt
-        # #12 Gift fade
-        if self.gift_timer > 0:
-            self.gift_timer -= dt
-        # #6 Wisdom fade
-        if self.wisdom_timer > 0:
-            self.wisdom_timer -= dt
+        # 통합 '속마음' 채널: 현재 문구 페이드 → 비면 큐에서 다음 문구 꺼내기
+        if self.thought_timer > 0:
+            self.thought_timer -= dt
+            if self.thought_timer <= 0:
+                self.thought_text = ""
+        if not self.thought_text and self.thought_queue:
+            self.thought_text, dur = self.thought_queue.pop(0)
+            self.thought_timer = dur
 
         if self.health <= 0:
             self.health = 25
             self.stress = 45
             self.mistakes += 2
             game_state.understanding = max(0, game_state.understanding - 8)
-            self.message = "당근이 크게 시들었습니다. 다시 흙을 다독이며 회복시켜야 합니다."
+            self.message = "당근이 크게 시들어 버렸다. 다시 흙부터 다독여야 한다."
+            self.push_thought("처음부터, 천천히.")
             self.rebuild_buttons()
 
     def draw_compact_meter(self, screen, label, value, x, y, color):
@@ -1066,66 +1050,26 @@ class FarmScene:
 
         draw_top_bar(screen, show_stats=False)
 
-        # #15 Sensory bar at top
-        if self.sense_text:
-            sf = get_font(13)
-            line = wrap_text(self.sense_text, sf, 315, max_lines=1)[0]
-            ss = sf.render(line, True, (231, 219, 178))
-            cap_rect = pygame.Rect(30, 43, ss.get_width() + 18, 18)
-            cap_surf = pygame.Surface((cap_rect.w, cap_rect.h), pygame.SRCALPHA)
-            cap_surf.fill((25, 34, 35, 210))
-            pygame.draw.rect(cap_surf, (107, 121, 103, 220), (0, 0, cap_rect.w, cap_rect.h), 1, border_radius=6)
-            screen.blit(cap_surf, cap_rect)
-            screen.blit(ss, (cap_rect.x + 9, cap_rect.y + 2))
+        # 통합 '속마음' 한 줄 — 밭과 하단바 사이 빈 공간에 겹치지 않게 표시
+        if self.thought_text:
+            tf = get_font(15)
+            alpha = 1.0 if self.thought_timer > 1.0 else max(0.0, self.thought_timer)
+            line = wrap_text(self.thought_text, tf, 330, max_lines=1)[0]
+            ts = tf.render(line, True, (245, 232, 198))
+            pad = 12
+            pill_w = ts.get_width() + pad * 2
+            pill_h = ts.get_height() + 8
+            px = 225 - pill_w // 2
+            py = 460
+            pill = pygame.Surface((pill_w, pill_h), pygame.SRCALPHA)
+            pill.fill((28, 24, 20, int(205 * alpha)))
+            pygame.draw.rect(pill, (150, 120, 80, int(220 * alpha)), (0, 0, pill_w, pill_h), 1, border_radius=8)
+            screen.blit(pill, (px, py))
+            ts.set_alpha(int(255 * alpha))
+            screen.blit(ts, (px + pad, py + 4))
 
-        # Echo text overlay — styled floating panel
-        if self.echo_timer > 0 and self.echo_text:
-            ef = get_font(17)
-            if self.echo_timer > 2.0:
-                ea = 1.0
-            else:
-                ea = self.echo_timer / 2.0
-            es = ef.render(self.echo_text, True, TEXT_DARK)
-            ew = es.get_width() + 24
-            eh = es.get_height() + 14
-            ex = 225 - ew // 2
-            ey = 456
-            panel_surf = pygame.Surface((ew, eh), pygame.SRCALPHA)
-            panel_surf.fill((242, 220, 180, int(200 * ea)))
-            pygame.draw.rect(panel_surf, (170, 130, 80, int(220 * ea)), (0, 0, ew, eh), 2, border_radius=6)
-            screen.blit(panel_surf, (ex, ey))
-            tc = (int(80 * ea), int(60 * ea), int(30 * ea))
-            es2 = ef.render(self.echo_text, True, tc)
-            screen.blit(es2, (ex + 12, ey + 7))
-
-        # #12 Silent gift overlay
-        if self.gift_timer > 0 and self.gift_text:
-            gf = get_font(16)
-            ga = min(1.0, self.gift_timer / 1.5) if self.gift_timer < 1.5 else 1.0
-            gs = gf.render(self.gift_text, True, (int(160 * ga), int(140 * ga), int(90 * ga)))
-            gw = gs.get_width() + 20
-            gh = gs.get_height() + 10
-            gx = 225 - gw // 2
-            gy = 140
-            gp = pygame.Surface((gw, gh), pygame.SRCALPHA)
-            gp.fill((255, 245, 220, int(180 * ga)))
-            pygame.draw.rect(gp, (180, 150, 100, int(200 * ga)), (0, 0, gw, gh), 2, border_radius=4)
-            screen.blit(gp, (gx, gy))
-            screen.blit(gs, (gx + 10, gy + 5))
-
-        # #6 Weather wisdom overlay (wrapped to prevent overlapping with right cards)
-        if self.wisdom_timer > 0 and self.wisdom_text:
-            wf = get_font(14)
-            wa = min(1.0, self.wisdom_timer / 1.0) if self.wisdom_timer < 1.0 else 1.0
-            color = (int(120 * wa), int(100 * wa), int(60 * wa))
-            lines = wrap_text(self.wisdom_text, wf, 320)
-            y_offset = 132
-            for line in lines:
-                ws = wf.render(line, True, color)
-                screen.blit(ws, (225 - ws.get_width() // 2, y_offset))
-                y_offset += wf.get_height() + 2
-
-        draw_bottom_bar(screen, "농장 일지", f"{self.message} {self.notice}")
+        # 하단바: 1줄 = 방금 일어난 일, 2줄 = 지금 밭의 증상
+        draw_bottom_bar(screen, "농장 일지", f"{self.message}\n{self.notice}")
 
         if self.tutorial_active:
             self.draw_tutorial(screen)
