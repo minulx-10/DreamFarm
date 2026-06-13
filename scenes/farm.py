@@ -36,9 +36,10 @@ class Button:
         self.text = text
         self.value = value
         self.font = get_font(font_size)
+        self.hovered = False
 
     def draw(self, screen):
-        draw_button(screen, self.rect, self.text, self.font)
+        draw_button(screen, self.rect, self.text, self.font, hovered=self.hovered)
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)
@@ -131,6 +132,7 @@ class FarmScene:
         # 첫 플레이 온보딩 (재플레이 시 생략)
         self.tutorial_step = 0
         self.tutorial_active = not game_state.is_second_run
+        self.last_hover_value = None
 
         self.rebuild_buttons()
 
@@ -788,6 +790,19 @@ class FarmScene:
         self.minigame_cooldown = 7 if mg == "stage1" else 5
 
     def update(self, dt):
+        # 버튼 호버 상태 갱신 + 새로 올라탄 버튼에 호버 효과음
+        if not self.tutorial_active:
+            mouse_pos = pygame.mouse.get_pos()
+            new_hover = None
+            for btn in self.buttons:
+                btn.hovered = btn.rect.collidepoint(mouse_pos)
+                if btn.hovered:
+                    new_hover = btn.value
+            if new_hover != self.last_hover_value:
+                if new_hover is not None:
+                    audio.play("hover")
+                self.last_hover_value = new_hover
+
         # Update firefly particles
         for f in self.fireflies:
             f['x'] += f['speed_x'] * dt
@@ -847,9 +862,9 @@ class FarmScene:
         title = title_font.render("밭 상태", True, TEXT_DARK)
         screen.blit(title, (450, 96))
 
-        self.draw_labeled_meter(screen, "성장", self.growth, self.growth_goal, 450, 123, 130, (235, 150, 55))
+        self.draw_labeled_meter(screen, "성장", self.growth, self.growth_goal, 450, 123, 116, (235, 150, 55))
         # Understanding badge (moon + stage name) instead of numeric bar
-        draw_understanding_badge(screen, 600, 123, 125)
+        draw_understanding_badge(screen, 600, 123, 130)
 
         status_font = get_font(16)
         health_text = status_font.render(f"건강 {self.grade_text(self.health)}", True, TEXT_DARK)

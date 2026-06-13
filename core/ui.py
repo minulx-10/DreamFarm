@@ -2,6 +2,21 @@ import math
 import pygame
 from core.assets import *
 from core.game_state import game_state, get_understanding_stage
+from core import audio
+
+
+def draw_mute_icon(screen, x, y):
+    """음소거 상태를 보여주는 작은 스피커 아이콘."""
+    muted = audio.is_muted() or not audio.is_enabled()
+    base = (150, 162, 150) if not muted else (120, 108, 104)
+    pygame.draw.rect(screen, base, (x, y + 5, 6, 9))
+    pygame.draw.polygon(screen, base, [(x + 6, y + 5), (x + 13, y), (x + 13, y + 19), (x + 6, y + 14)])
+    if muted:
+        pygame.draw.line(screen, (214, 96, 84), (x + 16, y + 2), (x + 24, y + 17), 2)
+        pygame.draw.line(screen, (214, 96, 84), (x + 24, y + 2), (x + 16, y + 17), 2)
+    else:
+        pygame.draw.arc(screen, base, (x + 12, y + 2, 9, 15), -0.9, 0.9, 2)
+        pygame.draw.arc(screen, base, (x + 15, y - 2, 12, 23), -0.9, 0.9, 2)
 
 
 def wrap_text(text, font, max_width, max_lines=None):
@@ -250,6 +265,7 @@ def draw_top_bar(screen, show_stats=True):
         title_text = "몽중농원"
         title_surf = get_font(27).render(title_text, True, WHITE)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 24))
+        draw_mute_icon(screen, 744, 22)
 
 
 def draw_bottom_bar(screen, obj_name, obj_desc):
