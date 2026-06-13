@@ -43,46 +43,47 @@ def main():
         "transition": None, "epiphany": None,
     }
 
-    scenes = {
-        "name_input": NameInputScene(),
-        "intro": IntroScene(),
-        "transition": TransitionScene(),
-        "memory": MemoryScene(),
-        "farm": FarmScene(),
-        "stage1": Stage1Scene(),
-        "stage2": Stage2Scene(),
-        "stage3": Stage3Scene(),
-        "stage4": Stage4Scene(),
-        "ending": EndingScene(),
-        "epiphany": EpiphanyScene(),
-        "story_choice": StoryChoiceScene(),
-        "father_day": FatherDayScene(),
+    # 씬 이름 → 생성자 레지스트리
+    SCENE_FACTORIES = {
+        "name_input": NameInputScene,
+        "intro": IntroScene,
+        "transition": TransitionScene,
+        "memory": MemoryScene,
+        "farm": FarmScene,
+        "stage1": Stage1Scene,
+        "stage2": Stage2Scene,
+        "stage3": Stage3Scene,
+        "stage4": Stage4Scene,
+        "ending": EndingScene,
+        "epiphany": EpiphanyScene,
+        "story_choice": StoryChoiceScene,
+        "father_day": FatherDayScene,
+    }
+    # 진입할 때마다 새 상태로 재생성해야 하는 씬 (farm/name_input/transition은 유지)
+    FRESH_ON_ENTER = {
+        "intro", "memory", "epiphany", "story_choice", "father_day",
+        "stage1", "stage2", "stage3", "stage4", "ending",
     }
 
-    current_scene_obj = scenes[game_state.current_scene]
+    scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}
+
+    current_key = game_state.current_scene
+    current_scene_obj = scenes[current_key]
 
     while game_state.running:
         dt = clock.tick(60) / 1000.0
         game_state.play_time += dt
-        
+
         target_scene = game_state.current_scene
 
-        if current_scene_obj != scenes.get(target_scene):
-            # 상태 리셋이 필요한 씬만 새로 생성
-            if target_scene == "stage1": scenes["stage1"] = Stage1Scene()
-            elif target_scene == "stage2": scenes["stage2"] = Stage2Scene()
-            elif target_scene == "stage3": scenes["stage3"] = Stage3Scene()
-            elif target_scene == "stage4": scenes["stage4"] = Stage4Scene()
-            elif target_scene == "ending": scenes["ending"] = EndingScene()
-            elif target_scene == "intro": 
-                scenes["farm"] = FarmScene()
-                scenes["intro"] = IntroScene()
-            elif target_scene == "memory": scenes["memory"] = MemoryScene()
-            elif target_scene == "epiphany": scenes["epiphany"] = EpiphanyScene()
-            elif target_scene == "story_choice": scenes["story_choice"] = StoryChoiceScene()
-            elif target_scene == "father_day": scenes["father_day"] = FatherDayScene()
-            
+        if target_scene != current_key:
+            # 인트로 진입은 새 게임이므로 밭도 함께 초기화
+            if target_scene == "intro":
+                scenes["farm"] = SCENE_FACTORIES["farm"]()
+            if target_scene in FRESH_ON_ENTER:
+                scenes[target_scene] = SCENE_FACTORIES[target_scene]()
             current_scene_obj = scenes[target_scene]
+            current_key = target_scene
 
         # 씬에 맞는 배경음 재생 (같은 곡이면 내부에서 무시됨)
         desired_bgm = BGM_BY_SCENE.get(target_scene)

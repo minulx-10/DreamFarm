@@ -91,55 +91,18 @@ class GameState:
         self.play_time = 0.0
 
     def reset(self):
-        self.understanding = 0
-        self.score = 0
-        self.timer = 0
-        self.transition_text = ""
-        self.transition_next = ""
-        self.is_clear_transition = False
-        self.return_scene = "farm"
-
-        self.memory_title = ""
-        self.memory_text = ""
-        self.memory_next = "farm"
-
-        self.final_health = 100
-        self.farm_mistakes = 0
-
-        self.weather = "맑음"
-        self.weather_turns_left = 3
-        self.next_weather = "흐림"
-
-        self.journal_entries = []
-        self.epiphanies_seen = set()
-        self.pending_epiphany = None
-        self.action_echo = ""
-        self.choice_data = None
-
-        self.water_count = 0
-        self.weed_count = 0
-        self.pest_count = 0
-        self.choice_impacts = []
-
-        self.patience_score = 0
-        self.care_score = 0
-        self.empathy_choices = 0
-        self.recovery_count = 0
-        self.rush_count = 0
-        self.last_failure_action = ""
-
-        self.dad_lessons = {}
-        self.gifts_revealed = 0
-        self.current_sense = "낯선 흙냄새가 코끝을 스친다."
-
-        self.dad_mode = False
-        self.dad_mode_turns = 0
-        self.dad_mode_triggered = False
-        self.father_day_seen = set()
-
-        self.wait_active = False
-        self.wait_timer = 0.0
-        self.play_time = 0.0
+        """새 플레이를 위해 상태를 초기화한다.
+        __init__을 다시 호출하되, 플레이어 정체성·이전 회차 기록(2회차 판정용)은 보존한다.
+        (필드를 손으로 나열하던 방식은 __init__과 어긋나 누락 버그를 만들기 쉬웠다.)"""
+        preserved = {
+            "player_name": self.player_name,
+            "is_second_run": self.is_second_run,
+            "prev_ending": self.prev_ending,
+            "prev_understanding": self.prev_understanding,
+        }
+        self.__init__()
+        for key, value in preserved.items():
+            setattr(self, key, value)
 
 
 game_state = GameState()
