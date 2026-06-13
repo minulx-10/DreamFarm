@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.game_state import game_state, apply_second_run
+from core import audio
 from scenes.name_input import NameInputScene
 from scenes.intro import IntroScene
 from scenes.transition import TransitionScene
@@ -27,9 +28,20 @@ def main():
     
     from core.assets import init_sprites
     init_sprites()
+    audio.init()
 
     # #14 Check for 2nd playthrough
     apply_second_run()
+
+    # 씬별 배경음 매핑 (None이면 현재 곡 유지)
+    BGM_BY_SCENE = {
+        "name_input": "night", "intro": "night", "memory": "night",
+        "story_choice": "night", "father_day": "night",
+        "farm": "farm", "stage1": "farm", "stage2": "farm",
+        "stage3": "farm", "stage4": "farm",
+        "ending": "ending",
+        "transition": None, "epiphany": None,
+    }
 
     scenes = {
         "name_input": NameInputScene(),
@@ -72,10 +84,17 @@ def main():
             
             current_scene_obj = scenes[target_scene]
 
+        # 씬에 맞는 배경음 재생 (같은 곡이면 내부에서 무시됨)
+        desired_bgm = BGM_BY_SCENE.get(target_scene)
+        if desired_bgm:
+            audio.play_bgm(desired_bgm)
+
         events = pygame.event.get()
         for event in events:
             if event.type == pygame.QUIT:
                 game_state.running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                audio.toggle_mute()
 
         current_scene_obj.handle_events(events)
         current_scene_obj.update(dt)

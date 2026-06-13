@@ -2,6 +2,7 @@ import pygame
 import random
 from core.game_state import game_state
 from core.assets import *
+from core import audio
 from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel
 
 class SortItem:
@@ -119,17 +120,21 @@ class Stage1Scene:
                 if self.bin_keep.collidepoint(event.pos):
                     if self.dragged_item.is_good:
                         game_state.score += 100
+                        audio.play("soil")
                         self.hovered_desc = "좋습니다. 씨앗이 제자리를 찾았습니다."
                     else:
                         game_state.score -= 80
+                        audio.play("break")
                         self.hovered_desc = "이건 밭에 두면 당근이 자라기 어렵습니다."
                     self.items.remove(self.dragged_item)
                 elif self.bin_trash.collidepoint(event.pos):
                     if not self.dragged_item.is_good:
                         game_state.score += 100
+                        audio.play("soil")
                         self.hovered_desc = "잘 치웠습니다. 흙이 한결 깨끗해졌습니다."
                     else:
                         game_state.score -= 80
+                        audio.play("break")
                         self.hovered_desc = "씨앗까지 버리면 수확할 것이 없어집니다."
                     self.items.remove(self.dragged_item)
                 self.dragged_item = None

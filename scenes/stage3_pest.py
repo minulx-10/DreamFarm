@@ -2,6 +2,7 @@ import pygame
 import random
 from core.game_state import game_state
 from core.assets import *
+from core import audio
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel
 
 class Bug:
@@ -43,6 +44,7 @@ class Stage3Scene:
                         bug.alive = False
                         game_state.score += 50
                         game_state.pest_count += 1
+                        audio.play("click")
                         break
 
     def update(self, dt):

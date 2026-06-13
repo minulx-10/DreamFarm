@@ -10,11 +10,24 @@ from core.game_state import (
     check_father_day,
 )
 from core.assets import *
+from core import audio
 from core.ui import (
     draw_light_panel, draw_wood_panel, draw_top_bar,
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
     wrap_text, mix_color,
 )
+
+# 행동별 효과음 매핑
+ACTION_SFX = {
+    "물 주기": "water",
+    "잡초 뽑기": "soil",
+    "흙 북돋기": "soil",
+    "배수로 정리": "water",
+    "해충 살피기": "click",
+    "살펴보기": "page",
+    "기다리기": "page",
+    "수확하기": "harvest",
+}
 
 
 class Button:
@@ -224,6 +237,7 @@ class FarmScene:
                     if btn.is_clicked(event.pos):
                         clicked = True
                         if btn.value == "__open_actions__":
+                            audio.play("click")
                             self.action_menu_open = True
                             self.action_scroll = 0
                             self.rebuild_buttons()
@@ -251,6 +265,7 @@ class FarmScene:
     def do_action(self, action):
         if action == "수확하기":
             if self.is_harvest_ready():
+                audio.play("click")
                 game_state.understanding += 12
                 game_state.final_health = self.health
                 game_state.farm_mistakes = self.mistakes
@@ -265,6 +280,7 @@ class FarmScene:
                 game_state.return_scene = "farm"
                 game_state.current_scene = "transition"
             else:
+                audio.play("break")
                 self.health -= 8
                 self.stress += 10
                 self.mistakes += 1
@@ -274,6 +290,7 @@ class FarmScene:
 
         self.actions_taken += 1
         self.last_action = action
+        audio.play(ACTION_SFX.get(action, "click"))
         if action == "물 주기":
             game_state.water_count += 1
         elif action == "잡초 뽑기":
@@ -299,6 +316,7 @@ class FarmScene:
             result += " 아버지의 리듬이 느껴진다."
             game_state.understanding += 6
             self.combo_count = 0
+            audio.play("success")
 
         if self.health <= 20:
             self.mistakes += 1

@@ -3,6 +3,7 @@ import math
 import random
 from core.game_state import game_state
 from core.assets import *
+from core import audio
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
@@ -149,6 +150,7 @@ class Stage4Scene:
                 self.pull_phase = "feedback"
                 self.feedback_text = "너무 세게... 부러졌다."
                 self.feedback_timer = 2.0
+                audio.play("break")
                 self.results.append("broken")
                 self.shake = 0.4
                 self.attempts += 1
@@ -160,6 +162,7 @@ class Stage4Scene:
                 self.pull_phase = "feedback"
                 self.feedback_text = "쏙! 완벽하게 뽑혔다."
                 self.feedback_timer = 2.0
+                audio.play("harvest")
                 self.results.append("perfect")
                 self.attempts += 1
                 game_state.score += 300

@@ -7,6 +7,7 @@ from core.game_state import (
 )
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
+from core import audio
 
 
 class EndingScene:
@@ -282,6 +283,8 @@ class EndingScene:
                 pass
             elif self.phase == "carrot":
                 if click:
+                    # 베어 무는 순간의 소리: 따뜻한 엔딩은 경쾌하게, 그 외엔 둔탁하게
+                    audio.play("harvest" if game_state.last_ending in ("true", "happy", "growth") else "break")
                     self.phase = "golden"
                     self.phase_timer = 0
             elif self.phase == "golden":

@@ -2,6 +2,7 @@ import math
 import pygame
 from core.game_state import game_state
 from core.assets import BLACK, get_font
+from core import audio
 
 class EpiphanyScene:
     """Fullscreen epiphany moment — dramatic text reveal when understanding crosses a threshold."""
@@ -14,6 +15,7 @@ class EpiphanyScene:
         self.phase = "fade_in"
         self.hold_timer = 0
         self.glow_timer = 0
+        audio.play("epiphany")
 
     def handle_events(self, events):
         for event in events:

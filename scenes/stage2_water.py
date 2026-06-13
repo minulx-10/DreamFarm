@@ -3,6 +3,7 @@ import random
 import math
 from core.game_state import game_state
 from core.assets import *
+from core import audio
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 class Stage2Scene:
@@ -98,6 +99,9 @@ class Stage2Scene:
             # Count watering turn stats randomly while spraying
             if random.random() < 0.08:
                 game_state.water_count += 1
+            # 물소리 효과음 (과하지 않게 간헐적으로)
+            if random.random() < 0.05:
+                audio.play("water")
         else:
             target_angle = 0.0
 
@@ -131,6 +135,8 @@ class Stage2Scene:
                 all_watered = False
                 break
         if all_watered:
+            if not self.stage_clear:
+                audio.play("success")
             self.stage_clear = True
             self.clear_timer = 2.0
 
