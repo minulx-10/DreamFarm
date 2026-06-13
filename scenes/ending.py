@@ -312,8 +312,12 @@ class EndingScene:
                     self.phase = "result"
                     self.phase_timer = 0
             elif self.phase == "result":
-                if self.result_done and click:
-                    self._start_credits()
+                if click:
+                    if self.result_done:
+                        self._start_credits()
+                    else:
+                        # 솟아오르던 결과 글자를 한 번에 제자리에 앉힌다 (다음 프레임에 안내가 뜸)
+                        self.result_y = 260
             elif self.phase == "credits":
                 if click and self.phase_timer > 1.0:
                     self._finish_after_credits()
@@ -655,11 +659,13 @@ class EndingScene:
             screen.blit(reason_surf, (400 - reason_surf.get_width() // 2, att_y + 24))
 
         if self.result_done:
-            hint = "R: 다시하기 / 크레딧: 스페이스바"
+            cont = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, (208, 198, 170))
+            screen.blit(cont, (400 - cont.get_width() // 2, 516))
+            sub = "R: 처음부터 다시"
             if self.gallery_unlocked():
-                hint += " / 1~7: 엔딩 갤러리"
-            prompt = self.font_small.render(hint, True, (150, 150, 150))
-            screen.blit(prompt, (400 - prompt.get_width() // 2, 535))
+                sub += "      1~7: 다른 엔딩 다시 보기"
+            sub_surf = att_font.render(sub, True, (140, 134, 116))
+            screen.blit(sub_surf, (400 - sub_surf.get_width() // 2, 548))
 
     def _draw_credits(self, screen):
         draw_story_backdrop(screen, "night")
@@ -715,8 +721,8 @@ class EndingScene:
                     y += 20
             y += 12
 
-        hint = "R: 다시하기 / 끝내기: 스페이스바"
+        prompt = self.font_small.render("클릭하거나 스페이스바를 누르면 처음 화면으로 돌아갑니다", True, (214, 204, 178))
+        screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
         if self.gallery_unlocked():
-            hint += " / 1~7: 엔딩 갤러리"
-        prompt = self.font_small.render(hint, True, TEXT_MUTED)
-        screen.blit(prompt, (400 - prompt.get_width() // 2, 560))
+            g = get_font(14).render("1~7: 다른 엔딩 다시 보기", True, (150, 143, 122))
+            screen.blit(g, (400 - g.get_width() // 2, 578))

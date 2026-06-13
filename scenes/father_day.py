@@ -136,8 +136,8 @@ class FatherDayScene:
 
             # Prompt
             if self.finished:
-                pt = "다음으로" if self.page_index < len(self.pages) - 1 else "아버지의 밭으로"
-                prompt = self.font_small.render(pt, True, (120, 100, 70))
+                label = "다음으로" if self.page_index < len(self.pages) - 1 else "아버지의 밭으로"
+                prompt = self.font_small.render(f"{label} ▸ 클릭하거나 스페이스바", True, (172, 148, 106))
                 screen.blit(prompt, (400 - prompt.get_width() // 2, 520))
 
         # Fade overlay
