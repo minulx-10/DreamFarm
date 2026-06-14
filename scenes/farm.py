@@ -37,19 +37,12 @@ ACTION_SFX = {
     "수확하기": "harvest",
 }
 
-# 미니게임 진입 연출 문구 — 같은 미니게임을 또 만나도 다른 결로 읽히도록 변주를 둔다.
+# '밭 정리' 돌발 상황 진입 문구 — 또 만나도 다른 결로 읽히도록 변주.
+# (물·해충 미니게임은 인라인 손맛으로 대체되어 폐지됨)
 MINIGAME_INTROS = {
     "stage1": [
         "[돌발 상황]\n\n밭에 씨앗과 잡동사니가 뒤섞였다.\n아버지는 이걸 매일 새벽, 혼자 골라냈다.\n이번에는 내 손으로 가려 본다.",
         "[돌발 상황]\n\n간밤의 바람이 밭을 헤집어 놓았다.\n쓸 것과 버릴 것이 뒤죽박죽이다.\n서두르면 씨앗까지 버리게 된다.",
-    ],
-    "stage2": [
-        "[돌발 상황]\n\n흙이 갑자기 물을 빨아들인다.\n너무 많지도, 적지도 않게.\n아버지의 손끝을 떠올리며 맞춰 본다.",
-        "[돌발 상황]\n\n두둑이 부쩍 메말라 간다.\n물은 정성이라 했다.\n급한 마음을 누르고, 골고루 적신다.",
-    ],
-    "stage3": [
-        "[돌발 상황]\n\n잎을 뒤집자 해충이 보였다.\n아버지는 이걸 맨손으로 잡았다.\n이번에는 내가 지켜 본다.",
-        "[돌발 상황]\n\n작은 것들이 잎 사이를 기어다닌다.\n그냥 두면 밤새 갉아먹을 것이다.\n눈을 크게 뜨고, 놓치지 말자.",
     ],
 }
 
@@ -98,10 +91,7 @@ class FarmScene:
         self.message = "낯선 밭에서 눈을 떴다."
         self.notice = "밭의 상태부터 천천히 살펴보자."
         self.memory_cooldown = 1
-        self.minigame_cooldown = 2
-        self.last_minigame = None
-        self.actions_since_minigame = 0  # 미발생 누적(pity) — 오래 안 나오면 확률↑, 확정 발생
-        self.minigames_seen = set()      # 이번 판에 나온 미니게임 — 안 나온 쪽에 가중치(다양성)
+        self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
         self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
@@ -838,55 +828,25 @@ class FarmScene:
         return random.choice(candidates or memories)
 
     def try_trigger_minigame(self, action):
-        # 살펴보기·수확은 돌발 상황을 부르지 않는다.
+        # 물·잡초·해충은 이제 밭 위 '손맛' 인라인으로 직접 하므로, 같은 걸 또 시키는
+        # 전체화면 미니게임(물·해충)은 흐름만 끊는 군더더기 → 폐지.
+        # 고유 콘텐츠인 '밭 정리(stage1)'만, 밭이 어수선할 때 가끔 등장하는 돌발 상황으로 남긴다.
         if action in ("살펴보기", "수확하기"):
             return
         if self.minigame_cooldown > 0:
             self.minigame_cooldown -= 1
             return
-        self.actions_since_minigame += 1
-
-        # 빈도: 기본 확률 + 미발생 누적(pity)으로 상승, 2회 쌓이면 확정 발생 → 시연에서 반드시 보임.
-        chance = 0.45 + 0.25 * self.actions_since_minigame
-        if self.actions_since_minigame < 2 and random.random() >= chance:
+        if self.weeds < 48 and self.drainage > 38:
+            return  # 밭이 충분히 정돈돼 있으면 굳이 부르지 않음
+        if random.random() >= 0.14:
             return
 
-        # 어떤 미니게임을 띄울지 가중치로 고른다:
-        #  · 방금 한 행동과 맞는 것 → 그 일이 손에 잡히는 일로 번지는 결
-        #  · 아직 이번 판에 안 나온 것 → 시연에서 세 종류가 골고루 보이도록
-        #  · 직전에 나온 것 → 연속 회피
-        action_stage = {
-            "잡초 뽑기": "stage1", "물 주기": "stage2",
-            "배수로 정리": "stage2", "해충 살피기": "stage3",
-        }.get(action)
-        weights = {"stage1": 1.0, "stage2": 1.0, "stage3": 1.0}
-        if action_stage:
-            weights[action_stage] += 3.0
-        for s in weights:
-            if s not in self.minigames_seen:
-                weights[s] += 2.5
-        if self.last_minigame:
-            weights[self.last_minigame] *= 0.15
-
-        stages = list(weights)
-        roll = random.uniform(0, sum(weights.values()))
-        upto = 0
-        mg = stages[-1]
-        for s in stages:
-            upto += weights[s]
-            if roll <= upto:
-                mg = s
-                break
-
-        self.minigames_seen.add(mg)
-        game_state.transition_text = random.choice(MINIGAME_INTROS[mg])
+        game_state.transition_text = random.choice(MINIGAME_INTROS["stage1"])
         game_state.current_scene = "transition"
         game_state.is_clear_transition = False
-        game_state.transition_next = mg
+        game_state.transition_next = "stage1"
         game_state.return_scene = "farm"
-        self.last_minigame = mg
-        self.minigame_cooldown = 1
-        self.actions_since_minigame = 0
+        self.minigame_cooldown = 6
 
     def update(self, dt):
         # 손맛 인터랙션 진행 중에는 그것만 갱신 (나머지 밭은 잠시 멈춤)
