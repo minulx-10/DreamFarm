@@ -414,6 +414,50 @@ class EndingScene:
             prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 562))
 
+    def _draw_plate(self, screen, cx, cy, tc=255):
+        """우묵한 백자 그릇 — 측벽 두께, 우묵한 안면, 청자색 띠, 림 광택으로 입체감."""
+        def c(*v):
+            return tuple(min(tc, x) for x in v)
+        pw, ph = 138, 60
+        x, y = cx - pw // 2, cy - ph // 2
+        # 바닥 그림자
+        sh = pygame.Surface((pw + 18, ph + 18), pygame.SRCALPHA)
+        pygame.draw.ellipse(sh, (0, 0, 0, min(95, tc)), (0, 0, pw + 14, ph + 14))
+        screen.blit(sh, (x - 7, y + 10))
+        # 측벽(두께) — 살짝 아래로 깐 어두운 타원
+        pygame.draw.ellipse(screen, c(196, 187, 170), (x, y + 8, pw, ph))
+        # 윗면(림)
+        pygame.draw.ellipse(screen, c(239, 234, 222), (x, y, pw, ph))
+        # 가는 청자색 띠
+        pygame.draw.ellipse(screen, c(150, 176, 173), (x + 10, y + 4, pw - 20, ph - 8), 1)
+        # 우묵한 안면
+        iw, ih = pw - 40, ph - 24
+        ix, iy = cx - iw // 2, cy - ih // 2
+        pygame.draw.ellipse(screen, c(212, 205, 189), (ix, iy, iw, ih))
+        # 윗 림 광택(위쪽 호) + 안쪽 바닥 그늘(아래쪽 호)
+        pygame.draw.arc(screen, c(253, 250, 241), (x + 8, y + 1, pw - 16, ph), 0.45, 2.7, 3)
+        pygame.draw.arc(screen, c(178, 169, 152), (ix, iy + 1, iw, ih), 3.5, 6.0, 3)
+
+    def _draw_chopsticks(self, screen, tc=255):
+        """끝으로 갈수록 가늘어지는 나무젓가락 — 그릇 오른쪽에 자연스레 걸쳐 둠."""
+        def c(*v):
+            return tuple(min(tc, x) for x in v)
+
+        def taper(ax, ay, bx, by, wa, wb):
+            dx, dy = bx - ax, by - ay
+            L = math.hypot(dx, dy) or 1
+            px, py = -dy / L, dx / L
+            return [(ax + px * wa, ay + py * wa), (bx + px * wb, by + py * wb),
+                    (bx - px * wb, by - py * wb), (ax - px * wa, ay - py * wa)]
+
+        # 받침(작은 그림자 덩이)
+        pygame.draw.ellipse(screen, c(120, 86, 50), (566, 372, 30, 9))
+        for (hx, hy), (tx, ty) in (((602, 344), (505, 360)), ((606, 354), (509, 370))):
+            pygame.draw.polygon(screen, c(96, 64, 36), taper(hx, hy + 4, tx, ty + 4, 3.2, 1.2))  # 그림자
+            pygame.draw.polygon(screen, c(156, 116, 70), taper(hx, hy, tx, ty, 3.4, 1.1))         # 몸통
+            pygame.draw.polygon(screen, c(198, 160, 108), taper(hx, hy - 1, tx, ty - 1, 1.3, 0.4))  # 윗 광택
+            pygame.draw.circle(screen, c(118, 82, 46), (int(tx), int(ty)), 2)                      # 짙은 끝
+
     def _draw_table(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
         draw_story_backdrop(screen, "night")
@@ -441,52 +485,25 @@ class EndingScene:
             pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (110, 365), (690, 365), 2)
             pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (120, 420), (680, 420), 2)
 
-            # 2. Plate Drawing (3D Ceramic Style with Rim and Shadow)
-            plate_x, plate_y, pw, ph = 340, 320, 120, 50
-            # Under-plate shadow
-            shadow_surf = pygame.Surface((pw + 10, ph + 10), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow_surf, (0, 0, 0, min(85, tc)), (0, 0, pw, ph))
-            screen.blit(shadow_surf, (plate_x - 3, plate_y + 4))
+            # 2. 그릇 (입체 백자)
+            self._draw_plate(screen, 400, 345, tc)
 
-            # Plate base
-            pygame.draw.ellipse(screen, (min(tc, 225), min(tc, 220), min(tc, 208)), (plate_x, plate_y, pw, ph))
-            # Outer rim border
-            pygame.draw.ellipse(screen, (min(tc, 190), min(tc, 182), min(tc, 170)), (plate_x, plate_y, pw, ph), 2)
-            # Inner plate recess (Rim line)
-            pygame.draw.ellipse(screen, (min(tc, 208), min(tc, 202), min(tc, 190)), (plate_x + 12, plate_y + 6, pw - 24, ph - 12), 1)
-
-            # 3. Carrot Pieces on Plate (Individually shaped chunks with highlights/shading)
+            # 3. 그릇에 담긴 당근 반찬 조각들 (안면 가운데)
             if tc > 120:
-                # Chunk 1 (Left)
-                c1_pts = [(plate_x + 28, plate_y + 20), (plate_x + 44, plate_y + 14), (plate_x + 48, plate_y + 24), (plate_x + 32, plate_y + 28)]
-                pygame.draw.polygon(screen, (min(tc, 245), min(tc, 125), min(tc, 30)), c1_pts)
-                pygame.draw.polygon(screen, (min(tc, 205), min(tc, 85), min(tc, 15)), c1_pts, 1) # Shade border
-                # Chunk 2 (Middle)
-                c2_pts = [(plate_x + 50, plate_y + 14), (plate_x + 68, plate_y + 10), (plate_x + 72, plate_y + 20), (plate_x + 54, plate_y + 24)]
-                pygame.draw.polygon(screen, (min(tc, 255), min(tc, 140), min(tc, 40)), c2_pts)
-                pygame.draw.polygon(screen, (min(tc, 215), min(tc, 95), min(tc, 20)), c2_pts, 1)
-                # Chunk 3 (Right)
-                c3_pts = [(plate_x + 72, plate_y + 22), (plate_x + 88, plate_y + 16), (plate_x + 94, plate_y + 26), (plate_x + 78, plate_y + 30)]
-                pygame.draw.polygon(screen, (min(tc, 235), min(tc, 115), min(tc, 25)), c3_pts)
-                pygame.draw.polygon(screen, (min(tc, 195), min(tc, 75), min(tc, 10)), c3_pts, 1)
-                
-                # Small shiny glaze dots
-                pygame.draw.circle(screen, (255, 255, 255), (plate_x + 40, plate_y + 18), 1)
-                pygame.draw.circle(screen, (255, 255, 255), (plate_x + 60, plate_y + 14), 1)
+                chunks = [
+                    ([(376, 348), (392, 342), (396, 352), (380, 356)], (245, 125, 30), (205, 85, 15)),
+                    ([(396, 341), (414, 337), (418, 347), (400, 351)], (255, 140, 40), (215, 95, 20)),
+                    ([(416, 350), (432, 344), (438, 354), (422, 358)], (235, 115, 25), (195, 75, 10)),
+                ]
+                for pts, fill, edge in chunks:
+                    pygame.draw.polygon(screen, (min(tc, fill[0]), min(tc, fill[1]), min(tc, fill[2])), pts)
+                    pygame.draw.polygon(screen, (min(tc, edge[0]), min(tc, edge[1]), min(tc, edge[2])), pts, 1)
+                pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (388, 346), 1)
+                pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (408, 342), 1)
 
-            # 4. Chopsticks resting naturally on the table (with shadow)
+            # 4. 젓가락
             if tc > 150:
-                # Chopsticks shadow
-                pygame.draw.line(screen, (0, 0, 0, min(60, tc)), (490, 362), (570, 372), 3)
-                pygame.draw.line(screen, (0, 0, 0, min(60, tc)), (496, 368), (576, 378), 3)
-                
-                # Chopstick 1
-                pygame.draw.line(screen, (min(tc, 132), min(tc, 102), min(tc, 62)), (488, 356), (568, 366), 3)
-                # Chopstick 2
-                pygame.draw.line(screen, (min(tc, 132), min(tc, 102), min(tc, 62)), (494, 362), (574, 372), 3)
-                # Chopstick tips highlight
-                pygame.draw.line(screen, (min(tc, 185), min(tc, 155), min(tc, 110)), (488, 356), (496, 357), 2)
-                pygame.draw.line(screen, (min(tc, 185), min(tc, 155), min(tc, 110)), (494, 362), (502, 363), 2)
+                self._draw_chopsticks(screen, tc)
 
     def _draw_carrot_click(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
@@ -508,17 +525,8 @@ class EndingScene:
         pygame.draw.line(screen, (140, 95, 55), (110, 365), (690, 365), 2)
         pygame.draw.line(screen, (140, 95, 55), (120, 420), (680, 420), 2)
         
-        # 2. Plate (Same ceramic style)
-        plate_x, plate_y, pw, ph = 340, 320, 120, 50
-        # Plate shadow
-        shadow_surf = pygame.Surface((pw + 10, ph + 10), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 85), (0, 0, pw, ph))
-        screen.blit(shadow_surf, (plate_x - 3, plate_y + 4))
-        
-        # Plate body
-        pygame.draw.ellipse(screen, (225, 220, 208), (plate_x, plate_y, pw, ph))
-        pygame.draw.ellipse(screen, (190, 182, 170), (plate_x, plate_y, pw, ph), 2)
-        pygame.draw.ellipse(screen, (208, 202, 190), (plate_x + 12, plate_y + 6, pw - 24, ph - 12), 1)
+        # 2. 그릇 (입체 백자)
+        self._draw_plate(screen, 400, 345)
 
         # 3. Golden Dream Sparkle Particles around the carrot
         import random
@@ -542,7 +550,7 @@ class EndingScene:
         cw = int(carrot.get_width() * scale)
         ch = int(carrot.get_height() * scale)
         scaled = pygame.transform.scale(carrot, (cw, ch))
-        screen.blit(scaled, (400 - cw // 2, 336 - ch))
+        screen.blit(scaled, (400 - cw // 2, 344 - ch))
         
         # Prompt
         prompt = self.font_small.render("당근을 클릭하세요", True, (255, 225, 130))
