@@ -31,6 +31,7 @@ class GameState:
 
         # Journal system
         self.journal_entries = []
+        self.journal_closed = False   # 엔딩별 '마지막 장'을 한 번만 더하기 위한 플래그
 
         # Epiphany system
         self.epiphanies_seen = set()
@@ -287,6 +288,28 @@ FATHER_DAY_NARRATIONS = {
         "오늘은 비가 올 것 같다.\n아버지는 배수로를 미리 정리하고,\n아이가 쓸 장갑을 밭 옆에 놓아 둔다.\n혹시나 하는 마음으로.\n아이는 모르겠지만, 괜찮다.\n알아주길 바라고 한 일이 아니니까.",
     ],
 }
+
+# 엔딩별 일지 '마지막 장' — 결말에 따라 일지의 닫는 글이 달라진다.
+ENDING_JOURNAL_CLOSINGS = {
+    "true": ("[마지막 장 · 수확의 날]\n흙을 처음 만지던 날이 떠오른다. 그땐 아무것도 몰랐다.\n이제는 안다 — 이 밭의 모든 새벽이 누군가의 사랑이었다는 걸.\n내일 새벽, 아버지 곁에서 다시 흙을 만질 것이다."),
+    "happy": ("[마지막 장 · 수확의 날]\n당근은 달았다. 기다린 만큼, 꼭 그만큼.\n서툴렀지만 마음만은 흙을 따라 한 뼘 자랐다."),
+    "growth": ("[마지막 장 · 수확의 날]\n실수투성이였다. 그래도 매번 다시 흙을 만졌다.\n서툰 손도 매일이면 단단해진다는 걸, 이 밭이 가르쳐 줬다."),
+    "skill": ("[마지막 장 · 수확의 날]\n밭일은 익혔고 수확도 넉넉했다.\n그런데 식탁 앞에서 왜 멈칫했을까. 아직 못 배운 것이 남아 있다."),
+    "rush": ("[마지막 장 · 수확의 날]\n급히 뽑은 당근은 어딘가 설었다.\n기다리는 법을, 나는 아직 배우지 못했다."),
+    "normal": ("[마지막 장 · 수확의 날]\n잘한 것도 못한 것도 있던 하루였다.\n조금은 알 것 같은, 그런 마음으로 밭을 나선다."),
+    "bad": ("[마지막 장 · 수확의 날]\n끝내 입에 넣지 못한 당근.\n그래도 예전처럼 밀어내지는 않았다. 그거면, 시작은 된 셈이다."),
+}
+
+
+def append_ending_journal():
+    """엔딩에 도달했을 때, 그 결말에 맞는 '마지막 장'을 일지에 딱 한 번 더한다."""
+    if game_state.journal_closed:
+        return
+    text = ENDING_JOURNAL_CLOSINGS.get(game_state.last_ending)
+    if text:
+        game_state.journal_entries.append(text)
+        game_state.journal_closed = True
+
 
 # #8 Journal retrospective lines
 JOURNAL_RETROSPECTIVES = {

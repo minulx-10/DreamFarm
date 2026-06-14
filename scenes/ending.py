@@ -4,6 +4,7 @@ import pygame
 from core.game_state import (
     append_josa, game_state, get_understanding_stage,
     get_attitude_ending, save_progress, JOURNAL_RETROSPECTIVES,
+    append_ending_journal,
 )
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
@@ -24,6 +25,8 @@ class EndingScene:
         self.char_delay = 0.065
         self.finished = False
         self.ending_data = self.get_ending()
+        # 이 엔딩에 맞는 '마지막 장'을 일지에 한 번 더한다 (엔딩별로 닫는 글이 달라짐)
+        append_ending_journal()
         self.pages = self.build_pages()
         self.page_index = 0
         self.text_to_print = self.prepare_page(self.page_index)
@@ -38,6 +41,7 @@ class EndingScene:
         self.result_done = False
         self.is_happy = False
         self.journal_scroll = 0
+        self.journal_max_scroll = 0
         self.show_journal = False
         self.carrot_pulse = 0
         self.letter_written = False
@@ -322,7 +326,16 @@ class EndingScene:
                 if click and self.phase_timer > 1.0:
                     self._finish_after_credits()
             elif self.phase == "journal":
-                if click:
+                # 휠(또는 휠 버튼)로 스크롤 — 나가기는 좌클릭/스페이스만
+                if event.type == pygame.MOUSEWHEEL:
+                    self.journal_scroll = max(0, min(self.journal_max_scroll,
+                                                     self.journal_scroll - event.y * 30))
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                    delta = -30 if event.button == 4 else 30
+                    self.journal_scroll = max(0, min(self.journal_max_scroll,
+                                                     self.journal_scroll + delta))
+                elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or (
+                        event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
                     save_progress()
                     self.retry()
 
@@ -713,25 +726,37 @@ class EndingScene:
 
         retro_font = get_font(14)
         head_color = (150, 110, 60)
-        y = 116
-        for entry in game_state.journal_entries[-3:]:
+        # 스크롤 보이는 영역(클리핑) — 전체 일지를 휠로 넘겨 읽는다
+        view = pygame.Rect(100, 108, 600, 404)
+        prev_clip = screen.get_clip()
+        screen.set_clip(view)
+        start_y = 116 - self.journal_scroll
+        y = start_y
+        for entry in game_state.journal_entries:
             for line in entry.split("\n"):
-                if y > 505:
-                    break
                 is_head = line.startswith("[")
-                surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
-                screen.blit(surf, (120, y))
+                if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
+                    surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
+                    screen.blit(surf, (120, y))
                 y += 26 if is_head else 22
-
-                # #8 Journal retrospective
                 if self.is_happy and line.strip() in JOURNAL_RETROSPECTIVES:
-                    retro = JOURNAL_RETROSPECTIVES[line.strip()]
-                    rs = retro_font.render(retro, True, TEXT_MUTED)
-                    screen.blit(rs, (140, y))
+                    if view.top - 30 < y < view.bottom + 4:
+                        rs = retro_font.render(JOURNAL_RETROSPECTIVES[line.strip()], True, TEXT_MUTED)
+                        screen.blit(rs, (140, y))
                     y += 18
-            y += 10
+            y += 12
+        screen.set_clip(prev_clip)
 
-        prompt = self.font_small.render("클릭하거나 스페이스바를 누르면 처음 화면으로 돌아갑니다", True, (214, 204, 178))
+        # 스크롤 가능 범위 갱신(다음 입력에서 클램프에 사용)
+        content_h = y - start_y
+        self.journal_max_scroll = max(0, content_h - view.height + 12)
+        if self.journal_scroll > self.journal_max_scroll:
+            self.journal_scroll = self.journal_max_scroll
+        if self.journal_max_scroll > 0:
+            sh = retro_font.render("휠로 스크롤", True, (172, 152, 112))
+            screen.blit(sh, (672 - sh.get_width(), 110))
+
+        prompt = self.font_small.render("스페이스바 또는 클릭 ▸ 처음 화면으로", True, (214, 204, 178))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
         if self.gallery_unlocked():
             g = get_font(14).render("1~7: 다른 엔딩 다시 보기", True, (150, 143, 122))
