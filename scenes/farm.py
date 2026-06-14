@@ -625,17 +625,40 @@ class FarmScene:
         game_state.current_scene = "story_choice"
 
     def _write_journal(self):
-        lines = [f"[{self.day}일째 일지]"]
+        season = get_season(self.growth, self.growth_goal)
+        lines = [f"[{self.day}일째 · {season} · {game_state.weather}]"]
+        # 수분 한 줄 (회고 키 문장 유지)
         if self.moisture > 75:
             lines.append("오늘 물을 너무 많이 줬다.")
         elif self.moisture < 25:
             lines.append("흙이 바짝 말라 있었다.")
         else:
             lines.append("수분은 적당했다.")
+        # 밭의 다른 상태를 구체적으로 — 그날의 손길이 어디에 닿았는지
+        detail = []
+        if self.weeds > 45:
+            detail.append("잡초가 자꾸 올라온다")
+        if self.pests > 38:
+            detail.append("잎 뒤로 벌레가 보인다")
+        if self.drainage < 35:
+            detail.append("물길이 막혀 물이 더디게 빠진다")
+        if detail:
+            lines.append(", ".join(detail) + ".")
+        elif self.is_good_turn():
+            lines.append("밭은 대체로 평온했다. 손이 갈 곳이 줄었다.")
+        # 건강 (회고 키 문장 유지 + 호전 표현 추가)
         if self.health < 45:
             lines.append("당근이 많이 힘들어 보였다.")
+        elif self.health >= 78:
+            lines.append("당근 잎에 윤기가 돌기 시작했다.")
+        # 실수 (회고 키 문장 유지)
         if self.mistakes > 3:
             lines.append("실수가 잦았다. 아직 모르는 것이 많다.")
+        # 성장 진척
+        prog = int(min(1.0, self.growth / self.growth_goal) * 100)
+        lines.append(f"여기까지 성장 {prog}%. 수확이 가까워진다." if prog >= 60
+                     else f"여기까지 성장 {prog}%.")
+        # 이해 단계별 속마음 (회고 키 문장 유지)
         u = game_state.understanding
         if u < 20:
             lines.append("이걸 왜 해야 하는지 아직 모르겠다.")

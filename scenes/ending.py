@@ -712,22 +712,24 @@ class EndingScene:
         pygame.draw.line(screen, (180, 141, 82), (120, 98), (680, 98), 2)
 
         retro_font = get_font(14)
-        y = 118
-        for entry in game_state.journal_entries[-6:]:
+        head_color = (150, 110, 60)
+        y = 116
+        for entry in game_state.journal_entries[-3:]:
             for line in entry.split("\n"):
-                if y > 500:
+                if y > 505:
                     break
-                surf = self.font_small.render(line, True, TEXT_DARK)
+                is_head = line.startswith("[")
+                surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
                 screen.blit(surf, (120, y))
-                y += 24
+                y += 26 if is_head else 22
 
                 # #8 Journal retrospective
                 if self.is_happy and line.strip() in JOURNAL_RETROSPECTIVES:
                     retro = JOURNAL_RETROSPECTIVES[line.strip()]
                     rs = retro_font.render(retro, True, TEXT_MUTED)
                     screen.blit(rs, (140, y))
-                    y += 20
-            y += 12
+                    y += 18
+            y += 10
 
         prompt = self.font_small.render("클릭하거나 스페이스바를 누르면 처음 화면으로 돌아갑니다", True, (214, 204, 178))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
