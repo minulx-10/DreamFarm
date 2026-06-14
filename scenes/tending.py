@@ -213,10 +213,16 @@ class WeedPull:
             if w["pulled"]:
                 continue
             ox, oy = int(w["ox"]), int(w["oy"])
+            gx2, gy2 = w["x"] + ox, w["y"] + oy
+            # 대상 표시 — 발밑에 옅은 빛 (이걸 뽑으라는 신호)
+            glow = pygame.Surface((46, 24), pygame.SRCALPHA)
+            pygame.draw.ellipse(glow, (255, 236, 165, 80), (0, 0, 46, 24))
+            pygame.draw.ellipse(glow, (255, 250, 210, 120), (9, 6, 28, 12))
+            screen.blit(glow, (gx2 - 23, gy2 + 6))
             # 뿌리에서 늘어나는 줄기 표시
             if self.grabbed is w and (ox or oy):
                 pygame.draw.line(screen, (96, 132, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
-            screen.blit(wsp, (w["x"] - wsp.get_width() // 2 + ox, w["y"] - wsp.get_height() // 2 + oy))
+            screen.blit(wsp, (gx2 - wsp.get_width() // 2, gy2 - wsp.get_height() // 2))
         for p in self.puffs:
             r = int(14 * (1 - p[2] / 0.45)) + 4
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
@@ -310,7 +316,13 @@ class PestTap:
         for b in self.bugs:
             if b["dead"]:
                 continue
-            screen.blit(bsp, (int(b["x"]) - bsp.get_width() // 2, int(b["y"]) - bsp.get_height() // 2))
+            bx, by = int(b["x"]), int(b["y"])
+            # 조준 고리 — 이 벌레를 잡으라는 신호 (움직여도 따라다님)
+            ring = pygame.Surface((36, 36), pygame.SRCALPHA)
+            pygame.draw.circle(ring, (255, 90, 60, 70), (18, 18), 16)        # 옅은 채움
+            pygame.draw.circle(ring, (255, 140, 95, 210), (18, 18), 15, 3)   # 또렷한 테두리
+            screen.blit(ring, (bx - 18, by - 18))
+            screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
         for p in self.puffs:
             r = int(10 * (1 - p[2] / 0.35)) + 3
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)

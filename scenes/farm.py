@@ -1044,17 +1044,19 @@ class FarmScene:
             self.draw_crop(screen, x, y, growth_stage, idx)
 
         # 4. Draw weeds & bugs on top of the scene
-        if self.weeds > 32:
-            weed_count = 2 if self.weeds < 55 else 4
-            weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]
-            for x, y in weed_spots[:weed_count]:
-                screen.blit(sprites["weed"], (x, y))
+        # 손맛 인터랙션 중에는 배경 잡초/벌레를 숨긴다 — 뽑을/잡을 '대상'과 헷갈리지 않게.
+        if self.interaction is None:
+            if self.weeds > 32:
+                weed_count = 2 if self.weeds < 55 else 4
+                weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]
+                for x, y in weed_spots[:weed_count]:
+                    screen.blit(sprites["weed"], (x, y))
 
-        if self.pests > 32:
-            bug_count = 1 if self.pests < 55 else 3
-            bug_spots = [(150, 228), (284, 336), (332, 220)]
-            for x, y in bug_spots[:bug_count]:
-                screen.blit(sprites["bug"], (x, y))
+            if self.pests > 32:
+                bug_count = 1 if self.pests < 55 else 3
+                bug_spots = [(150, 228), (284, 336), (332, 220)]
+                for x, y in bug_spots[:bug_count]:
+                    screen.blit(sprites["bug"], (x, y))
 
     def draw(self, screen):
         # #7 Seasonal tiled background
