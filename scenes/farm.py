@@ -68,6 +68,10 @@ class FarmScene:
         ("꿈속의 밭에 도착했습니다",
          "오른쪽의 여섯 스탯으로 밭의 상태를 읽으세요. "
          "수분·건강·잡초·해충·배수·스트레스 — 이 모든 것이 당근의 건강을 좌우합니다."),
+        ("밭일은 직접 손으로",
+         "'행동하기'에서 할 일을 고르면, 물 주기·잡초·해충은 밭에서 직접 합니다. "
+         "물은 꾹 눌러 붓고, 잡초는 잡아 쭉 끌어내고, 벌레는 톡톡 쳐서 잡으세요. "
+         "그때그때 화면이 방법을 알려줍니다."),
         ("정답은 알려주지 않습니다",
          "아래 '농장 일지'는 밭의 증상만 알려줄 뿐, 무엇을 할지는 직접 판단해야 합니다. "
          "막막하면 '살펴보기'로 정밀 진단과 날씨 예보를 받을 수 있어요."),
@@ -360,9 +364,12 @@ class FarmScene:
         track_attitude(action, is_fail, self.is_good_turn())
 
         if self.health <= 20:
+            # 건강이 바닥이어도 성장이 뒤로 가지는 않는다(역행은 영영 못 자라게 만듦).
+            # 게다가 '제대로 시도한' 돌봄엔 아주 더디게나마 자란다 — 끈기는 늘 보답받게.
             self.mistakes += 1
-            self.growth = max(0, self.growth - 1)
             result += " 당근이 버티지 못하고 시든다."
+            if action not in ("살펴보기", "기다리기") and not is_fail:
+                self.growth += 1
         else:
             # 성장은 '제대로 된 돌봄'과 '안정된 상태에서의 기다림'에서만 일어난다.
             # 관찰(살펴보기)이나 실패한 행동으로는 자라지 않는다 → 살펴보기 남발 지배 전략 차단.
@@ -465,10 +472,11 @@ class FarmScene:
                 add = quality["moisture_add"]
                 self.moisture += add
                 if quality["quality"] == "over":
-                    self.health -= 12 + difficulty
-                    self.stress += 10
+                    # 실수는 따끔하되 회복 가능하게 — 손맛을 못해도 소프트락에 빠지지 않도록.
+                    self.health -= 6
+                    self.stress += 6
                     self.mistakes += 1
-                    return "물이 흥건하다. 뿌리가 숨을 못 쉰다.", True
+                    return "물이 흥건하다. 뿌리가 조금 답답해한다.", True
                 if quality["quality"] == "under":
                     return "조금 모자란 듯, 흙이 아직 마르다.", False
                 self.health += 4
@@ -564,16 +572,21 @@ class FarmScene:
         self.weeds += random.randint(4, 7 + difficulty)
         self.pests += random.randint(2, 5 + difficulty)
 
+        dmg = 0
         if self.moisture > 75:
-            self.health -= 5 + difficulty
+            dmg += 5 + difficulty
             self.drainage -= 5
         if self.moisture < 22:
-            self.health -= 6 + difficulty
+            dmg += 6 + difficulty
             self.stress += 5
         if self.weeds > 55:
-            self.health -= 5 + difficulty
+            dmg += 5 + difficulty
         if self.pests > 48:
-            self.health -= 6 + difficulty
+            dmg += 6 + difficulty
+        # 건강이 이미 바닥이면 밭이 덜 몰아붙인다 — 회복의 길을 늘 열어 소프트락 방지.
+        if self.health < 28:
+            dmg = int(dmg * 0.4)
+        self.health -= dmg
         if random.random() < 0.18 + difficulty * 0.04:
             self.drainage -= random.randint(4, 10)
 
