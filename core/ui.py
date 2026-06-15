@@ -125,27 +125,62 @@ def draw_meter_bar(screen, rect, value, max_value=100, color=ACCENT_MINT, back=(
     pygame.draw.rect(screen, mix_color(back, WHITE, 0.16), rect, 1, border_radius=5)
 
 
+# 밤하늘 배경의 고정 별자리 — 매 프레임 같은 자리 (밝기 다양)
+_BACKDROP_STARS = [
+    (62, 70, 2), (138, 44, 1), (210, 96, 1), (300, 58, 2), (96, 130, 1),
+    (250, 24, 1), (430, 78, 1), (372, 120, 1), (508, 40, 2), (566, 96, 1),
+    (700, 60, 1), (744, 118, 1), (180, 78, 1), (48, 36, 1), (620, 130, 1),
+    (336, 86, 1), (470, 132, 1), (126, 104, 1),
+]
+
+
 def draw_story_backdrop(screen, mood="night"):
     if mood == "warm":
-        top, bottom = (58, 82, 92), (171, 116, 76)
-        hill = (45, 72, 64)
-        ground = (85, 63, 49)
+        stops = [(0.0, (58, 82, 96)), (0.5, (132, 98, 90)), (1.0, (188, 130, 84))]
+        hill_far, hill_near = (70, 92, 84), (50, 74, 60)
+        ground = (92, 68, 52)
+        moon_glow = (255, 224, 150)
     else:
-        top, bottom = (14, 20, 31), (53, 47, 57)
-        hill = (25, 38, 44)
-        ground = (38, 31, 31)
+        stops = [(0.0, (10, 12, 28)), (0.46, (28, 24, 54)), (1.0, (60, 48, 64))]
+        hill_far, hill_near = (36, 42, 60), (22, 30, 44)
+        ground = (32, 27, 33)
+        moon_glow = (246, 234, 198)
 
-    draw_vertical_gradient(screen, pygame.Rect(0, 0, 800, 600), top, bottom)
-    for i, (x, y) in enumerate([(82, 74), (170, 112), (252, 58), (512, 84), (690, 126), (738, 52)]):
-        shade = 115 + (i % 3) * 28
-        pygame.draw.rect(screen, (shade, shade, min(255, shade + 28)), (x, y, 2, 2))
+    def sky(t):
+        for i in range(len(stops) - 1):
+            t0, c0 = stops[i]
+            t1, c1 = stops[i + 1]
+            if t <= t1:
+                return mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
+        return stops[-1][1]
 
-    pygame.draw.circle(screen, (226, 201, 139), (650, 92), 34)
-    pygame.draw.circle(screen, bottom, (638, 84), 30)
-    pygame.draw.polygon(screen, hill, [(0, 340), (120, 270), (246, 322), (386, 248), (548, 326), (800, 264), (800, 600), (0, 600)])
-    pygame.draw.rect(screen, ground, (0, 390, 800, 210))
-    for y in range(414, 600, 38):
-        pygame.draw.line(screen, mix_color(ground, WHITE, 0.08), (0, y), (800, y + 12), 1)
+    for y in range(600):
+        pygame.draw.line(screen, sky(y / 600.0), (0, y), (800, y))
+
+    # 별
+    for sx, sy, sb in _BACKDROP_STARS:
+        v = 190 + sb * 24
+        pygame.draw.circle(screen, (min(255, v), min(255, v), 220), (sx, sy), sb)
+
+    # 달 — 부드러운 헤일로 + 초승달
+    mx, my = 648, 90
+    halo = pygame.Surface((180, 180), pygame.SRCALPHA)
+    for r in range(84, 0, -6):
+        a = int(40 * (1 - r / 84.0))
+        pygame.draw.circle(halo, (moon_glow[0], moon_glow[1], moon_glow[2], a), (90, 90), r)
+    screen.blit(halo, (mx - 90, my - 90))
+    pygame.draw.circle(screen, moon_glow, (mx, my), 32)
+    pygame.draw.circle(screen, mix_color(moon_glow, WHITE, 0.4), (mx, my), 30)
+    pygame.draw.circle(screen, sky(my / 600.0), (mx - 13, my - 7), 27)  # 그림자로 초승달
+
+    # 산 2겹 (멀고 옅은 뒤, 가깝고 짙은 앞)
+    pygame.draw.polygon(screen, hill_far, [(0, 332), (140, 264), (300, 320), (470, 250), (650, 318), (800, 268), (800, 600), (0, 600)])
+    pygame.draw.polygon(screen, hill_near, [(0, 372), (130, 312), (286, 360), (430, 300), (610, 356), (800, 308), (800, 600), (0, 600)])
+
+    # 바닥
+    pygame.draw.rect(screen, ground, (0, 396, 800, 204))
+    for y in range(420, 600, 38):
+        pygame.draw.line(screen, mix_color(ground, WHITE, 0.07), (0, y), (800, y + 12), 1)
 
 
 def draw_multiline_text(screen, text, font, color, x, y, max_width, line_gap=4, max_lines=None):

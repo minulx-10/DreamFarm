@@ -96,6 +96,8 @@ class FarmScene:
         self.notice = "밭의 상태부터 천천히 살펴보자."
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
+        self.withers = 0                 # 작물이 완전히 시든 횟수 (3이면 끝내 시듦 — 배드엔딩)
+        self.weak_turns = 0              # 비실비실(저체력)하게 흘려보낸 턴 — 오래 가면 끝내 시든다
         self.mistakes = 0
         self.memories_seen = set()
         self.buttons = []
@@ -364,12 +366,14 @@ class FarmScene:
         track_attitude(action, is_fail, self.is_good_turn())
 
         if self.health <= 20:
-            # 건강이 바닥이어도 성장이 뒤로 가지는 않는다(역행은 영영 못 자라게 만듦).
-            # 게다가 '제대로 시도한' 돌봄엔 아주 더디게나마 자란다 — 끈기는 늘 보답받게.
+            # 건강이 바닥이면 자라지 못하고 멈춘다(역행은 없음). 끝내 손쓰지 못하면 시들어 버린다.
             self.mistakes += 1
             result += " 당근이 버티지 못하고 시든다."
-            if action not in ("살펴보기", "기다리기") and not is_fail:
-                self.growth += 1
+        elif self.health < 38:
+            # 비실비실한 작물은 버티기만 할 뿐 자라지 못한다 — 먼저 건강을 끌어올려야 한 뼘이라도 자란다.
+            # (못하는 플레이어가 비실대는 채 수확까지 끌려가지 않게 — 회복하거나, 끝내 시들거나.)
+            if not is_fail and action not in ("살펴보기", "기다리기"):
+                result += " 아직 기운이 없어 자라지는 못한다."
         else:
             # 성장은 '제대로 된 돌봄'과 '안정된 상태에서의 기다림'에서만 일어난다.
             # 관찰(살펴보기)이나 실패한 행동으로는 자라지 않는다 → 살펴보기 남발 지배 전략 차단.
@@ -410,6 +414,12 @@ class FarmScene:
         self.message = result
         self.notice = self.build_notice()
         self.clamp_stats()
+
+        # 비실비실(저체력)하게 흘려보낸 턴을 센다 — 건강을 끌어올리면 초기화, 오래 끌면 끝내 시든다.
+        if self.health < 38:
+            self.weak_turns += 1
+        elif self.health >= 45:
+            self.weak_turns = 0
 
         # #7 Update seasonal colors
         self.season_colors = get_season_colors(self.growth, self.growth_goal)
@@ -583,9 +593,11 @@ class FarmScene:
             dmg += 5 + difficulty
         if self.pests > 48:
             dmg += 6 + difficulty
-        # 건강이 이미 바닥이면 밭이 덜 몰아붙인다 — 회복의 길을 늘 열어 소프트락 방지.
+        # 건강이 바닥일 때 — '돌보려는' 손에겐 회복의 길을 열어 두되(소프트락 방지),
+        # 잡초·해충을 손 놓고 방치한 밭은 봐주지 않는다. 끝내 시들어 수확 못 한 채 배드엔딩으로.
         if self.health < 28:
-            dmg = int(dmg * 0.4)
+            neglected = self.weeds > 52 or self.pests > 46
+            dmg = int(dmg * (0.9 if neglected else 0.45))
         self.health -= dmg
         if random.random() < 0.18 + difficulty * 0.04:
             self.drainage -= random.randint(4, 10)
@@ -904,14 +916,39 @@ class FarmScene:
             self.thought_text, dur = self.thought_queue.pop(0)
             self.thought_timer = dur
 
-        if self.health <= 0:
-            self.health = 25
-            self.stress = 45
-            self.mistakes += 2
-            game_state.understanding = max(0, game_state.understanding - 8)
-            self.message = "당근이 크게 시들어 버렸다. 다시 흙부터 다독여야 한다."
-            self.push_thought("처음부터, 천천히.")
-            self.rebuild_buttons()
+        # 완전히 쓰러졌거나(체력 0), 비실비실하게 너무 오래 끌면(정체) 한 번 크게 시든다.
+        if self.health <= 0 or self.weak_turns >= 7:
+            self._wilt()
+
+    def _wilt(self):
+        """작물이 한 번 크게 시든다. 세 번째면 끝내 회복 못 하고 '시듦' 배드엔딩으로 종결.
+        못 키우는 플레이를 무한정 끌지 않고 수확 못 한 채 깔끔히 마무리하는 안전판이기도 하다."""
+        self.withers += 1
+        self.weak_turns = 0
+        if self.withers >= 3:
+            # 세 번째로 완전히 시들면 손쓸 수 없다 — 수확 못 한 채 '시듦' 배드엔딩으로.
+            game_state.crop_failed = True
+            game_state.final_health = 0
+            game_state.farm_mistakes = self.mistakes + 3
+            game_state.transition_text = (
+                "[밭이 시들어 버렸다]\n\n"
+                "아무리 다독여도 당근은 다시 일어서지 못했다.\n"
+                "흙만 남은 두둑을 한참 바라보았다."
+            )
+            game_state.transition_next = "ending"
+            game_state.is_clear_transition = False
+            game_state.current_scene = "transition"
+            return
+        # 시들 때마다 조금씩 기력을 돌려주되, 거듭될수록 회복이 야박해진다(스스로 일으켜 세워야 한다).
+        self.health = max(self.health, 28 - self.withers * 6)
+        self.stress = 45
+        self.mistakes += 2
+        game_state.understanding = max(0, game_state.understanding - 8)
+        warn = ("이대로면 밭을 잃는다. 한 번만 더 시들면 손쓸 수 없다."
+                if self.withers == 2 else "다시 흙부터 천천히 다독여야 한다.")
+        self.message = "당근이 크게 시들어 버렸다. " + warn
+        self.push_thought("처음부터, 천천히.")
+        self.rebuild_buttons()
 
     def draw_compact_meter(self, screen, label, value, x, y, color):
         font = get_font(14)

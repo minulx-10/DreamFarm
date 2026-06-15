@@ -75,11 +75,20 @@ def create_sprite_from_string(sprite_str, scale=4):
     
     colors = {
         '.': (0,0,0,0),
-        'X': (40,40,40,255),    # Outline
-        'G': (100,220,100,255), # Bright Green
-        'g': (50,150,50,255),   # Dark Green
-        'O': (255,160,50,255),  # Orange
-        'o': (200,100,20,255),  # Dark Orange
+        'X': (38,32,34,255),    # Outline (warm near-black)
+        '#': (22,18,22,255),    # Deepest outline / contact shadow
+        'L': (158,228,128,255), # Light leaf green (highlight)
+        'G': (96,200,96,255),   # Bright Green
+        'g': (52,150,64,255),   # Dark Green
+        'e': (32,104,54,255),   # Deepest green (shadow)
+        'w': (150,162,72,255),  # Sickly weed yellow-green
+        'H': (255,206,128,255), # Carrot highlight
+        'O': (250,150,52,255),  # Orange
+        'o': (214,104,30,255),  # Dark Orange
+        'q': (160,68,22,255),   # Deepest orange shadow
+        'k': (66,58,52,255),    # Beetle dark
+        'K': (104,92,78,255),   # Beetle mid
+        'i': (212,74,62,255),   # Beetle eye (red)
         'R': (180,180,180,255), # Rock light
         'r': (120,120,120,255), # Rock dark
         'B': (150,100,60,255),  # Brown
@@ -88,7 +97,8 @@ def create_sprite_from_string(sprite_str, scale=4):
         's': (172,112,76,255),  # Skin shade
         'N': (66,92,92,255),    # Workwear
         'n': (42,58,62,255),    # Workwear shade
-        'M': (188,198,194,255), # Metal light
+        'W': (230,238,234,255), # Metal highlight (shine)
+        'M': (180,192,190,255), # Metal light
         'm': (108,124,124,255), # Metal shade
         'Y': (238,190,92,255),  # Warm accent
         'y': (178,132,70,255),  # Warm accent shade
@@ -117,14 +127,14 @@ DddlddddD
 ...DD....
 ''', 3)
     sprites['mini_carrot'] = create_sprite_from_string('''
-.G.
+LGL
 gGg
 .X.
-XOX
-XOX
-XoX
-.X.
-.X.
+HOo
+HOo
+HOo
+.oX
+.qX
 ''', 2)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
@@ -135,14 +145,14 @@ XoX
 ...XX...
 ''', 5)
     sprites['weed'] = create_sprite_from_string('''
-....X....
-..X.X.X..
-.XGgGgGX.
-..XgGgX..
-.XGgXgGX.
-...XgX...
-...XgX...
-..XgXgX..
+..w.X.w..
+.XwGwGwX.
+X.XGgGX.X
+..XGgGX..
+.XwgXgwX.
+...XeX...
+..XgegX..
+.Xg.X.gX.
 ''', 5)
     sprites['rock'] = create_sprite_from_string('''
 ..XXXX..
@@ -161,58 +171,58 @@ Xgb..bgX
 .X....X.
 ''', 5)
     sprites['sprout1'] = create_sprite_from_string('''
-..X..
+.LGL.
 .XGX.
 ..X..
 ''', 6)
     sprites['sprout2'] = create_sprite_from_string('''
-...X...
-..XGX..
-.XgGgX.
+..LGL..
+.LGgGL.
+.XGgGX.
 ...X...
 ''', 6)
     sprites['sprout3'] = create_sprite_from_string('''
-...X.X...
-..XGXGX..
-.XGGGGGX.
-..XgXgX..
-...XgX...
+..L.L.L..
+.LGgGgGL.
+XLGGgGGLX
+.XGgGgGX.
+...XeX...
 ''', 6)
     sprites['sprout4'] = create_sprite_from_string('''
-...X.X...
-..XGXGX..
-.XGGGGGX.
-XgGGGGGgX
-.XgXgXgX.
-..XXXXX..
+..L.X.L..
+.LGgGgGL.
+XLGGgGGLX
+XLGgGgGLX
+.XGgGgGX.
+..XXeXX..
 ''', 6)
     sprites['carrot'] = create_sprite_from_string('''
-...X.X...
-..XGgGgX.
-.XGgGgGgX
-..XgXgX..
-.XXXXXXX.
-XoOOOOOOX
-XoOOYOOOX
-XoOOYOOOX
-.XoOOOOX.
-.XoOOOOX.
-..XoOOX..
-..XoOOX..
-...XoX...
-...XoX...
-....X....
-....X....
+...LGL...
+..LGGGL..
+.LGgGgGL.
+.XGgGgGX.
+..XGGGX..
+.XHOOOoX.
+XHOOOOOoX
+XHOOOOOoX
+XHOOOOOoX
+.XHOOOoX.
+.XHOOooX.
+..XOOoX..
+..XOooX..
+...XOoX..
+...XoqX..
+....XX...
 ''', 5)
     sprites['bug'] = create_sprite_from_string('''
-...XX....
-..XggX...
-.XgGGgX..
-XgGYYGgX.
-XgGGGGgX.
-.XgGGgX..
-..XgXgX..
-.X..X..X.
+.X....X.
+..XkkX..
+.XkKKkX.
+XkKiiKkX
+XkKKKKkX
+.XkKKkX.
+X.XkkX.X
+.XX..XX.
 ''', 5)
     dad_path = os.path.join(os.path.dirname(__file__), "dad.png")
     loaded_dad = False
@@ -271,14 +281,14 @@ XbBBbbBBbX
 ....X...X.....XXX.
 ....X...X....XXmX.
 ...XXXXXXX..XXmMX.
-..XmMMMMMmXXmMMMX.
-..XMMMMMMMMMMMMX..
-..XMMMMMMMMMMMMX..
-..XMMMMMMMMMMMmX..
-..XMMMMMMMMMMMmX..
-..XMMMMMMMMMMMmX..
-..XMMMMMMMMMMMmX..
-...XMMMMMMMMMmX...
+..XWMMMMMmXXmMMMX.
+..XWWMMMMMMMMMMMX.
+..XWMMMMMMMMMMMmX.
+..XWMMMMMMMMMMMmX.
+..XMMMMMMMMMMMmmX.
+..XMMMMMMMMMMmmmX.
+..XmMMMMMMMMmmmX..
+...XmMMMMMMmmmX...
 ....XmmmmmmmX.....
 .....XXXXXXX......
 ''', 5)
@@ -315,31 +325,89 @@ def _mix_color(a, b, ratio):
     )
 
 
+# 황혼 하늘 다단 그라데이션 — 위에서 지평선으로 갈수록 남보라→자주→장미→노을빛
+_SKY_STOPS = [
+    (0.00, (30, 20, 56)),    # 깊은 남보라 (천정)
+    (0.32, (66, 36, 92)),    # 보랏빛
+    (0.58, (150, 66, 104)),  # 장미빛
+    (0.82, (232, 126, 86)),  # 노을 주황
+    (1.00, (252, 178, 116)), # 지평선 따뜻한 빛
+]
+# 별·구름은 매 프레임 같은 자리에 있어야 깜빡이지 않으므로 고정 배치
+_STARS = [(58, 26, 2), (124, 52, 1), (208, 20, 2), (332, 44, 1), (96, 92, 1),
+          (470, 28, 1), (250, 70, 2), (150, 130, 1), (560, 22, 1), (40, 120, 1),
+          (412, 104, 1), (300, 16, 1), (90, 56, 1)]
+_CLOUDS = [(150, 92, 132, 22), (520, 64, 168, 28), (350, 126, 96, 16), (60, 138, 80, 14)]
+# 흙바닥 알갱이 텍스처 — 고정 배치 (dirt_rect 기준 상대좌표)
+import random as _random
+_speck_rng = _random.Random(7)
+_SOIL_SPECKS = [(_speck_rng.randint(18, 700), _speck_rng.randint(18, 330), _speck_rng.choice([2, 2, 3]))
+                for _ in range(48)]
+
+
+def _sky_color(t):
+    for i in range(len(_SKY_STOPS) - 1):
+        t0, c0 = _SKY_STOPS[i]
+        t1, c1 = _SKY_STOPS[i + 1]
+        if t <= t1:
+            return _mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
+    return _SKY_STOPS[-1][1]
+
+
 def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, dirt_dk=None):
-    gc = grass or (60, 95, 85)     # Twilight teal-green grass
-    gd = grass_dk or (45, 75, 65)  # Dark grass shadow
+    gc = grass or (70, 128, 96)    # Twilight teal-green grass
+    gd = grass_dk or (42, 88, 64)  # Dark grass shadow
     dc = dirt or DIRT_COLOR
     dd = dirt_dk or DIRT_DARK
-
-    sky_top = (45, 24, 78)       # Twilight purple sky
-    sky_bottom = (245, 125, 65)  # Twilight orange sunset
-    for y in range(h):
-        ratio = min(1, y / max(1, h * 0.62))
-        pygame.draw.line(screen, _mix_color(sky_top, sky_bottom, ratio), (0, y), (w, y))
-
-    # Glowing twilight sun
-    pygame.draw.circle(screen, (245, 140, 70), (670, 82), 42)
-    pygame.draw.circle(screen, (255, 210, 120), (670, 82), 30)
-
     horizon = 166
-    # Misty twilight mountains
-    pygame.draw.polygon(screen, (75, 45, 90), [(0, horizon + 28), (110, 118), (260, horizon + 18), (440, 112), (610, horizon + 26), (800, 126), (800, h), (0, h)])
-    pygame.draw.polygon(screen, (50, 75, 80), [(0, horizon + 56), (160, 148), (340, horizon + 48), (520, 142), (800, horizon + 54), (800, h), (0, h)])
 
-    pygame.draw.rect(screen, gc, (0, horizon, w, h - horizon))
+    # --- 하늘: 다단 황혼 그라데이션 ---
+    for y in range(horizon):
+        pygame.draw.line(screen, _sky_color(y / horizon), (0, y), (w, y))
+
+    # --- 별 (윗하늘, 태양에서 먼 쪽일수록 또렷하게) ---
+    for sx, sy, sb in _STARS:
+        if sx < 540 or sy > 110:
+            tw = 200 + sb * 22
+            pygame.draw.circle(screen, (min(255, tw), min(255, tw), 210), (sx, sy), sb)
+
+    # --- 태양 + 부드러운 블룸 ---
+    sun_x, sun_y = 640, 78
+    bloom = pygame.Surface((260, 260), pygame.SRCALPHA)
+    for r in range(126, 0, -7):
+        a = int(54 * (1.0 - r / 126.0))
+        pygame.draw.circle(bloom, (255, 188, 120, a), (130, 130), r)
+    screen.blit(bloom, (sun_x - 130, sun_y - 130))
+    pygame.draw.circle(screen, (255, 152, 86), (sun_x, sun_y), 40)
+    pygame.draw.circle(screen, (255, 206, 142), (sun_x, sun_y), 29)
+    pygame.draw.circle(screen, (255, 240, 206), (sun_x, sun_y), 15)
+
+    # --- 노을 구름 (반투명, 빛을 받은 아랫면이 환하게) ---
+    for cx, cy, cw, ch in _CLOUDS:
+        cloud = pygame.Surface((cw, ch * 2), pygame.SRCALPHA)
+        pygame.draw.ellipse(cloud, (90, 52, 84, 120), (0, 0, cw, ch))
+        pygame.draw.ellipse(cloud, (236, 158, 120, 110), (cw * 0.18, ch * 0.5, cw * 0.7, ch))
+        screen.blit(cloud, (cx - cw // 2, cy - ch // 2))
+
+    # --- 안개 낀 산 3겹 (멀수록 옅고 푸르게) ---
+    pygame.draw.polygon(screen, (108, 74, 116), [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104), (800, horizon + 10), (0, horizon + 10)])
+    pygame.draw.polygon(screen, (78, 52, 98), [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122), (800, h), (0, h)])
+    pygame.draw.polygon(screen, (46, 70, 78), [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50), (800, h), (0, h)])
+
+    # --- 지평선 햇무리 (따뜻한 가로 빛띠) ---
+    haze = pygame.Surface((w, 40), pygame.SRCALPHA)
+    for i in range(20):
+        a = int(70 * (1 - abs(i - 10) / 10))
+        pygame.draw.line(haze, (255, 196, 140, a), (0, i * 2), (w, i * 2))
+    screen.blit(haze, (0, horizon - 20))
+
+    # --- 잔디: 세로 그라데이션 + 결 ---
+    for i in range(h - horizon):
+        c = _mix_color(_mix_color(gc, (255, 200, 150), 0.12), gd, min(1.0, i / 150.0))
+        pygame.draw.line(screen, c, (0, horizon + i), (w, horizon + i))
     for y in range(horizon, h, 34):
-        c = _mix_color(gc, gd, 0.35 if (y // 34) % 2 == 0 else 0.55)
-        pygame.draw.line(screen, c, (0, y), (w, y + 18), 2)
+        c = _mix_color(gc, gd, 0.30 if (y // 34) % 2 == 0 else 0.50)
+        pygame.draw.line(screen, c, (0, y), (w, y + 16), 2)
 
     for x in range(0, w, 44):
         for y in range(horizon + 18, h, 70):
@@ -347,19 +415,34 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
                 pygame.draw.line(screen, gd, (x + 10, y + 8), (x + 18, y + 2), 2)
                 pygame.draw.line(screen, gd, (x + 17, y + 3), (x + 22, y + 11), 2)
 
-    # Farming soil bed
+    # --- 텃밭 흙바닥: 나무 테두리 + 결 고운 흙 + 빛·그늘 밴드 + 입체 이랑 ---
     dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)
-    pygame.draw.rect(screen, dd, dirt_rect.move(0, 6), border_radius=12)
+    # 나무 테두리
+    frame = dirt_rect.inflate(12, 12)
+    pygame.draw.rect(screen, (52, 36, 25), frame.move(0, 6), border_radius=15)
+    pygame.draw.rect(screen, (122, 86, 53), frame, border_radius=15)
+    pygame.draw.rect(screen, (156, 114, 74), frame, 2, border_radius=15)
+    # 흙 바닥
+    pygame.draw.rect(screen, dd, dirt_rect.move(0, 4), border_radius=12)
     pygame.draw.rect(screen, dc, dirt_rect, border_radius=12)
-    pygame.draw.rect(screen, _mix_color(dc, WHITE, 0.18), dirt_rect.inflate(-14, -14), 2, border_radius=9)
-    pygame.draw.rect(screen, dd, dirt_rect, 3, border_radius=12)
-
-    # 3D Horizontal farming ridges (furrows) instead of grid lines
-    for y in range(dirt_rect.y + 36, dirt_rect.bottom - 20, 42):
-        # Ridge shadow
-        pygame.draw.rect(screen, dd, (dirt_rect.x + 16, y, dirt_rect.w - 32, 8), border_radius=3)
-        # Ridge highlight (sunset glow reflection)
-        pygame.draw.rect(screen, _mix_color(dc, (255, 200, 150), 0.15), (dirt_rect.x + 16, y - 4, dirt_rect.w - 32, 4), border_radius=2)
+    # 위쪽 빛 밴드 / 아래쪽 그늘 밴드로 깊이감
+    top_band = pygame.Surface((dirt_rect.w, 64), pygame.SRCALPHA)
+    for i in range(64):
+        top_band.fill((255, 205, 150, int(58 * (1 - i / 64))), (0, i, dirt_rect.w, 1))
+    screen.blit(top_band, (dirt_rect.x, dirt_rect.y))
+    bot_band = pygame.Surface((dirt_rect.w, 90), pygame.SRCALPHA)
+    for i in range(90):
+        bot_band.fill((26, 16, 10, int(72 * (i / 90))), (0, i, dirt_rect.w, 1))
+    screen.blit(bot_band, (dirt_rect.x, dirt_rect.bottom - 90))
+    # 입체 이랑 (어두운 고랑 + 윗면 노을 하이라이트)
+    for y in range(dirt_rect.y + 30, dirt_rect.bottom - 16, 40):
+        pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.20), (dirt_rect.x + 14, y + 6, dirt_rect.w - 28, 6), border_radius=3)
+        pygame.draw.rect(screen, _mix_color(dc, (255, 205, 150), 0.24), (dirt_rect.x + 14, y, dirt_rect.w - 28, 4), border_radius=2)
+    # 흙 알갱이 텍스처
+    speck = _mix_color(dc, dd, 0.65)
+    for sx_, sy_, ss in _SOIL_SPECKS:
+        pygame.draw.rect(screen, speck, (dirt_rect.x + sx_, dirt_rect.y + sy_, ss, ss))
+    pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
 
 
 def draw_weather_icon(screen, weather, x, y, size=20):

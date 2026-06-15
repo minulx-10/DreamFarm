@@ -32,6 +32,7 @@ class GameState:
         # Journal system
         self.journal_entries = []
         self.journal_closed = False   # 엔딩별 '마지막 장'을 한 번만 더하기 위한 플래그
+        self.crop_failed = False      # 작물이 끝내 시들어 수확 못 하고 끝났는가('시듦' 엔딩)
 
         # Epiphany system
         self.epiphanies_seen = set()
@@ -298,6 +299,7 @@ ENDING_JOURNAL_CLOSINGS = {
     "rush": ("[마지막 장 · 수확의 날]\n급히 뽑은 당근은 어딘가 설었다.\n기다리는 법을, 나는 아직 배우지 못했다."),
     "normal": ("[마지막 장 · 수확의 날]\n잘한 것도 못한 것도 있던 하루였다.\n조금은 알 것 같은, 그런 마음으로 밭을 나선다."),
     "bad": ("[마지막 장 · 수확의 날]\n끝내 입에 넣지 못한 당근.\n그래도 예전처럼 밀어내지는 않았다. 그거면, 시작은 된 셈이다."),
+    "wither": ("[마지막 장 · 시든 밭]\n수확은 없었다. 흙만 남았다.\n아버지가 매일 무엇과 싸웠는지, 이제야 조금 안다.\n다음 새벽엔, 조금 다르게 해볼 수 있을 것 같다."),
 }
 
 

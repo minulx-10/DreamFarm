@@ -24,7 +24,9 @@ class EndingScene:
         self.char_timer = 0
         self.char_delay = 0.065
         self.finished = False
-        self.ending_data = self.get_ending()
+        # 작물이 끝내 시들었으면 수확 못 한 '시듦' 엔딩으로 강제 (연출은 아래 advance에서 단축)
+        self.crop_failed = game_state.crop_failed
+        self.ending_data = self.get_ending("wither" if self.crop_failed else None)
         # 이 엔딩에 맞는 '마지막 장'을 일지에 한 번 더한다 (엔딩별로 닫는 글이 달라짐)
         append_ending_journal()
         self.pages = self.build_pages()
@@ -138,6 +140,16 @@ class EndingScene:
                     f"하지만 예전처럼 무작정 밀어내지는 않는다."
                 ),
             },
+            "wither": {
+                "title": "시듦엔딩: 끝내 지켜내지 못한 밭",
+                "result": "Withered...",
+                "text": (
+                    f"아무리 다독여도 당근은 다시 일어서지 못했다.\n"
+                    f"흙만 남은 두둑을 오래 바라보았다.\n"
+                    f"그래도 이 숱한 새벽이 헛되지는 않았다.\n"
+                    f"아버지가 매일 무엇과 싸웠는지, 이제 조금은 안다."
+                ),
+            },
         }
 
         data = endings.get(ending_type, endings["normal"])
@@ -155,7 +167,7 @@ class EndingScene:
         ]
 
     def build_credit_lines(self):
-        impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "rush") else "이어진 일들"
+        impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "rush", "wither") else "이어진 일들"
         
         # 플레이 타임 포맷팅 (분, 초)
         m = int(game_state.play_time // 60)
@@ -231,7 +243,8 @@ class EndingScene:
             self.finished = False
             self.text_to_print = self.prepare_page(self.page_index)
         else:
-            self.phase = "table"
+            # 시듦 엔딩은 베어 무는 연출(테이블·당근)이 없으니 바로 결과로
+            self.phase = "result" if self.crop_failed else "table"
             self.phase_timer = 0
 
     def retry(self):
@@ -241,6 +254,7 @@ class EndingScene:
         game_state.current_scene = "intro"
 
     def change_ending(self, ending_type):
+        self.crop_failed = False   # 갤러리 감상은 늘 전체 연출
         self.ending_data = self.get_ending(ending_type)
         self.pages = self.build_pages()
         self.page_index = 0
@@ -281,6 +295,7 @@ class EndingScene:
         "rush": "조급함이 기다림을 앞질렀습니다.",
         "normal": "조금은 알 것 같은, 그런 하루였습니다.",
         "bad": "아직은 그 마음과의 거리를 좁히지 못했습니다.",
+        "wither": "끝내 밭을 지켜내지 못했지만, 그 숱한 새벽은 남았습니다.",
     }
 
     def handle_events(self, events):
@@ -471,6 +486,21 @@ class EndingScene:
             pygame.draw.polygon(screen, c(198, 160, 108), taper(hx, hy - 1, tx, ty - 1, 1.3, 0.4))  # 윗 광택
             pygame.draw.circle(screen, c(118, 82, 46), (int(tx), int(ty)), 2)                      # 짙은 끝
 
+    def _draw_dining_table(self, screen, tc=255):
+        """나무 식탁 — 빛 받는 윗 모서리 + 어두운 앞면 + 판자 이음·나뭇결로 입체감."""
+        def c(*v):
+            return tuple(min(tc, x) for x in v)
+        front = pygame.Rect(100, 358, 600, 150)
+        pygame.draw.rect(screen, c(150, 104, 62), front)                 # 앞면
+        for px in (244, 400, 556):                                       # 세로 판자 이음
+            pygame.draw.line(screen, c(120, 82, 48), (px, 362), (px, 504), 2)
+        for gy in (398, 438, 476):                                       # 가로 나뭇결
+            pygame.draw.line(screen, c(134, 92, 54), (110, gy), (690, gy), 1)
+        pygame.draw.rect(screen, c(118, 80, 46), (96, 350, 608, 14))     # 윗면 그늘 단
+        pygame.draw.rect(screen, c(192, 142, 90), (96, 348, 608, 9))     # 윗면 (빛 받는 밝은 띠)
+        pygame.draw.line(screen, c(216, 168, 112), (100, 350), (700, 350), 2)  # 윗 모서리 광택
+        pygame.draw.rect(screen, c(94, 62, 38), front, 3)               # 앞면 테두리
+
     def _draw_table(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
         draw_story_backdrop(screen, "night")
@@ -489,14 +519,9 @@ class EndingScene:
             screen.blit(glow_surf, (400 - 170, 320 - 170))
 
         if self.table_alpha > 50:
-            
-            # 1. Table Drawing (Wooden Texture Bevel)
-            table_rect = pygame.Rect(100, 350, 600, 150)
-            pygame.draw.rect(screen, (min(tc, 165), min(tc, 115), min(tc, 70)), table_rect, border_radius=4)
-            pygame.draw.rect(screen, (min(tc, 110), min(tc, 75), min(tc, 40)), table_rect, 4, border_radius=4)
-            # Subtle wood grain line
-            pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (110, 365), (690, 365), 2)
-            pygame.draw.line(screen, (min(tc, 140), min(tc, 95), min(tc, 55)), (120, 420), (680, 420), 2)
+
+            # 1. 나무 식탁
+            self._draw_dining_table(screen, tc)
 
             # 2. 그릇 (입체 백자)
             self._draw_plate(screen, 400, 345, tc)
@@ -532,12 +557,9 @@ class EndingScene:
             pygame.draw.circle(glow_surf, (255, 210, 120, alpha), (170, 170), r)
         screen.blit(glow_surf, (400 - 170, 320 - 170))
         
-        # 1. Table
-        pygame.draw.rect(screen, (165, 115, 70), (100, 350, 600, 150), border_radius=4)
-        pygame.draw.rect(screen, (110, 75, 40), (100, 350, 600, 150), 4, border_radius=4)
-        pygame.draw.line(screen, (140, 95, 55), (110, 365), (690, 365), 2)
-        pygame.draw.line(screen, (140, 95, 55), (120, 420), (680, 420), 2)
-        
+        # 1. 나무 식탁
+        self._draw_dining_table(screen)
+
         # 2. 그릇 (입체 백자)
         self._draw_plate(screen, 400, 345)
 

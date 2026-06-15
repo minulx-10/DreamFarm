@@ -94,10 +94,17 @@ class WaterPour:
 
         spout_x = PLOT.x + 150 + 64
         if self.pouring:
-            pygame.draw.line(screen, (150, 205, 235), (spout_x, 196), (spout_x + 18, 240), 3)
+            # 물줄기 — 반투명 리본 여러 겹 + 밝은 심줄
+            ribbon = pygame.Surface((48, 56), pygame.SRCALPHA)
+            for ox, a, wd in ((-2, 70, 6), (1, 120, 4), (4, 80, 5)):
+                pygame.draw.line(ribbon, (150, 205, 235, a), (8 + ox, 0), (26 + ox, 46), wd)
+            pygame.draw.line(ribbon, (222, 242, 252, 210), (8, 0), (26, 44), 2)
+            screen.blit(ribbon, (spout_x - 8, 196))
         for d in self.drops:
-            pygame.draw.circle(screen, (170, 215, 240), (int(d[0]), int(d[1])), 3)
-            pygame.draw.circle(screen, (210, 238, 252), (int(d[0]), int(d[1])), 1)
+            glow = pygame.Surface((10, 10), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (170, 215, 240, 110), (5, 5), 5)
+            screen.blit(glow, (int(d[0]) - 5, int(d[1]) - 5))
+            pygame.draw.circle(screen, (226, 244, 253), (int(d[0]), int(d[1])), 2)
 
         wet = min(1.0, self.level / max(1.0, self.overflow))
         if wet > 0:

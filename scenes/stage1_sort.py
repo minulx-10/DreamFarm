@@ -3,7 +3,7 @@ import random
 from core.game_state import game_state
 from core.assets import *
 from core import audio
-from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel
+from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel, mix_color
 
 class SortItem:
     def __init__(self, item_type, x, y):
@@ -62,47 +62,72 @@ class Stage1Scene:
         self.items.append(SortItem(itype, x, y))
 
     def draw_seed_bed(self, screen):
+        """왼쪽 '밭' — 흙 담긴 테라코타 화분 (씨앗을 여기로)."""
         x, y, w, h = self.bin_keep
-        pygame.draw.ellipse(screen, (86, 54, 31), (x + 8, y + 103, w - 16, 34))
-        pygame.draw.rect(screen, (179, 103, 50), (x + 22, y + 48, w - 44, h - 26), border_radius=14)
-        pygame.draw.rect(screen, (103, 58, 34), (x + 22, y + 48, w - 44, h - 26), 4, border_radius=14)
-
-        for i in range(8):
-            by = y + 60 + i * 8
-            pygame.draw.arc(screen, (118, 69, 38), (x + 26, by, w - 52, 30), 3.25, 6.0, 2)
-            pygame.draw.arc(screen, (218, 138, 72), (x + 30, by + 1, w - 60, 24), 3.3, 5.9, 1)
-
-        lip = pygame.Rect(x, y + 22, w, 54)
-        pygame.draw.ellipse(screen, (221, 135, 62), lip)
-        pygame.draw.ellipse(screen, (80, 47, 29), lip, 5)
-        pygame.draw.ellipse(screen, (96, 54, 31), lip.inflate(-24, -16))
-        pygame.draw.ellipse(screen, (61, 37, 25), lip.inflate(-50, -26))
-        pygame.draw.arc(screen, (245, 167, 89), lip.inflate(-12, -10), 3.2, 6.2, 4)
+        cx = x + w // 2
+        rim_y, bot_y = 402, 496
+        th, bh = 78, 54
+        clay = (188, 112, 64); clay_dk = (150, 84, 46); clay_hi = (220, 150, 96)
+        # 바닥 그림자
+        pygame.draw.ellipse(screen, (40, 28, 18), (cx - bh - 8, bot_y - 12, (bh + 8) * 2, 26))
+        # 몸통(사다리꼴)
+        body = [(cx - th, rim_y), (cx + th, rim_y), (cx + bh, bot_y), (cx - bh, bot_y)]
+        pygame.draw.polygon(screen, clay, body)
+        pygame.draw.polygon(screen, clay_hi, [(cx - th, rim_y), (cx - th + 15, rim_y), (cx - bh + 11, bot_y), (cx - bh, bot_y)])      # 왼쪽 빛
+        pygame.draw.polygon(screen, clay_dk, [(cx + th - 17, rim_y), (cx + th, rim_y), (cx + bh, bot_y), (cx + bh - 13, bot_y)])      # 오른쪽 그늘
+        pygame.draw.polygon(screen, mix_color(clay_dk, BLACK, 0.2), body, 3)
+        # 윗 턱(림)
+        lip = pygame.Rect(cx - th - 8, rim_y - 18, (th + 8) * 2, 36)
+        pygame.draw.ellipse(screen, clay_hi, lip)
+        pygame.draw.ellipse(screen, mix_color(clay_dk, BLACK, 0.2), lip, 3)
+        # 담긴 흙
+        inner = lip.inflate(-26, -14)
+        pygame.draw.ellipse(screen, (98, 62, 38), inner)
+        pygame.draw.ellipse(screen, (66, 42, 26), inner.inflate(-30, -8))
+        pygame.draw.arc(screen, mix_color(clay_hi, WHITE, 0.4), lip.inflate(-12, -8), 3.3, 6.1, 3)   # 림 광택
 
     def draw_trash_zone(self, screen):
+        """오른쪽 '통' — 뚜껑이 비스듬히 열린 양철 쓰레기통 (방해물을 여기로)."""
         x, y, w, h = self.bin_trash
-        can_x, can_y = x + 20, y + 70
-        can_w, can_h = 120, 130
-
-        pygame.draw.ellipse(screen, (42, 43, 40), (can_x + 10, can_y + can_h - 8, can_w, 24))
-        body = pygame.Rect(can_x, can_y + 26, can_w, can_h - 32)
-        pygame.draw.rect(screen, (171, 176, 170), body)
-        pygame.draw.rect(screen, (44, 45, 43), body, 4)
-        for stripe_x in (can_x + 18, can_x + 44, can_x + 72):
-            pygame.draw.line(screen, (104, 109, 105), (stripe_x, body.y + 8), (stripe_x + 3, body.bottom - 8), 4)
-            pygame.draw.line(screen, (223, 225, 219), (stripe_x + 5, body.y + 6), (stripe_x + 8, body.bottom - 10), 2)
-
-        rim = pygame.Rect(can_x - 8, can_y, can_w + 16, 40)
-        pygame.draw.ellipse(screen, (220, 223, 217), rim)
-        pygame.draw.ellipse(screen, (37, 38, 37), rim, 5)
-        pygame.draw.ellipse(screen, (18, 19, 18), rim.inflate(-18, -12))
-
-        lid = pygame.Rect(x + 108, y + 8, 72, 126)
-        pygame.draw.ellipse(screen, (194, 198, 192), lid)
-        pygame.draw.ellipse(screen, (43, 44, 42), lid, 5)
-        pygame.draw.arc(screen, (235, 237, 231), lid.inflate(-12, -10), 4.7, 7.5, 3)
-        pygame.draw.line(screen, (43, 44, 42), (x + 124, y + 118), (x + 140, y + 134), 5)
-        pygame.draw.ellipse(screen, (67, 68, 65), (x + 146, y + 84, 18, 42), 3)
+        cx = x + w // 2
+        top_y, bot_y = 392, 492
+        th, bh = 56, 48
+        met = (170, 174, 170); met_dk = (102, 106, 102); met_hi = (214, 218, 212)
+        # 바닥 그림자
+        pygame.draw.ellipse(screen, (38, 30, 24), (cx - bh - 8, bot_y - 12, (bh + 8) * 2, 26))
+        # 몸통(살짝 좁아지는 원통)
+        body = [(cx - th, top_y), (cx + th, top_y), (cx + bh, bot_y), (cx - bh, bot_y)]
+        pygame.draw.polygon(screen, met, body)
+        # 원통 음영 (왼쪽 밝음 → 오른쪽 어둠)
+        for i in range(-4, 5):
+            col = mix_color(met_hi, met_dk, (i + 4) / 8)
+            pygame.draw.line(screen, col, (cx + int(i / 4 * th), top_y + 6), (cx + int(i / 4 * bh), bot_y - 4), 4)
+        # 가로 골(2줄)
+        def half_at(ry):
+            f = (ry - top_y) / (bot_y - top_y)
+            return th + (bh - th) * f
+        for ry in (top_y + 26, bot_y - 26):
+            hw = half_at(ry)
+            pygame.draw.line(screen, mix_color(met_dk, BLACK, 0.15), (cx - hw + 5, ry), (cx + hw - 5, ry), 3)
+            pygame.draw.line(screen, met_hi, (cx - hw + 5, ry + 4), (cx + hw - 5, ry + 4), 1)
+        pygame.draw.polygon(screen, (56, 58, 56), body, 3)
+        # 림 + 어두운 입구
+        rim = pygame.Rect(cx - th - 6, top_y - 15, (th + 6) * 2, 30)
+        pygame.draw.ellipse(screen, met_hi, rim)
+        pygame.draw.ellipse(screen, (56, 58, 56), rim, 3)
+        pygame.draw.ellipse(screen, (40, 42, 41), rim.inflate(-14, -8))
+        # 비스듬히 열린 뚜껑 (오른쪽 위로 들림)
+        lid_surf = pygame.Surface((130, 42), pygame.SRCALPHA)
+        pygame.draw.ellipse(lid_surf, met, (0, 0, 130, 42))
+        pygame.draw.ellipse(lid_surf, met_hi, (6, 4, 118, 16))
+        pygame.draw.ellipse(lid_surf, (56, 58, 56), (0, 0, 130, 42), 3)
+        pygame.draw.circle(lid_surf, met_hi, (65, 21), 8)
+        pygame.draw.circle(lid_surf, (56, 58, 56), (65, 21), 8, 2)
+        lid_rot = pygame.transform.rotate(lid_surf, 38)
+        lr = lid_rot.get_rect(center=(cx + 66, top_y - 30))
+        screen.blit(lid_rot, lr)
+        # 경첩
+        pygame.draw.line(screen, (62, 64, 62), (cx + th - 8, top_y - 3), (cx + 42, top_y - 16), 5)
 
     def handle_events(self, events):
         if self.stage_clear: return

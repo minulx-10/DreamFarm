@@ -199,28 +199,29 @@ class Stage4Scene:
         if self.shake > 0:
             sx = random.randint(-4, 4)
 
-        # 1. Draw background carrots to look like a full carrot patch
-        bg_sprout = sprites["sprout4"]
-        bsw = bg_sprout.get_width()
-        bsh = bg_sprout.get_height()
-        for crop in self.bg_crops:
+        # 1. 배경 당근밭 — 줄지어 심긴 모습 (종류·크기 살짝 다르게 + 발밑 그늘)
+        for i, crop in enumerate(self.bg_crops):
             cx, cy = crop['x'], crop['y']
-            # Draw individual background crops slightly buried
-            screen.blit(bg_sprout, (cx - bsw // 2 + sx, cy + 12 - bsh // 2))
+            spr = sprites["sprout4"] if (crop['stage'] + i) % 3 else sprites["sprout3"]
+            bsw, bsh = spr.get_width(), spr.get_height()
+            sh = pygame.Surface((bsw, 12), pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (20, 12, 8, 120), (0, 0, bsw, 12))
+            screen.blit(sh, (cx - bsw // 2 + sx, cy + 16))
+            screen.blit(spr, (cx - bsw // 2 + sx, cy + 12 - bsh // 2))
 
-        # 2. Main target carrot dirt mound (3D Styled with pixel texture)
-        mound_y = 350
-        pygame.draw.ellipse(screen, DIRT_COLOR, (260 + sx, mound_y, 280, 70))
-        pygame.draw.ellipse(screen, DIRT_DARK, (260 + sx, mound_y, 280, 70), 3)
-        # 입체 흙 질감 라인들
-        pygame.draw.ellipse(screen, DIRT_DARK, (280 + sx, mound_y + 12, 240, 46), 2)
-        pygame.draw.ellipse(screen, (165, 110, 70), (300 + sx, mound_y + 6, 200, 24), 2)
-        # 흙 알갱이 묘사
-        rng = random.Random(123)
-        for _ in range(15):
-            rx = rng.randint(285, 515)
-            ry = rng.randint(358, 398)
-            pygame.draw.rect(screen, DIRT_DARK, (rx + sx, ry, 3, 3))
+        # 2. 가운데 당근이 솟은 흙두둑 — 봉긋한 둔덕 + 심긴 자리
+        mcx, mcy = 400 + sx, 392
+        pygame.draw.ellipse(screen, (40, 26, 16), (mcx - 150, mcy - 4, 300, 50))           # 바닥 그늘
+        pygame.draw.ellipse(screen, mix_color(DIRT_DARK, BLACK, 0.10), (mcx - 144, mcy - 26, 288, 64))
+        pygame.draw.ellipse(screen, DIRT_COLOR, (mcx - 144, mcy - 30, 288, 60))            # 둔덕
+        pygame.draw.ellipse(screen, mix_color(DIRT_COLOR, (255, 210, 150), 0.18), (mcx - 130, mcy - 30, 260, 28))  # 윗면 빛
+        pygame.draw.ellipse(screen, (52, 34, 22), (mcx - 36, mcy - 16, 72, 28))            # 심긴 자리
+        pygame.draw.ellipse(screen, (34, 22, 14), (mcx - 26, mcy - 12, 52, 20))
+        srng = random.Random(123)
+        for _ in range(16):
+            rx = mcx + srng.randint(-128, 128)
+            ry = mcy + srng.randint(-22, 16)
+            pygame.draw.rect(screen, mix_color(DIRT_COLOR, DIRT_DARK, 0.6), (rx, ry, 3, 3))
 
         # Draw falling dirt particles
         for p in self.dirt_particles:
