@@ -51,6 +51,10 @@ class EndingScene:
         self.credits_y = 620
 
         # 엔딩 타입에 따라 BGM 분기
+        self._select_ending_bgm()
+
+    def _select_ending_bgm(self):
+        """현재 엔딩(last_ending)에 맞는 배경음으로 전환. 갤러리 감상에서도 곡이 바뀌도록 분리."""
         if game_state.last_ending in ("true", "happy", "growth"):
             audio.play_bgm("ending_warm")
         elif game_state.last_ending in ("rush", "bad", "wither"):
@@ -283,6 +287,7 @@ class EndingScene:
         self.carrot_pulse = 0
         self.credit_lines = self.build_credit_lines()
         self.credits_y = 620
+        self._select_ending_bgm()   # 갤러리에서 다른 엔딩을 보면 그 엔딩 BGM으로 전환
 
     # 엔딩 갤러리 키 (1회 클리어 이후에만 활성화 — 첫 플레이에서는 엔딩을 직접 얻어야 함)
     GALLERY_KEYS = {
