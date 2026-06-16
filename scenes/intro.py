@@ -2,6 +2,7 @@ import pygame
 from core.game_state import append_josa, game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WHITE, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
+from core import audio
 
 
 class IntroScene:
@@ -66,6 +67,7 @@ class IntroScene:
             if event.type == pygame.MOUSEBUTTONDOWN or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
             ):
+                audio.play("click")
                 self.advance()
 
     def start_game(self):
@@ -89,6 +91,7 @@ class IntroScene:
             if self.char_idx < len(self.text_to_print):
                 self.printed_text += self.text_to_print[self.char_idx]
                 self.char_idx += 1
+                audio.type_tick(self.text_to_print[self.char_idx - 1])
             else:
                 self.finished = True
 

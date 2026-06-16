@@ -2,6 +2,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, draw_tiled_background, get_font
 from core.ui import draw_light_panel, draw_wood_panel
+from core import audio
 
 class TransitionScene:
     def __init__(self):
@@ -10,8 +11,10 @@ class TransitionScene:
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                audio.play("click")
                 game_state.current_scene = game_state.transition_next
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                audio.play("click")
                 game_state.current_scene = game_state.transition_next
 
     def update(self, dt): pass

@@ -8,10 +8,10 @@ from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
 class Stage4Scene:
-    """Harvest minigame.
-    Click and hold the carrot to drag it UP out of the soil.
-    If you drag too fast, the tension rises. High tension breaks the carrot.
-    Let go and it slips back down into the dirt."""
+    """Harvest minigame — 연타 클릭 방식.
+    당근을 클릭할 때마다 조금씩 위로 올라온다.
+    클릭을 멈추면 중력처럼 다시 아래로 미끄러진다.
+    너무 빠르게 연타하면 tension이 올라 부러질 수 있다."""
 
     def __init__(self):
         game_state.timer = 24.0
@@ -37,18 +37,22 @@ class Stage4Scene:
                 'stage': bstage
             })
 
-        # Carrot physics
+        # 당근 물리
         self.carrot_y = 360.0
         self.carrot_start_y = 360.0
-        self.carrot_target_y = 230.0  # Harvest height (pull 130px)
-        
-        self.is_dragging = False
-        self.drag_offset_y = 0.0
+        self.carrot_target_y = 230.0  # 이 높이까지 뽑으면 성공 (130px 끌어올리기)
+
         self.pull_phase = "ready"  # ready → pulling → feedback
         self.tension = 0.0
         self.shake = 0.0
         self.feedback_text = ""
         self.feedback_timer = 0.0
+
+        # 연타 클릭 관련
+        self.pull_per_click = 10.0       # 클릭당 올라가는 픽셀
+        self.slide_speed = 50.0          # 클릭 안 할 때 내려가는 속도 (px/s)
+        self.last_click_time = 0.0       # 마지막 클릭 시각 (pygame.time.get_ticks 기반)
+        self.rapid_threshold = 0.08      # 이 시간(초) 미만 간격이면 과도한 연타로 판정
 
         self.stage_clear = False
         self.clear_timer = 2.0
@@ -57,28 +61,45 @@ class Stage4Scene:
     def handle_events(self, events):
         if self.stage_clear or self.phase == "intro":
             return
-        
-        mx, my = pygame.mouse.get_pos()
-        carrot_w = sprites["carrot"].get_width()
-        carrot_h = sprites["carrot"].get_height()
-        # Clickable bounding box for the carrot
+
         carrot_rect = pygame.Rect(400 - 35, self.carrot_y, 70, 90)
 
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.pull_phase == "ready":
+                    # 당근 클릭 시 pulling 상태로 전환
                     if carrot_rect.collidepoint(event.pos):
-                        self.is_dragging = True
-                        self.drag_offset_y = self.carrot_y - event.pos[1]
                         self.pull_phase = "pulling"
                         self.tension = 0.0
+                        self.last_click_time = pygame.time.get_ticks() / 1000.0
+                        audio.play("pop")
 
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if self.is_dragging:
-                    self.is_dragging = False
-                    if self.pull_phase == "pulling":
-                        # Slips back down if released early
-                        self.pull_phase = "ready"
+                elif self.pull_phase == "pulling":
+                    # 클릭할 때마다 당근을 위로 올림
+                    now = pygame.time.get_ticks() / 1000.0
+                    interval = now - self.last_click_time
+
+                    # 당근 위로 이동
+                    self.carrot_y = max(self.carrot_target_y, self.carrot_y - self.pull_per_click)
+                    audio.play("pop")
+
+                    # 연타 속도 체크: 너무 빠르면 tension 증가
+                    if interval < self.rapid_threshold:
+                        self.tension = min(100.0, self.tension + 8.0)
+
+                    self.last_click_time = now
+
+                    # 흙 파티클 생성
+                    for _ in range(random.randint(1, 3)):
+                        self.dirt_particles.append({
+                            'x': random.uniform(370, 430),
+                            'y': random.uniform(330, 360),
+                            'vx': random.uniform(-65, 65),
+                            'vy': random.uniform(-40, 20),
+                            'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                            'size': random.randint(2, 5),
+                            'life': random.uniform(0.3, 0.6)
+                        })
 
     def update(self, dt):
         if self.phase == "intro":
@@ -111,42 +132,21 @@ class Stage4Scene:
             game_state.timer = 0
             self.stage_clear = True
 
-        # Handle dragging physics
-        if self.is_dragging and self.pull_phase == "pulling":
-            mx, my = pygame.mouse.get_pos()
-            target_y = my + self.drag_offset_y
-            # Clamp between start position and fully pulled target height
-            clamped_y = max(self.carrot_target_y, min(self.carrot_start_y, target_y))
-            
-            # Calculate upward speed
-            dy = self.carrot_y - clamped_y
-            self.carrot_y = clamped_y
+        # pulling 상태 업데이트
+        if self.pull_phase == "pulling":
+            # tension 자연 감소
+            self.tension = max(0.0, self.tension - 25.0 * dt)
 
-            if dy > 0:
-                # Dragging upwards. Calculate tension based on speed
-                speed = dy / dt
-                # Safe speed limit is roughly 120 pixels per second
-                tension_gain = max(0.0, (speed - 110.0) * 0.16)
-                self.tension = min(100.0, self.tension + tension_gain)
-                
-                # Generate dirt particles based on drag displacement
-                for _ in range(int(dy // 1.5) + 1):
-                    self.dirt_particles.append({
-                        'x': random.uniform(370, 430),
-                        'y': random.uniform(330, 360),
-                        'vx': random.uniform(-65, 65),
-                        'vy': random.uniform(-40, 20),
-                        'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
-                        'size': random.randint(2, 5),
-                        'life': random.uniform(0.3, 0.6)
-                    })
-            else:
-                # Idle or moving down decreases tension
-                self.tension = max(0.0, self.tension - 60.0 * dt)
+            # 클릭이 없으면 당근이 중력처럼 아래로 미끄러짐
+            if self.carrot_y < self.carrot_start_y:
+                self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * dt)
 
-            # Check break condition (too fast!)
+            # 완전히 내려갔으면 다시 ready 상태로
+            if self.carrot_y >= self.carrot_start_y:
+                self.carrot_y = self.carrot_start_y
+
+            # 부러짐 체크 (tension 과다)
             if self.tension >= 100.0:
-                self.is_dragging = False
                 self.pull_phase = "feedback"
                 self.feedback_text = "너무 세게... 부러졌다."
                 self.feedback_timer = 2.0
@@ -156,9 +156,8 @@ class Stage4Scene:
                 self.attempts += 1
                 game_state.score -= 50
 
-            # Check pull clear condition
+            # 수확 성공 체크
             elif self.carrot_y <= self.carrot_target_y:
-                self.is_dragging = False
                 self.pull_phase = "feedback"
                 self.feedback_text = "쏙! 완벽하게 뽑혔다."
                 self.feedback_timer = 2.0
@@ -168,7 +167,7 @@ class Stage4Scene:
                 game_state.score += 300
 
         elif self.pull_phase == "ready":
-            # Gravity slide back down to earth
+            # ready 상태에서도 자연 복귀 & tension 감소
             if self.carrot_y < self.carrot_start_y:
                 self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
             self.tension = max(0.0, self.tension - 120.0 * dt)
@@ -183,11 +182,11 @@ class Stage4Scene:
                     self.carrot_y = self.carrot_start_y
                     self.tension = 0.0
 
-        # Update dirt particles
+        # 흙 파티클 업데이트
         for p in self.dirt_particles[:]:
             p['x'] += p['vx'] * dt
             p['y'] += p['vy'] * dt
-            p['vy'] += 380.0 * dt  # Gravity
+            p['vy'] += 380.0 * dt  # 중력
             p['life'] -= dt
             if p['life'] <= 0:
                 self.dirt_particles.remove(p)
@@ -223,56 +222,54 @@ class Stage4Scene:
             ry = mcy + srng.randint(-22, 16)
             pygame.draw.rect(screen, mix_color(DIRT_COLOR, DIRT_DARK, 0.6), (rx, ry, 3, 3))
 
-        # Draw falling dirt particles
+        # 흙 파티클 그리기
         for p in self.dirt_particles:
             pygame.draw.rect(screen, p['color'], (int(p['x'] + sx), int(p['y']), p['size'], p['size']))
 
-        # 3. Draw target carrot sprout leaves & body
+        # 3. 당근 스프라이트 그리기
         carrot = sprites["carrot"]
         cw = carrot.get_width()
         cy = self.carrot_y - 20
-        
-        # If broken, blit a half carrot, otherwise draw normally
+
+        # 부러진 경우 윗부분만 표시
         if self.pull_phase == "feedback" and "부러졌다" in self.feedback_text:
-            # Render only the top part of the carrot (cut off)
             cropped = pygame.Surface((cw, 35), pygame.SRCALPHA)
             cropped.blit(carrot, (0, 0))
             screen.blit(cropped, (400 - cw // 2 + sx, cy))
         else:
             screen.blit(carrot, (400 - cw // 2 + sx, cy))
 
-        # 4. Tension gauge (only shown when dragging and pulling)
+        # 4. Tension 게이지 (pulling 중에만 표시)
         if self.pull_phase == "pulling" and not self.stage_clear:
             gx, gy, gw, gh = 250, 444, 300, 16
             pygame.draw.rect(screen, (40, 35, 30), (gx, gy, gw, gh), border_radius=4)
             fill_w = int((gw - 4) * (self.tension / 100.0))
             if fill_w > 0:
-                # Color transitions from green to red based on tension
+                # 초록 → 빨강 그라데이션
                 gauge_color = mix_color((80, 175, 110), (220, 60, 45), self.tension / 100.0)
                 pygame.draw.rect(screen, gauge_color, (gx + 2, gy + 2, fill_w, gh - 4), border_radius=3)
-            
-            # Warning text
+
+            # 경고 텍스트
             font_t = get_font(14)
-            txt = "속도 조절! 천천히 들어 올리세요." if self.tension > 50.0 else "적정 속도로 위로 끄세요."
+            txt = "너무 빨라요! 천천히 클릭하세요." if self.tension > 50.0 else "적당한 속도로 클릭하세요."
             color = (230, 80, 60) if self.tension > 50.0 else TEXT_MUTED
             surf = font_t.render(txt, True, color)
             screen.blit(surf, (400 - surf.get_width() // 2, gy + 22))
 
-        # 5. Feedback text
+        # 5. 피드백 텍스트
         if self.pull_phase == "feedback" and self.feedback_text:
             font = get_font(24)
             color = (255, 220, 120) if "쏙" in self.feedback_text else (210, 100, 80)
             surf = font.render(self.feedback_text, True, color)
-            
-            # Draw wood backing panel
+
+            # 나무 패널 배경
             panel = pygame.Rect(400 - surf.get_width() // 2 - 16, 170, surf.get_width() + 32, 45)
             draw_wood_panel(screen, panel)
             screen.blit(surf, (400 - surf.get_width() // 2, 178))
 
-        # 6. Relocated Attempt Counter (High visibility wood panel above the gauge)
+        # 6. 시도 횟수 표시
         if not self.stage_clear and self.phase != "intro":
             att_font = get_font(16)
-            # Display current attempt index clearly (e.g. 1/3)
             cur_attempt = min(self.attempts + 1, self.max_attempts)
             att_panel = pygame.Rect(400 - 80, 396, 160, 30)
             draw_wood_panel(screen, att_panel)
@@ -282,7 +279,7 @@ class Stage4Scene:
         draw_top_bar(screen)
 
         if self.phase == "intro":
-            # Intro overlay description
+            # 인트로 오버레이
             overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 170))
             screen.blit(overlay, (0, 0))
@@ -290,9 +287,9 @@ class Stage4Scene:
             t1 = font_t.render("[수확의 시간]", True, (255, 220, 130))
             screen.blit(t1, (400 - t1.get_width() // 2, 200))
             font_b = get_font(18)
-            t2 = font_b.render("마우스 왼쪽 버튼으로 당근을 꾹 누른 채", True, (200, 180, 140))
+            t2 = font_b.render("마우스 왼쪽 버튼을 연타해서", True, (200, 180, 140))
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
-            t3 = font_b.render("천천히 위로 끌어 올려주세요.", True, (200, 180, 140))
+            t3 = font_b.render("당근을 조금씩 뽑아 올리세요.", True, (200, 180, 140))
             screen.blit(t3, (400 - t3.get_width() // 2, 290))
             t4 = font_b.render("너무 빠르게 당기면 줄기가 꺾여 부러집니다.", True, (230, 110, 90))
             screen.blit(t4, (400 - t4.get_width() // 2, 330))
@@ -304,4 +301,4 @@ class Stage4Scene:
             screen.blit(t, (400 - t.get_width() // 2, 210))
             draw_bottom_bar(screen, "결과", f"수확 점수: {game_state.score}")
         else:
-            draw_bottom_bar(screen, "수확하기", "마우스 드래그로 당근을 위로 끌어 올리세요. 너무 성급하면 부러집니다.")
+            draw_bottom_bar(screen, "수확하기", "마우스를 연타해 당근을 뽑아 올리세요. 너무 빠르면 부러집니다.")

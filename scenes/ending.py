@@ -50,6 +50,14 @@ class EndingScene:
         self.credit_lines = self.build_credit_lines()
         self.credits_y = 620
 
+        # 엔딩 타입에 따라 BGM 분기
+        if game_state.last_ending in ("true", "happy", "growth"):
+            audio.play_bgm("ending_warm")
+        elif game_state.last_ending in ("rush", "bad", "wither"):
+            audio.play_bgm("ending_sad")
+        else:
+            audio.play_bgm("ending")
+
     def write_desktop_letter(self):
         try:
             desktop = os.path.join(os.environ.get('USERPROFILE', ''), 'Desktop')
@@ -383,6 +391,7 @@ class EndingScene:
                 if self.char_idx < len(self.text_to_print):
                     self.printed_text += self.text_to_print[self.char_idx]
                     self.char_idx += 1
+                    audio.type_tick(self.text_to_print[self.char_idx - 1])
                 else:
                     self.finished = True
 

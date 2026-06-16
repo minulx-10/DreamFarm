@@ -164,6 +164,52 @@ def _sfx_page():
     return _to_sound(w, 0.18)
 
 
+def _sfx_type():
+    """타자기 톡 — 아주 짧고 작게(빠른 타이핑에도 안 거슬리게)."""
+    w = _tone(1500, 0.018, harmonics=(1.0,)) * _adsr(0.018, a=0.001, d=0.005, s=0.1, r=0.008)
+    click = _lowpass(_noise(0.018), 0.4) * 0.5
+    return _to_sound(_mix(w * 0.6, click), 0.17)
+
+
+def _sfx_weed_pull():
+    """스윽 — 잡초가 흙에서 빠져나오는 부드러운 마찰음."""
+    dur = 0.26
+    t = _t(dur)
+    sweep = _lowpass(_noise(dur), 0.05)
+    pitch = 230 + 200 * (t / dur)
+    body = np.sin(2 * np.pi * pitch * t) * 0.3
+    w = _mix(sweep * 0.85, body) * _adsr(dur, a=0.02, d=0.06, s=0.5, r=0.14)
+    return _to_sound(w, 0.42)
+
+
+def _sfx_pop():
+    """뿅 — 튀어나오거나 두드릴 때."""
+    dur = 0.12
+    t = _t(dur)
+    pitch = 480 * np.exp(-10 * t) + 130
+    w = np.sin(2 * np.pi * pitch * t) * _adsr(dur, a=0.002, d=0.03, s=0.2, r=0.06)
+    return _to_sound(w, 0.4)
+
+
+def _sfx_chirp():
+    """짹 — 새 울음."""
+    dur = 0.14
+    t = _t(dur)
+    pitch = 1300 + 500 * np.sin(2 * np.pi * 18 * t)
+    w = np.sin(2 * np.pi * pitch * t) * _adsr(dur, a=0.004, d=0.04, s=0.3, r=0.06)
+    return _to_sound(w, 0.3)
+
+
+def _sfx_thud():
+    """툭 — 당근이 쏙 뽑히는 묵직한 마무리."""
+    dur = 0.2
+    t = _t(dur)
+    pitch = 180 * np.exp(-6 * t) + 70
+    body = np.sin(2 * np.pi * pitch * t)
+    w = _mix(body * 0.8, _lowpass(_noise(dur), 0.08) * 0.4) * _adsr(dur, a=0.002, d=0.05, s=0.3, r=0.1)
+    return _to_sound(w, 0.45)
+
+
 _SFX_BUILDERS = {
     "click": _sfx_click,
     "hover": _sfx_hover,
@@ -174,6 +220,11 @@ _SFX_BUILDERS = {
     "break": _sfx_break,
     "epiphany": _sfx_epiphany,
     "page": _sfx_page,
+    "type": _sfx_type,
+    "weed_pull": _sfx_weed_pull,
+    "pop": _sfx_pop,
+    "chirp": _sfx_chirp,
+    "thud": _sfx_thud,
 }
 
 
@@ -242,10 +293,38 @@ def _bgm_ending():
     return _mix(pad * 0.55, mel * 0.6)
 
 
+def _bgm_ending_warm():
+    """진·해피·성장 엔딩용 — 밝고 따뜻한 장조."""
+    bar = 4.0
+    pad = _pad_chord([196.0, 246.94, 293.66], bar * 2)   # G장조 느낌
+    mel = _melody([
+        (392.0, 1), (493.88, 1), (587.33, 2),
+        (523.25, 1), (493.88, 1), (440.0, 2),
+        (392.0, 1), (440.0, 1), (493.88, 2),
+        (392.0, 4),
+    ], 0.55)
+    return _mix(pad * 0.5, mel * 0.62)
+
+
+def _bgm_ending_sad():
+    """조급·배드·시듦 엔딩용 — 느리고 가라앉은 단조."""
+    bar = 4.0
+    pad = _pad_chord([146.83, 174.61, 220.0], bar * 2)   # D단조 느낌
+    mel = _melody([
+        (293.66, 2), (261.63, 1), (293.66, 1),
+        (349.23, 2), (293.66, 2),
+        (261.63, 2), (246.94, 1), (220.0, 1),
+        (196.0, 4),
+    ], 0.72)   # 느린 호흡
+    return _mix(pad * 0.55, mel * 0.52)
+
+
 _BGM_BUILDERS = {
     "farm": _bgm_farm,
     "night": _bgm_night,
-    "ending": _bgm_ending,
+    "ending": _bgm_ending,            # 중립(솜씨·노멀)
+    "ending_warm": _bgm_ending_warm,  # 따뜻함(진·해피·성장)
+    "ending_sad": _bgm_ending_sad,    # 슬픔(조급·배드·시듦)
 }
 
 
@@ -300,6 +379,12 @@ def play(name):
             snd.play()
     except Exception:
         pass
+
+
+def type_tick(ch):
+    """타자기 글자 효과음 — 공백·줄바꿈은 건너뛴다(빈 곳에서 안 울리게)."""
+    if ch and not ch.isspace():
+        play("type")
 
 
 def play_bgm(name, fade_ms=600):

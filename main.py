@@ -41,7 +41,7 @@ def main():
         "story_choice": "night", "father_day": "night",
         "farm": "farm", "stage1": "farm", "stage2": "farm",
         "stage3": "farm", "stage4": "farm", "seed_catch": "farm",
-        "ending": "ending",
+        "ending": None,
         "transition": None, "epiphany": None,
     }
 

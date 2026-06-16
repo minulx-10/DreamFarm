@@ -16,7 +16,7 @@ from core.ui import (
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
     wrap_text, mix_color,
 )
-from scenes.tending import WaterPour, WeedPull, PestTap
+from scenes.tending import WaterPour, WeedPull, PestTap, WEATHER_MINIGAMES
 
 # 행동 → 손맛 인터랙션 클래스 (없는 행동은 즉시 적용)
 TACTILE_INTERACTIONS = {
@@ -102,6 +102,7 @@ class FarmScene:
         self.notice = "밭의 상태부터 천천히 살펴보자."
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
+        self.weather_minigame_cooldown = 2  # 날씨 미니게임 쿨다운 (2턴 후부터 발동 가능)
         self.special_cooldown = random.randint(3, 5)   # 특별 이벤트('씨앗 받기')까지 남은 턴
         self.withers = 0                 # 작물이 완전히 시든 횟수 (3이면 끝내 시듦 — 배드엔딩)
         self.weak_turns = 0              # 비실비실(저체력)하게 흘려보낸 턴 — 오래 가면 끝내 시든다
@@ -865,6 +866,16 @@ class FarmScene:
         # 고유 콘텐츠인 '밭 정리(stage1)'만, 밭이 어수선할 때 가끔 등장하는 돌발 상황으로 남긴다.
         if action in ("살펴보기", "수확하기"):
             return
+
+        # ── 날씨 미니게임: 매 턴 확률적으로 발동 ──
+        if self.weather_minigame_cooldown > 0:
+            self.weather_minigame_cooldown -= 1
+        elif game_state.weather in WEATHER_MINIGAMES and random.random() < 0.35:
+            self.interaction = WEATHER_MINIGAMES[game_state.weather](self)
+            self.interaction_action = "__weather__"
+            self.weather_minigame_cooldown = 3
+            return
+
         if self.minigame_cooldown > 0:
             self.minigame_cooldown -= 1
             return
@@ -901,7 +912,17 @@ class FarmScene:
                 result = self.interaction.result
                 action = self.interaction_action
                 self.interaction = None
-                self._run_action(action, result)
+                # 날씨 미니게임 결과 — 스탯 보너스 직접 적용
+                if result and "weather_bonus" in result:
+                    bonus = result["weather_bonus"]
+                    for stat, val in bonus.items():
+                        cur = getattr(self, stat, None)
+                        if cur is not None:
+                            setattr(self, stat, cur + val)
+                    self.clamp_stats()
+                    self.rebuild_buttons()
+                else:
+                    self._run_action(action, result)
             return
 
         # 버튼 호버 상태 갱신 + 새로 올라탄 버튼에 호버 효과음

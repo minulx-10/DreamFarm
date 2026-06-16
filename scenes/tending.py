@@ -180,7 +180,7 @@ class WeedPull:
             dist = (w["ox"] ** 2 + w["oy"] ** 2) ** 0.5
             if dist >= w["strength"]:
                 w["pulled"] = True
-                audio.play("soil")
+                audio.play("weed_pull")
                 self.puffs.append([w["x"], w["y"] + 12, 0.45])
             else:
                 w["ox"] = w["oy"] = 0.0   # 덜 뽑힘 → 도로 박힘
@@ -367,3 +367,577 @@ def _counter(screen, text, time_frac):
     w = 120
     pygame.draw.rect(screen, (40, 34, 28), (PLOT.right - w - 8, PLOT.y + 8, w, 6), border_radius=3)
     pygame.draw.rect(screen, (210, 180, 90), (PLOT.right - w - 8, PLOT.y + 8, int(w * max(0.0, min(1.0, time_frac))), 6), border_radius=3)
+
+
+# ============================================================================
+# 날씨별 미니게임 — 밭 위 오버레이로 farm.interaction 에 꽂힌다.
+# result 는 {"weather_bonus": {...}} 딕셔너리로 farm 이 스탯에 적용한다.
+# ============================================================================
+
+import math
+
+class WeatherSunshine:
+    """맑음 — 햇빛 모으기. 하늘에서 내려오는 햇살 구슬을 클릭해 모은다."""
+    PROMPT = "떨어지는 햇살을 클릭해 모으세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.timer = 8.0
+        self.collected = 0
+        self.target = 8
+        self.orbs = []
+        self.sparkles = []
+        self._spawn(4)
+
+    def _spawn(self, n):
+        for _ in range(n):
+            self.orbs.append({
+                "x": random.randint(PLOT.x + 30, PLOT.right - 30),
+                "y": float(random.randint(PLOT.y - 40, PLOT.y - 10)),
+                "speed": random.uniform(50, 100),
+                "size": random.randint(10, 16),
+                "pulse": random.uniform(0, 6.28),
+                "alive": True,
+            })
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for orb in self.orbs:
+                if not orb["alive"]:
+                    continue
+                dx = mx - orb["x"]
+                dy = my - orb["y"]
+                if dx * dx + dy * dy < (orb["size"] + 8) ** 2:
+                    orb["alive"] = False
+                    self.collected += 1
+                    audio.play("pop")
+                    self.sparkles.append([orb["x"], orb["y"], 0.4])
+                    if self.collected >= self.target:
+                        self._resolve()
+                    break
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        for orb in self.orbs:
+            if orb["alive"]:
+                orb["y"] += orb["speed"] * dt
+                orb["pulse"] += dt * 3
+                if orb["y"] > PLOT.bottom + 10:
+                    orb["y"] = float(random.randint(PLOT.y - 40, PLOT.y - 10))
+                    orb["x"] = random.randint(PLOT.x + 30, PLOT.right - 30)
+        # 주기적으로 새 구슬 생성
+        alive_count = sum(1 for o in self.orbs if o["alive"])
+        if alive_count < 3 and self.collected < self.target:
+            self._spawn(2)
+        for s in self.sparkles:
+            s[2] -= dt
+        self.sparkles = [s for s in self.sparkles if s[2] > 0]
+        if self.timer <= 0:
+            self._resolve()
+
+    def _resolve(self):
+        frac = self.collected / max(1, self.target)
+        bonus = {}
+        if frac >= 0.8:
+            self.feedback = "햇살을 가득 모았다! 밭이 따뜻해졌다."
+            self.feedback_color = (255, 230, 130)
+            bonus = {"health": 6, "stress": -8}
+            audio.play("success")
+        elif frac >= 0.4:
+            self.feedback = "어느 정도 모았다."
+            self.feedback_color = (220, 205, 140)
+            bonus = {"health": 3, "stress": -4}
+            audio.play("page")
+        else:
+            self.feedback = "햇살을 많이 놓쳤다."
+            self.feedback_color = (225, 175, 130)
+            audio.play("page")
+        self.result = {"weather_bonus": bonus}
+        self.settle = 1.2
+
+    def draw(self, screen):
+        _veil(screen)
+        for orb in self.orbs:
+            if not orb["alive"]:
+                continue
+            x, y = int(orb["x"]), int(orb["y"])
+            pulse = 0.85 + 0.15 * math.sin(orb["pulse"])
+            r = int(orb["size"] * pulse)
+            glow = pygame.Surface((r * 4, r * 4), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (255, 230, 100, 50), (r * 2, r * 2), r * 2)
+            pygame.draw.circle(glow, (255, 240, 150, 120), (r * 2, r * 2), r)
+            screen.blit(glow, (x - r * 2, y - r * 2))
+        for s in self.sparkles:
+            r = int(12 * (1 - s[2] / 0.4)) + 3
+            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (255, 255, 200, int(200 * (s[2] / 0.4))), (r, r), r)
+            screen.blit(surf, (int(s[0]) - r, int(s[1]) - r))
+        _caption(screen, self.PROMPT if self.result is None else self.feedback,
+                 None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"모은 햇살 {self.collected}/{self.target}", self.timer / 8.0)
+
+
+class WeatherRain:
+    """비 — 빗물 받기. 양동이를 좌우로 움직여 떨어지는 빗방울을 받는다."""
+    PROMPT = "마우스를 움직여 빗물을 받으세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.timer = 8.0
+        self.bucket_x = PLOT.centerx
+        self.bucket_y = PLOT.bottom - 30
+        self.drops = []
+        self.caught = 0
+        self.target = 12
+        self.spawn_timer = 0
+        self.splashes = []
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEMOTION:
+            self.bucket_x = max(PLOT.x + 20, min(PLOT.right - 20, event.pos[0]))
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        self.spawn_timer += dt
+        if self.spawn_timer > 0.25:
+            self.drops.append({
+                "x": random.randint(PLOT.x + 20, PLOT.right - 20),
+                "y": float(PLOT.y),
+                "speed": random.uniform(160, 280),
+            })
+            self.spawn_timer = 0
+        for drop in self.drops[:]:
+            drop["y"] += drop["speed"] * dt
+            # 양동이 충돌 체크
+            if drop["y"] >= self.bucket_y - 10 and abs(drop["x"] - self.bucket_x) < 24:
+                self.caught += 1
+                self.drops.remove(drop)
+                audio.play("water")
+                self.splashes.append([drop["x"], self.bucket_y - 5, 0.3])
+                if self.caught >= self.target:
+                    self._resolve()
+            elif drop["y"] > PLOT.bottom + 10:
+                self.drops.remove(drop)
+        for s in self.splashes:
+            s[2] -= dt
+        self.splashes = [s for s in self.splashes if s[2] > 0]
+        if self.timer <= 0:
+            self._resolve()
+
+    def _resolve(self):
+        frac = self.caught / max(1, self.target)
+        bonus = {}
+        if frac >= 0.8:
+            self.feedback = "빗물을 넉넉히 모았다!"
+            self.feedback_color = (150, 200, 255)
+            bonus = {"moisture": 12, "drainage": -4}
+            audio.play("success")
+        elif frac >= 0.4:
+            self.feedback = "어느 정도 모았다."
+            self.feedback_color = (220, 205, 140)
+            bonus = {"moisture": 6}
+            audio.play("page")
+        else:
+            self.feedback = "빗물을 많이 흘렸다."
+            self.feedback_color = (225, 175, 130)
+            bonus = {"moisture": 2}
+            audio.play("page")
+        self.result = {"weather_bonus": bonus}
+        self.settle = 1.2
+
+    def draw(self, screen):
+        _veil(screen)
+        # 빗방울
+        for drop in self.drops:
+            x, y = int(drop["x"]), int(drop["y"])
+            pygame.draw.line(screen, (150, 190, 240), (x, y), (x - 1, y + 6), 2)
+        # 양동이
+        bx, by = int(self.bucket_x), int(self.bucket_y)
+        pygame.draw.polygon(screen, (120, 110, 90), [
+            (bx - 18, by - 16), (bx + 18, by - 16),
+            (bx + 14, by + 8), (bx - 14, by + 8)
+        ])
+        pygame.draw.polygon(screen, (150, 140, 110), [
+            (bx - 16, by - 14), (bx + 16, by - 14),
+            (bx + 12, by + 6), (bx - 12, by + 6)
+        ])
+        # 물 튀김
+        for s in self.splashes:
+            r = int(8 * (1 - s[2] / 0.3)) + 2
+            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (150, 200, 255, int(180 * (s[2] / 0.3))), (r, r), r)
+            screen.blit(surf, (int(s[0]) - r, int(s[1]) - r))
+        _caption(screen, self.PROMPT if self.result is None else self.feedback,
+                 None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"받은 빗물 {self.caught}/{self.target}", self.timer / 8.0)
+
+
+class WeatherCloudy:
+    """흐림 — 구름 걷기. 구름을 드래그해서 화면 밖으로 밀어낸다."""
+    PROMPT = "구름을 끌어 화면 밖으로 밀어내세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.timer = 10.0
+        self.clouds = []
+        self.cleared = 0
+        self.target = 5
+        self.dragging = None
+        self.drag_offset = (0, 0)
+        for _ in range(self.target):
+            self.clouds.append({
+                "x": random.randint(PLOT.x + 20, PLOT.right - 80),
+                "y": random.randint(PLOT.y + 10, PLOT.y + 120),
+                "w": random.randint(60, 100),
+                "h": random.randint(30, 45),
+                "alive": True,
+                "drift": random.uniform(-10, 10),
+            })
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for cloud in self.clouds:
+                if not cloud["alive"]:
+                    continue
+                cr = pygame.Rect(cloud["x"], cloud["y"], cloud["w"], cloud["h"])
+                if cr.collidepoint(mx, my):
+                    self.dragging = cloud
+                    self.drag_offset = (mx - cloud["x"], my - cloud["y"])
+                    audio.play("click")
+                    break
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            self.dragging["x"] = event.pos[0] - self.drag_offset[0]
+            self.dragging["y"] = event.pos[1] - self.drag_offset[1]
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging:
+            c = self.dragging
+            # 화면 밖으로 밀었는지 체크
+            if c["x"] + c["w"] < PLOT.x - 10 or c["x"] > PLOT.right + 10 or c["y"] + c["h"] < PLOT.y - 20:
+                c["alive"] = False
+                self.cleared += 1
+                audio.play("pop")
+                if self.cleared >= self.target:
+                    self._resolve()
+            self.dragging = None
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        for c in self.clouds:
+            if c["alive"] and c is not self.dragging:
+                c["x"] += c["drift"] * dt
+        if self.timer <= 0:
+            self._resolve()
+
+    def _resolve(self):
+        frac = self.cleared / max(1, self.target)
+        bonus = {}
+        if frac >= 0.8:
+            self.feedback = "구름이 걷혔다! 햇빛이 비친다."
+            self.feedback_color = (255, 240, 160)
+            bonus = {"health": 5, "stress": -6}
+            audio.play("success")
+        elif frac >= 0.4:
+            self.feedback = "구름이 좀 걷혔다."
+            self.feedback_color = (220, 205, 140)
+            bonus = {"health": 2, "stress": -3}
+            audio.play("page")
+        else:
+            self.feedback = "구름이 여전히 두껍다."
+            self.feedback_color = (225, 175, 130)
+            audio.play("page")
+        self.result = {"weather_bonus": bonus}
+        self.settle = 1.2
+
+    def draw(self, screen):
+        _veil(screen)
+        for c in self.clouds:
+            if not c["alive"]:
+                continue
+            cx, cy, cw, ch = int(c["x"]), int(c["y"]), c["w"], c["h"]
+            surf = pygame.Surface((cw, ch), pygame.SRCALPHA)
+            pygame.draw.ellipse(surf, (210, 215, 225, 200), (0, ch // 4, cw, ch * 3 // 4))
+            pygame.draw.ellipse(surf, (220, 225, 235, 220), (cw // 5, 0, cw * 3 // 5, ch * 3 // 4))
+            screen.blit(surf, (cx, cy))
+        _caption(screen, self.PROMPT if self.result is None else self.feedback,
+                 None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"치운 구름 {self.cleared}/{self.target}", self.timer / 10.0)
+
+
+class WeatherDrought:
+    """가뭄 — 물길 찾기. 갈라진 땅에서 수맥 표시가 깜빡일 때 타이밍 맞춰 클릭."""
+    PROMPT = "수맥이 빛날 때 재빨리 클릭하세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.timer = 10.0
+        self.spots = []
+        self.found = 0
+        self.target = 5
+        self.current_spot = 0
+        for i in range(self.target):
+            self.spots.append({
+                "x": random.randint(PLOT.x + 50, PLOT.right - 50),
+                "y": random.randint(PLOT.y + 60, PLOT.bottom - 50),
+                "active": False,
+                "found": False,
+                "glow_timer": 0.0,
+                "glow_duration": random.uniform(1.2, 2.0),
+                "delay": i * 1.8 + random.uniform(0, 0.5),
+            })
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for spot in self.spots:
+                if not spot["found"] and spot["active"]:
+                    dx = mx - spot["x"]
+                    dy = my - spot["y"]
+                    if dx * dx + dy * dy < 25 ** 2:
+                        spot["found"] = True
+                        spot["active"] = False
+                        self.found += 1
+                        audio.play("water")
+                        if self.found >= self.target:
+                            self._resolve()
+                        break
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        elapsed = 10.0 - self.timer
+        for spot in self.spots:
+            if spot["found"]:
+                continue
+            if elapsed >= spot["delay"]:
+                spot["active"] = True
+                spot["glow_timer"] += dt
+                if spot["glow_timer"] >= spot["glow_duration"]:
+                    spot["active"] = False
+                    # 놓쳤으면 다시 돌아옴 (딜레이 리셋)
+                    spot["delay"] = elapsed + random.uniform(1.5, 2.5)
+                    spot["glow_timer"] = 0.0
+        if self.timer <= 0:
+            self._resolve()
+
+    def _resolve(self):
+        frac = self.found / max(1, self.target)
+        bonus = {}
+        if frac >= 0.8:
+            self.feedback = "수맥을 모두 찾았다! 물길이 열렸다."
+            self.feedback_color = (120, 200, 255)
+            bonus = {"moisture": 15, "health": 4}
+            audio.play("success")
+        elif frac >= 0.4:
+            self.feedback = "수맥을 몇 개 찾았다."
+            self.feedback_color = (220, 205, 140)
+            bonus = {"moisture": 8}
+            audio.play("page")
+        else:
+            self.feedback = "수맥을 거의 찾지 못했다."
+            self.feedback_color = (225, 175, 130)
+            bonus = {"moisture": 3}
+            audio.play("page")
+        self.result = {"weather_bonus": bonus}
+        self.settle = 1.2
+
+    def draw(self, screen):
+        _veil(screen)
+        # 갈라진 땅 그리기
+        for i in range(6):
+            sx = PLOT.x + 30 + i * 55
+            sy = PLOT.y + 40 + (i % 3) * 80
+            pygame.draw.line(screen, (100, 70, 45), (sx, sy), (sx + 20, sy + 30), 2)
+            pygame.draw.line(screen, (100, 70, 45), (sx + 20, sy + 30), (sx + 10, sy + 50), 1)
+        for spot in self.spots:
+            if spot["found"]:
+                # 찾은 수맥 — 물 표시
+                pygame.draw.circle(screen, (100, 180, 255, 150), (int(spot["x"]), int(spot["y"])), 12)
+                pygame.draw.circle(screen, (150, 210, 255), (int(spot["x"]), int(spot["y"])), 6)
+            elif spot["active"]:
+                # 빛나는 수맥 — 깜빡깜빡
+                glow_phase = math.sin(spot["glow_timer"] * 8) * 0.5 + 0.5
+                alpha = int(100 + 155 * glow_phase)
+                r = int(14 + 6 * glow_phase)
+                glow_surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (100, 180, 255, alpha), (r, r), r)
+                screen.blit(glow_surf, (int(spot["x"]) - r, int(spot["y"]) - r))
+        _caption(screen, self.PROMPT if self.result is None else self.feedback,
+                 None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"찾은 수맥 {self.found}/{self.target}", self.timer / 10.0)
+
+
+class WeatherWind:
+    """강풍 — 작물 지키기. 날아오는 나뭇잎/돌을 연타 클릭해 방어한다."""
+    PROMPT = "날아오는 것들을 클릭해 막으세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.timer = 8.0
+        self.debris = []
+        self.blocked = 0
+        self.missed = 0
+        self.target = 10
+        self.spawn_timer = 0
+        self.puffs = []
+
+    def _spawn_debris(self):
+        self.debris.append({
+            "x": float(PLOT.x - 20),
+            "y": float(random.randint(PLOT.y + 30, PLOT.bottom - 40)),
+            "speed": random.uniform(100, 200),
+            "type": random.choice(["leaf", "leaf", "stone"]),
+            "alive": True,
+        })
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for d in self.debris:
+                if not d["alive"]:
+                    continue
+                dx = mx - d["x"]
+                dy = my - d["y"]
+                if dx * dx + dy * dy < 20 ** 2:
+                    d["alive"] = False
+                    self.blocked += 1
+                    audio.play("click")
+                    self.puffs.append([d["x"], d["y"], 0.3])
+                    break
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        self.spawn_timer += dt
+        if self.spawn_timer > 0.6 and len([d for d in self.debris if d["alive"]]) < 4:
+            self._spawn_debris()
+            self.spawn_timer = 0
+        for d in self.debris[:]:
+            if d["alive"]:
+                d["x"] += d["speed"] * dt
+                d["y"] += math.sin(d["x"] * 0.05) * 30 * dt
+                if d["x"] > PLOT.right + 20:
+                    d["alive"] = False
+                    self.missed += 1
+        for p in self.puffs:
+            p[2] -= dt
+        self.puffs = [p for p in self.puffs if p[2] > 0]
+        if self.timer <= 0 or self.blocked + self.missed >= self.target:
+            self._resolve()
+
+    def _resolve(self):
+        total = self.blocked + self.missed
+        frac = self.blocked / max(1, total) if total > 0 else 0
+        bonus = {}
+        if frac >= 0.7:
+            self.feedback = "바람을 잘 막아냈다!"
+            self.feedback_color = (180, 220, 160)
+            bonus = {"stress": -10, "health": 4}
+            audio.play("success")
+        elif frac >= 0.4:
+            self.feedback = "그런대로 막았다."
+            self.feedback_color = (220, 205, 140)
+            bonus = {"stress": -5}
+            audio.play("page")
+        else:
+            self.feedback = "바람에 많이 당했다."
+            self.feedback_color = (225, 175, 130)
+            bonus = {"stress": 5}
+            audio.play("page")
+        self.result = {"weather_bonus": bonus}
+        self.settle = 1.2
+
+    def draw(self, screen):
+        _veil(screen)
+        for d in self.debris:
+            if not d["alive"]:
+                continue
+            x, y = int(d["x"]), int(d["y"])
+            if d["type"] == "leaf":
+                leaf = pygame.Surface((16, 10), pygame.SRCALPHA)
+                pygame.draw.ellipse(leaf, (120, 170, 80, 200), (0, 0, 16, 10))
+                screen.blit(leaf, (x - 8, y - 5))
+            else:
+                pygame.draw.circle(screen, (140, 130, 120), (x, y), 6)
+                pygame.draw.circle(screen, (170, 160, 150), (x - 1, y - 1), 3)
+        for p in self.puffs:
+            r = int(10 * (1 - p[2] / 0.3)) + 3
+            s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(s, (200, 210, 180, int(160 * (p[2] / 0.3))), (r, r), r)
+            screen.blit(s, (int(p[0]) - r, int(p[1]) - r))
+        _caption(screen, self.PROMPT if self.result is None else self.feedback,
+                 None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"막은 횟수 {self.blocked}", self.timer / 8.0)
+
+
+# 날씨 → 미니게임 클래스 매핑
+WEATHER_MINIGAMES = {
+    "맑음": WeatherSunshine,
+    "비": WeatherRain,
+    "흐림": WeatherCloudy,
+    "가뭄": WeatherDrought,
+    "강풍": WeatherWind,
+}

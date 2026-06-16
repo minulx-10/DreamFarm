@@ -2,6 +2,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
 from core.ui import draw_button, draw_light_panel, draw_story_backdrop, wrap_text
+from core import audio
 
 
 class StoryChoiceScene:
@@ -76,8 +77,10 @@ class StoryChoiceScene:
             elif not self.choice_made:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.btn_a.collidepoint(event.pos):
+                        audio.play("click")
                         self._apply(self.choice_a)
                     elif self.btn_b.collidepoint(event.pos):
+                        audio.play("click")
                         self._apply(self.choice_b)
 
     def update(self, dt):
@@ -97,6 +100,7 @@ class StoryChoiceScene:
             if self.char_idx < len(self.text_to_print):
                 self.printed_text += self.text_to_print[self.char_idx]
                 self.char_idx += 1
+                audio.type_tick(self.text_to_print[self.char_idx - 1])
             else:
                 self.finished = True
 

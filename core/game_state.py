@@ -509,7 +509,7 @@ def advance_weather():
     game_state.weather = game_state.next_weather
     candidates = [w for w in weathers if w != game_state.weather]
     game_state.next_weather = random.choice(candidates)
-    game_state.weather_turns_left = random.randint(3, 5)
+    game_state.weather_turns_left = random.randint(2, 3)
 
 
 def check_epiphany():

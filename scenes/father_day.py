@@ -3,6 +3,7 @@ import pygame
 from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
 from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
+from core import audio
 
 
 class FatherDayScene:
@@ -85,6 +86,7 @@ class FatherDayScene:
                     if self.char_idx < len(self.text_to_print):
                         self.printed_text += self.text_to_print[self.char_idx]
                         self.char_idx += 1
+                        audio.type_tick(self.text_to_print[self.char_idx - 1])
                     else:
                         self.finished = True
 

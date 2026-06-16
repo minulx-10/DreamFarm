@@ -2,6 +2,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
 from core.ui import draw_light_panel, draw_story_backdrop, wrap_text
+from core import audio
 
 
 class MemoryScene:
@@ -36,6 +37,7 @@ class MemoryScene:
             if event.type == pygame.MOUSEBUTTONDOWN or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
             ):
+                audio.play("click")
                 if not self.finished:
                     self.printed_text = self.text_to_print
                     self.char_idx = len(self.text_to_print)
@@ -66,6 +68,7 @@ class MemoryScene:
             if self.char_idx < len(self.text_to_print):
                 self.printed_text += self.text_to_print[self.char_idx]
                 self.char_idx += 1
+                audio.type_tick(self.text_to_print[self.char_idx - 1])
             else:
                 self.finished = True
 
