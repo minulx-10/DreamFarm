@@ -16,7 +16,7 @@ from scenes.stage1_sort import Stage1Scene
 from scenes.stage2_water import Stage2Scene
 from scenes.stage3_pest import Stage3Scene
 from scenes.stage4_harvest import Stage4Scene
-from scenes.seed_catch import SeedCatchScene
+from scenes.star_connect import StarConnectScene
 from scenes.ending import EndingScene
 from scenes.epiphany import EpiphanyScene
 from scenes.story_choice import StoryChoiceScene
@@ -40,7 +40,7 @@ def main():
         "name_input": "night", "intro": "night", "memory": "night",
         "story_choice": "night", "father_day": "night",
         "farm": "farm", "stage1": "farm", "stage2": "farm",
-        "stage3": "farm", "stage4": "farm", "seed_catch": "farm",
+        "stage3": "farm", "stage4": "farm", "star_connect": "night",
         "ending": None,
         "transition": None, "epiphany": None,
     }
@@ -56,7 +56,7 @@ def main():
         "stage2": Stage2Scene,
         "stage3": Stage3Scene,
         "stage4": Stage4Scene,
-        "seed_catch": SeedCatchScene,
+        "star_connect": StarConnectScene,
         "ending": EndingScene,
         "epiphany": EpiphanyScene,
         "story_choice": StoryChoiceScene,
@@ -65,7 +65,7 @@ def main():
     # 진입할 때마다 새 상태로 재생성해야 하는 씬 (farm/name_input/transition은 유지)
     FRESH_ON_ENTER = {
         "intro", "memory", "epiphany", "story_choice", "father_day",
-        "stage1", "stage2", "stage3", "stage4", "seed_catch", "ending",
+        "stage1", "stage2", "stage3", "stage4", "star_connect", "ending",
     }
 
     scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}

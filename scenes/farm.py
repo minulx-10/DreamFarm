@@ -47,10 +47,10 @@ MINIGAME_INTROS = {
     ],
 }
 
-# 가끔 등장하는 특별 이벤트 미니게임 '씨앗 받기' 진입 문구
-SEED_CATCH_INTROS = [
-    "[특별한 새벽]\n\n간밤의 바람에 씨앗 봉지가 터졌다.\n흩날리는 씨앗을, 바구니로 받아 보자.",
-    "[돌발 상황]\n\n바람이 씨앗과 잎을 한꺼번에 날려 보낸다.\n쓸 것만 골라 바구니에 담아야 한다.",
+# 한 게임에 한 번, 중반에 반드시 등장하는 특별 이벤트 '별 잇기' 진입 문구
+STAR_CONNECT_INTROS = [
+    "[꿈결 같은 새벽]\n\n밭 위로 별이 유난히 밝다.\n아버지는 저 별을 보고 새벽을 가늠했다고 했다.\n별과 별을 이어 본다.",
+    "[고요한 새벽]\n\n잠 못 든 밤, 하늘에 북두칠성이 또렷하다.\n아버지가 늘 올려다보던 그 별이다.\n순서대로 이어 본다.",
 ]
 
 
@@ -104,7 +104,8 @@ class FarmScene:
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
         self.weather_minigame_cooldown = 2  # 날씨 미니게임 쿨다운 (2턴 후부터 발동 가능)
-        self.special_cooldown = random.randint(3, 5)   # 특별 이벤트('씨앗 받기')까지 남은 턴
+        self.special_cooldown = random.randint(3, 5)   # 특별 이벤트('별 잇기')까지 남은 턴
+        self.special_done = False                       # 특별 이벤트는 한 게임에 한 번만
         self.withers = 0                 # 작물이 완전히 시든 횟수 (3이면 끝내 시듦 — 배드엔딩)
         self.weak_turns = 0              # 비실비실(저체력)하게 흘려보낸 턴 — 오래 가면 끝내 시든다
         self.mistakes = 0
@@ -879,6 +880,22 @@ class FarmScene:
         if action in ("살펴보기", "수확하기"):
             return
 
+        # ── 특별 이벤트 '별 잇기' — 한 게임에 한 번, 중반에 반드시 등장 ──
+        # 예전 '씨앗 받기'는 ① 날씨 미니게임에 밀리고 ② 확률 게이트(0.6)까지 겹쳐
+        # 거의 안 떠서 사실상 못 보던 콘텐츠였고, 메커니즘도 '빗물 받기'와 겹쳤다.
+        # → 날씨 체크보다 먼저, 쿨다운이 다 되면 확정으로 띄운다.
+        if not self.special_done:
+            self.special_cooldown -= 1
+            if self.special_cooldown <= 0:
+                game_state.transition_text = random.choice(STAR_CONNECT_INTROS)
+                game_state.current_scene = "transition"
+                game_state.is_clear_transition = False
+                game_state.transition_next = "star_connect"
+                game_state.return_scene = "farm"
+                self.special_done = True
+                self.minigame_cooldown = max(self.minigame_cooldown, 4)
+                return
+
         # ── 날씨 미니게임: 매 턴 확률적으로 발동 ──
         if self.weather_minigame_cooldown > 0:
             self.weather_minigame_cooldown -= 1
@@ -890,18 +907,6 @@ class FarmScene:
 
         if self.minigame_cooldown > 0:
             self.minigame_cooldown -= 1
-            return
-
-        # 특별 이벤트 '씨앗 받기' — 밭 상태와 무관하게 몇 턴에 한 번씩 드물게 등장
-        self.special_cooldown -= 1
-        if self.special_cooldown <= 0 and random.random() < 0.6:
-            game_state.transition_text = random.choice(SEED_CATCH_INTROS)
-            game_state.current_scene = "transition"
-            game_state.is_clear_transition = False
-            game_state.transition_next = "seed_catch"
-            game_state.return_scene = "farm"
-            self.special_cooldown = random.randint(6, 9)
-            self.minigame_cooldown = 6
             return
 
         if self.weeds < 48 and self.drainage > 38:
