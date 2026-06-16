@@ -62,8 +62,8 @@ class Stage1Scene:
         self.items.append(SortItem(itype, x, y))
 
     def draw_seed_bed(self, screen):
-        """왼쪽 — 씨앗을 담는 픽셀 아트 나무 바구니(sprites['basket'])."""
-        self._blit_bin(screen, sprites['basket'], self.bin_keep)
+        """왼쪽 — 씨앗을 담는 픽셀 아트 테라코타 화분(sprites['seed_pot'])."""
+        self._blit_bin(screen, sprites['seed_pot'], self.bin_keep)
 
     def draw_trash_zone(self, screen):
         """오른쪽 — 방해물을 버리는 픽셀 아트 회색 금속통(sprites['trashcan'])."""

@@ -33,6 +33,7 @@ ACCENT_MINT = (104, 164, 118)
 ACCENT_CORAL = (213, 104, 72)
 
 import os
+import math
 import urllib.request
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "Galmuri11.ttf")
@@ -105,8 +106,9 @@ def create_sprite_from_string(sprite_str, scale=4):
         'd': (87, 51, 25, 255),   # Pit base brown
         'D': (56, 33, 15, 255),   # Pit dark shadow
         'l': (110, 65, 30, 255),  # Pit light brown speckle
-        'A': (150, 158, 156, 255),# Metal mid (gray)
-        'a': (84, 92, 92, 255),   # Metal dark (gray)
+        'c': (196, 120, 72, 255), # Terracotta clay
+        'C': (226, 158, 104, 255),# Terracotta highlight
+        'v': (146, 84, 50, 255),  # Terracotta shade
     }
     
     for y, line in enumerate(lines):
@@ -114,6 +116,74 @@ def create_sprite_from_string(sprite_str, scale=4):
             if char in colors and colors[char][3] > 0:
                 pygame.draw.rect(surf, colors[char], (x*scale, y*scale, scale, scale))
     return surf
+
+
+def _lerp(a, b, t):
+    t = max(0.0, min(1.0, t))
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def build_trashcan_sprite(S=4):
+    """회색 금속 쓰레기통 — 뚜껑이 비스듬히 열린 형태. 저해상도에 픽셀 단위로 그린 뒤
+    정수배 확대(transform.scale=nearest)해 픽셀 아트 톤을 유지한다."""
+    LW, LH = 32, 40
+    lo = pygame.Surface((LW, LH), pygame.SRCALPHA)
+    cx = (LW - 1) / 2.0
+    OUT=(46,50,52); LITE=(216,222,219); MID=(170,176,174); DRK=(104,111,111); DARK=(72,79,80); INSIDE=(36,40,41)
+    rim_top, bot = 15, 37
+    hw_top, hw_bot = 12.0, 10.2
+    def hw(y):
+        f = (y - rim_top) / (bot - rim_top); return hw_top + (hw_bot - hw_top) * f
+    ridges = {rim_top + 5, rim_top + 11, rim_top + 16}
+    for y in range(rim_top, bot + 1):
+        w = hw(y)
+        for x in range(LW):
+            dx = x - cx
+            if abs(dx) <= w:
+                t = (dx / w + 1) / 2
+                col = _lerp(LITE, DRK, t * 0.92)
+                if t < 0.24: col = _lerp(col, LITE, 0.45)
+                if y in ridges: col = _lerp(col, DARK, 0.55)
+                if abs(dx) >= w - 1: col = OUT
+                lo.set_at((x, y), col)
+    for x in range(LW):                                  # 윗 림(턱)
+        dx = x - cx
+        if abs(dx) <= hw_top + 0.7:
+            for yy in (rim_top - 2, rim_top - 1):
+                lo.set_at((x, yy), OUT if abs(dx) >= hw_top - 0.3 else _lerp(LITE, MID, (dx / hw_top + 1) / 2))
+    for x in range(LW):                                  # 받침
+        dx = x - cx
+        if abs(dx) <= hw_bot + 0.7:
+            for yy in (bot, bot + 1):
+                lo.set_at((x, yy), OUT if abs(dx) >= hw_bot - 0.3 else MID)
+    for y in range(rim_top - 3, rim_top + 3):            # 열린 입구(어두운 안쪽)
+        for x in range(LW):
+            dx = x - cx
+            if (dx / (hw_top - 1.5)) ** 2 + ((y - (rim_top - 1)) / 3.0) ** 2 <= 1.0:
+                lo.set_at((x, y), INSIDE)
+    clx, cly = cx + 3.5, rim_top - 5.0                   # 기울어진 열린 뚜껑
+    rx, ry = 11.5, 5.4
+    th = math.radians(-21); ct, st = math.cos(th), math.sin(th)
+    for y in range(0, rim_top + 3):
+        for x in range(LW):
+            ux, uy = x - clx, y - cly
+            rxr = ux * ct + uy * st; ryr = -ux * st + uy * ct
+            e = (rxr / rx) ** 2 + (ryr / ry) ** 2
+            if e <= 1.0:
+                s = (ryr / ry + 1) / 2
+                col = _lerp(LITE, DRK, s * 0.95)
+                if s < 0.25: col = _lerp(col, LITE, 0.5)
+                if s > 0.80: col = DARK
+                lo.set_at((x, y), col)
+            elif e <= 1.16:
+                lo.set_at((x, y), OUT)
+    kcx, kcy = clx + 1.2, cly - 3.6                      # 손잡이(꼭지)
+    for y in range(0, rim_top):
+        for x in range(LW):
+            d = ((x - kcx) / 2.7) ** 2 + ((y - kcy) / 2.5) ** 2
+            if d <= 1.0: lo.set_at((x, y), _lerp(LITE, MID, (y - (kcy - 2.5)) / 5.0))
+            elif d <= 1.55 and y <= kcy + 1: lo.set_at((x, y), OUT)
+    return pygame.transform.scale(lo, (LW * S, LH * S))
 
 sprites = {}
 def init_sprites():
@@ -256,24 +326,26 @@ X.XkkX.X
 ..XB...BX...
 ..XX...XX...
 ''', 7)
-    # 밭 정리(stage1)의 두 통 — 같은 좌우대칭 실루엣을 색만 바꿔 한 쌍으로(통일감).
-    # 왼쪽 = 씨앗 담는 나무 바구니, 오른쪽 = 방해물 버리는 회색 금속통.
-    _BIN_ART = '''
-.XXXXXXXXXXXXXX.
-XYYYYYYYYYYYYYYX
-XYdDDDDDDDDDDdYX
-XYBYBYBYYBYBYBYX
-XBYBYBYBBYBYBYBX
-XYBYBYBYYBYBYBYX
-XBYBYBYBBYBYBYBX
-.XYBYBYBBYBYBYX.
-..XyBYBYYBYByX..
-..XbbBBBBBBbbX..
-...XXXXXXXXXX...
-'''
-    sprites['basket'] = create_sprite_from_string(_BIN_ART, 10)
-    sprites['trashcan'] = create_sprite_from_string(
-        _BIN_ART.translate(str.maketrans({'Y': 'M', 'B': 'A', 'b': 'a', 'y': 'm', 'D': '#', 'd': 'a'})), 10)
+    # 밭 정리(stage1) 두 통 — 레퍼런스풍. 왼쪽=테라코타 화분(씨앗), 오른쪽=뚜껑 열린 회색 통(방해물).
+    # 화분은 실루엣 좌우대칭 + 방향성 음영. 통은 절차적(뚜껑 기울임).
+    sprites['seed_pot'] = create_sprite_from_string('''
+..XXXXXXXXXXXXXXXX..
+.XCCCCCCCCCCCCCCCCX.
+XCCccccccccccccccvvX
+XCdDDDDDDDDDDDDDDdvX
+XCdDlDDDlDDDlDDDdvvX
+XCvbbbbbbbbbbbbbvvvX
+.XCcccccccccccvvvX.
+.XCccccccccccccvvX.
+..XCccccccccccvvX..
+..XCccccccccccvvX..
+...XCcccccccvvvX...
+...XCccccccccvvX...
+....XvccccccvvX....
+.....XvccccvvX.....
+.....XXXXXXXX.....
+''', 8)
+    sprites['trashcan'] = build_trashcan_sprite(4)
     sprites['watering_can'] = create_sprite_from_string('''
 ....XXXXX.........
 ....X...X.....XXX.
