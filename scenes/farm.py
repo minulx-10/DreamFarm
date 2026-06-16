@@ -954,7 +954,11 @@ class FarmScene:
         font = get_font(14)
         label_surf = font.render(label, True, TEXT_DARK)
         screen.blit(label_surf, (x, y - 1))
-        bar = pygame.Rect(x + 48, y, 86, 13)
+        # 막대 오른쪽 끝은 열마다 고정(정렬 유지)하되, 시작점은 라벨 실제 폭 뒤로 둔다.
+        # '스트레스'처럼 긴 라벨이 막대에 덮여 잘리던 문제를 막는다.
+        bar_right = x + 134
+        bar_x = x + max(48, label_surf.get_width() + 6)
+        bar = pygame.Rect(bar_x, y, bar_right - bar_x, 13)
         draw_meter_bar(screen, bar, value, 100, color)
 
     def draw_labeled_meter(self, screen, label, value, max_value, x, y, w, color):

@@ -7,7 +7,7 @@ from core.game_state import (
     append_ending_journal,
 )
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
-from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
+from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
 from core import audio
 
 
@@ -298,8 +298,25 @@ class EndingScene:
         "wither": "끝내 밭을 지켜내지 못했지만, 그 숱한 새벽은 남았습니다.",
     }
 
+    # 게임이 끝난 화면에서 보이는 '종료하기' 버튼
+    EXIT_BUTTON = pygame.Rect(632, 550, 146, 40)
+
+    def _exit_visible(self):
+        return self.phase == "journal" or (self.phase == "result" and self.result_done)
+
+    def _draw_exit_button(self, screen):
+        hovered = self.EXIT_BUTTON.collidepoint(pygame.mouse.get_pos())
+        draw_button(screen, self.EXIT_BUTTON, "종료하기", self.font_small, hovered=hovered)
+
     def handle_events(self, events):
         for event in events:
+            # 끝난 화면에서는 '종료하기' 버튼으로 창을 닫는다 (다른 클릭 처리보다 먼저)
+            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                    and self._exit_visible() and self.EXIT_BUTTON.collidepoint(event.pos)):
+                save_progress()
+                game_state.running = False
+                return
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     if self.phase in ("result", "journal") or self.finished:
@@ -709,6 +726,7 @@ class EndingScene:
                 sub += "      1~7: 다른 엔딩 다시 보기"
             sub_surf = att_font.render(sub, True, (140, 134, 116))
             screen.blit(sub_surf, (400 - sub_surf.get_width() // 2, 548))
+            self._draw_exit_button(screen)
 
     def _draw_credits(self, screen):
         draw_story_backdrop(screen, "night")
@@ -783,3 +801,4 @@ class EndingScene:
         if self.gallery_unlocked():
             g = get_font(14).render("1~7: 다른 엔딩 다시 보기", True, (150, 143, 122))
             screen.blit(g, (400 - g.get_width() // 2, 578))
+        self._draw_exit_button(screen)

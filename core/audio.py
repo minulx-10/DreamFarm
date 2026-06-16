@@ -345,5 +345,45 @@ def is_muted():
     return _muted
 
 
+def set_muted(value):
+    """음소거 상태를 명시적으로 지정."""
+    global _muted
+    if bool(value) == _muted:
+        return _muted
+    return toggle_mute()
+
+
+def get_sfx_volume():
+    return _sfx_volume
+
+
+def set_sfx_volume(v):
+    """효과음 음량(0.0~1.0)을 즉시 반영."""
+    global _sfx_volume
+    _sfx_volume = max(0.0, min(1.0, float(v)))
+    for snd in _sfx.values():
+        try:
+            snd.set_volume(_sfx_volume)
+        except Exception:
+            pass
+    return _sfx_volume
+
+
+def get_bgm_volume():
+    return _bgm_volume
+
+
+def set_bgm_volume(v):
+    """배경음 음량(0.0~1.0)을 즉시 반영."""
+    global _bgm_volume
+    _bgm_volume = max(0.0, min(1.0, float(v)))
+    if _bgm_channel is not None and not _muted:
+        try:
+            _bgm_channel.set_volume(_bgm_volume)
+        except Exception:
+            pass
+    return _bgm_volume
+
+
 def is_enabled():
     return _enabled

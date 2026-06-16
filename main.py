@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.game_state import game_state, apply_second_run
 from core import audio
+from core.settings_overlay import SettingsOverlay
 from scenes.name_input import NameInputScene
 from scenes.intro import IntroScene
 from scenes.transition import TransitionScene
@@ -67,6 +68,8 @@ def main():
 
     scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}
 
+    settings_overlay = SettingsOverlay()
+
     current_key = game_state.current_scene
     current_scene_obj = scenes[current_key]
 
@@ -94,12 +97,17 @@ def main():
         for event in events:
             if event.type == pygame.QUIT:
                 game_state.running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:
-                audio.toggle_mute()
 
-        current_scene_obj.handle_events(events)
+        # 소리 설정 창이 입력을 가로채면 씬으로 넘기지 않는다
+        if not settings_overlay.handle_events(events):
+            for event in events:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                    audio.toggle_mute()
+            current_scene_obj.handle_events(events)
+
         current_scene_obj.update(dt)
         current_scene_obj.draw(screen)
+        settings_overlay.draw(screen)
 
         pygame.display.flip()
 

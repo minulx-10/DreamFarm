@@ -300,7 +300,7 @@ def draw_top_bar(screen, show_stats=True):
         title_text = "몽중농원"
         title_surf = get_font(27).render(title_text, True, WHITE)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 24))
-        draw_mute_icon(screen, 744, 22)
+        # 음소거/음량은 오른쪽 위 스피커 버튼(소리 설정)에서 관리
 
 
 def draw_bottom_bar(screen, obj_name, obj_desc):
