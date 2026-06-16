@@ -2,6 +2,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_DARK, TEXT_MUTED, GOLD, WHITE
 from core.ui import draw_light_panel, draw_story_backdrop
+from core import audio
 
 class NameInputScene:
     def __init__(self):
@@ -22,15 +23,19 @@ class NameInputScene:
             elif event.type == pygame.TEXTINPUT:
                 if len(self.input_text) + len(event.text) <= 8:
                     self.input_text += event.text
+                    audio.type_tick(event.text)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
+                        audio.play("success")
                         game_state.player_name = self.input_text.strip()
                         game_state.current_scene = "intro"
                         pygame.key.stop_text_input()
                 elif event.key == pygame.K_BACKSPACE:
                     if len(self.ime_text) == 0:
-                        self.input_text = self.input_text[:-1]
+                        if len(self.input_text) > 0:
+                            self.input_text = self.input_text[:-1]
+                            audio.play("click")
 
     def update(self, dt):
         pass

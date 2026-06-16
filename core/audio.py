@@ -210,6 +210,39 @@ def _sfx_thud():
     return _to_sound(w, 0.45)
 
 
+def _sfx_pest():
+    """찌직, 톡 — 해충을 누를 때 나는 터지는 효과음."""
+    dur = 0.08
+    t = _t(dur)
+    pitch = 800 * np.exp(-15 * t) + 120
+    crush = _lowpass(_noise(dur), 0.12) * 0.7
+    w = _mix(np.sin(2 * np.pi * pitch * t) * 0.45, crush) * _adsr(dur, a=0.001, d=0.02, s=0.15, r=0.04)
+    return _to_sound(w, 0.42)
+
+
+def _sfx_memory_in():
+    """회상 씬 진입음 — 몽환적인 신스 아르페지오."""
+    notes = [261.63, 329.63, 392.0, 523.25, 659.25]
+    total = np.zeros(int(SAMPLE_RATE * 1.5))
+    for i, f in enumerate(notes):
+        tone = _tone(f, 0.9, harmonics=(1.0, 0.25), detune=0.002) * _adsr(0.9, a=0.05, d=0.15, s=0.4, r=0.3)
+        start = int(SAMPLE_RATE * 0.08 * i)
+        total[start:start + len(tone)] += tone * 0.35
+    peak = np.max(np.abs(total)) or 1.0
+    return _to_sound(total / peak, 0.38)
+
+
+def _sfx_memory_out():
+    """회상 씬 이탈음 — 슈우우욱 번쩍하며 퍼지는 소리."""
+    dur = 1.0
+    t = _t(dur)
+    sweep_noise = _lowpass(_noise(dur), 0.05) * np.linspace(0.0, 1.0, len(t))
+    pitch = 440 * np.exp(-1.5 * t) + 80
+    tone = np.sin(2 * np.pi * pitch * t) * (1.0 - t) * 0.3
+    w = _mix(sweep_noise * 0.9, tone) * _adsr(dur, a=0.2, d=0.2, s=0.6, r=0.4)
+    return _to_sound(w, 0.4)
+
+
 _SFX_BUILDERS = {
     "click": _sfx_click,
     "hover": _sfx_hover,
@@ -225,6 +258,9 @@ _SFX_BUILDERS = {
     "pop": _sfx_pop,
     "chirp": _sfx_chirp,
     "thud": _sfx_thud,
+    "pest": _sfx_pest,
+    "memory_in": _sfx_memory_in,
+    "memory_out": _sfx_memory_out,
 }
 
 

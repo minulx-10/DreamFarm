@@ -277,7 +277,7 @@ class PestTap:
             for b in self.bugs:
                 if not b["dead"] and abs(event.pos[0] - b["x"]) < 20 and abs(event.pos[1] - b["y"]) < 20:
                     b["dead"] = True
-                    audio.play("click")
+                    audio.play("pest")
                     self.puffs.append([b["x"], b["y"], 0.35])
                     break
             if all(b["dead"] for b in self.bugs):

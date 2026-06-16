@@ -22,6 +22,7 @@ class MemoryScene:
         self.phase = "fade_in"
         self.transition_alpha = 255
         self.exit_flash = 0
+        audio.play("memory_in")
 
     def prepare_text(self, text):
         lines = []
@@ -45,6 +46,7 @@ class MemoryScene:
                 elif self.phase != "fade_out":
                     self.phase = "fade_out"
                     self.exit_flash = 180
+                    audio.play("memory_out")
 
     def update(self, dt):
         if self.phase == "fade_in":
