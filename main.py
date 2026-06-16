@@ -36,11 +36,14 @@ def main():
     apply_second_run()
 
     # 씬별 배경음 매핑 (None이면 현재 곡 유지)
+    # None = 현재 곡 유지(전환마다 처음부터 다시 트는 '리셋' 방지).
+    # 밭 단계 중간에 끼는 회상·스토리·아버지의 하루·별 잇기는 곡을 바꾸지 않아
+    # 밭 배경음이 끊기지 않고 길게 이어진다. 곡 전환은 도입(밤)과 엔딩에서만.
     BGM_BY_SCENE = {
-        "name_input": "night", "intro": "night", "memory": "night",
-        "story_choice": "night", "father_day": "night",
+        "name_input": "night", "intro": "night",
+        "memory": None, "story_choice": None, "father_day": None,
         "farm": "farm", "stage1": "farm", "stage2": "farm",
-        "stage3": "farm", "stage4": "farm", "star_connect": "night",
+        "stage3": "farm", "stage4": "farm", "star_connect": None,
         "ending": None,
         "transition": None, "epiphany": None,
     }

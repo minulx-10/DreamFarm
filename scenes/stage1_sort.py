@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from core.game_state import game_state
 from core.assets import *
 from core import audio
@@ -86,48 +87,66 @@ class Stage1Scene:
         pygame.draw.ellipse(screen, (66, 42, 26), inner.inflate(-30, -8))
         pygame.draw.arc(screen, mix_color(clay_hi, WHITE, 0.4), lip.inflate(-12, -8), 3.3, 6.1, 3)   # 림 광택
 
+    def _build_barrel(self):
+        """방해물을 버리는 나무 거름통 — 테라코타 화분과 어울리는 농가 소품.
+        정적 그림이라 서피스에 한 번만 그려 캐시한다."""
+        W, H = 176, 138
+        surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        lcx = W // 2
+        top_y, bot_y = 26, 124
+        span = bot_y - top_y
+        top_hw, mid_hw, bot_hw = 52, 65, 47
+        wood = (150, 100, 58); wood_dk = (96, 62, 36); wood_hi = (198, 144, 92)
+        hoop = (120, 92, 70); hoop_hi = (188, 158, 126); hoop_dk = (64, 46, 34)
+
+        def hw(ry):
+            f = (ry - top_y) / span
+            bulge = math.sin(f * math.pi)                      # 0..1..0 (배부른 곡선)
+            return (top_hw + (bot_hw - top_hw) * f) + (mid_hw - (top_hw + bot_hw) / 2) * bulge
+
+        # 몸통 채움 + 둥근 곡면 음영 (세로 1px 컬럼, 왼쪽이 약간 밝게)
+        maxhw = int(mid_hw) + 1
+        rows = list(range(top_y, bot_y + 1))
+        for px in range(-maxhw, maxhw + 1):
+            fr = (px + maxhw) / (2 * maxhw)
+            shade = min(1.0, abs(fr - 0.40) * 1.75)
+            col = mix_color(wood_hi, wood_dk, shade)
+            inside = [ry for ry in rows if hw(ry) >= abs(px)]
+            if inside:
+                pygame.draw.line(surf, col, (lcx + px, inside[0]), (lcx + px, inside[-1]))
+
+        # 세로 판자 이음새
+        for s in (-2, -1, 0, 1, 2):
+            seam = [(lcx + s * 24 * (hw(ry) / mid_hw), ry)
+                    for ry in range(top_y + 6, bot_y - 2, 3) if abs(s * 24) < hw(ry) - 3]
+            if len(seam) > 1:
+                pygame.draw.lines(surf, mix_color(wood_dk, BLACK, 0.12), False, seam, 1)
+
+        # 금속 테(후프) 2줄 — 통 곡률 따라 감긴 띠
+        for ry in (top_y + 22, bot_y - 16):
+            w_ = hw(ry)
+            band = pygame.Rect(int(lcx - w_), ry - 6, int(w_ * 2), 13)
+            pygame.draw.ellipse(surf, hoop, band)
+            pygame.draw.ellipse(surf, hoop_hi, (band.x + 4, band.y + 2, band.w - 8, 4))
+            pygame.draw.ellipse(surf, hoop_dk, band, 1)
+
+        # 열린 윗면 — 나무 림 + 어두운 입구
+        rim = pygame.Rect(int(lcx - top_hw), top_y - 14, int(top_hw * 2), 28)
+        pygame.draw.ellipse(surf, wood, rim)
+        pygame.draw.ellipse(surf, wood_hi, (rim.x + 3, rim.y + 2, rim.w - 6, 9))
+        inner = rim.inflate(-16, -9)
+        pygame.draw.ellipse(surf, (54, 38, 28), inner)
+        pygame.draw.ellipse(surf, (34, 24, 18), inner.inflate(-22, -7))
+        pygame.draw.ellipse(surf, wood_dk, rim, 2)
+        return surf
+
     def draw_trash_zone(self, screen):
-        """오른쪽 '통' — 뚜껑이 비스듬히 열린 양철 쓰레기통 (방해물을 여기로)."""
-        x, y, w, h = self.bin_trash
-        cx = x + w // 2
-        top_y, bot_y = 392, 492
-        th, bh = 56, 48
-        met = (170, 174, 170); met_dk = (102, 106, 102); met_hi = (214, 218, 212)
-        # 바닥 그림자
-        pygame.draw.ellipse(screen, (38, 30, 24), (cx - bh - 8, bot_y - 12, (bh + 8) * 2, 26))
-        # 몸통(살짝 좁아지는 원통)
-        body = [(cx - th, top_y), (cx + th, top_y), (cx + bh, bot_y), (cx - bh, bot_y)]
-        pygame.draw.polygon(screen, met, body)
-        # 원통 음영 (왼쪽 밝음 → 오른쪽 어둠)
-        for i in range(-4, 5):
-            col = mix_color(met_hi, met_dk, (i + 4) / 8)
-            pygame.draw.line(screen, col, (cx + int(i / 4 * th), top_y + 6), (cx + int(i / 4 * bh), bot_y - 4), 4)
-        # 가로 골(2줄)
-        def half_at(ry):
-            f = (ry - top_y) / (bot_y - top_y)
-            return th + (bh - th) * f
-        for ry in (top_y + 26, bot_y - 26):
-            hw = half_at(ry)
-            pygame.draw.line(screen, mix_color(met_dk, BLACK, 0.15), (cx - hw + 5, ry), (cx + hw - 5, ry), 3)
-            pygame.draw.line(screen, met_hi, (cx - hw + 5, ry + 4), (cx + hw - 5, ry + 4), 1)
-        pygame.draw.polygon(screen, (56, 58, 56), body, 3)
-        # 림 + 어두운 입구
-        rim = pygame.Rect(cx - th - 6, top_y - 15, (th + 6) * 2, 30)
-        pygame.draw.ellipse(screen, met_hi, rim)
-        pygame.draw.ellipse(screen, (56, 58, 56), rim, 3)
-        pygame.draw.ellipse(screen, (40, 42, 41), rim.inflate(-14, -8))
-        # 비스듬히 열린 뚜껑 (오른쪽 위로 들림)
-        lid_surf = pygame.Surface((130, 42), pygame.SRCALPHA)
-        pygame.draw.ellipse(lid_surf, met, (0, 0, 130, 42))
-        pygame.draw.ellipse(lid_surf, met_hi, (6, 4, 118, 16))
-        pygame.draw.ellipse(lid_surf, (56, 58, 56), (0, 0, 130, 42), 3)
-        pygame.draw.circle(lid_surf, met_hi, (65, 21), 8)
-        pygame.draw.circle(lid_surf, (56, 58, 56), (65, 21), 8, 2)
-        lid_rot = pygame.transform.rotate(lid_surf, 38)
-        lr = lid_rot.get_rect(center=(cx + 66, top_y - 30))
-        screen.blit(lid_rot, lr)
-        # 경첩
-        pygame.draw.line(screen, (62, 64, 62), (cx + th - 8, top_y - 3), (cx + 42, top_y - 16), 5)
+        """오른쪽 '통' — 방해물을 여기로. 나무 거름통."""
+        if not hasattr(self, "_barrel"):
+            self._barrel = self._build_barrel()
+        cx = self.bin_trash.x + self.bin_trash.width // 2
+        pygame.draw.ellipse(screen, (38, 28, 20), (cx - 70, 486, 140, 24))   # 바닥 그림자
+        screen.blit(self._barrel, (cx - self._barrel.get_width() // 2, 372))
 
     def handle_events(self, events):
         if self.stage_clear: return
