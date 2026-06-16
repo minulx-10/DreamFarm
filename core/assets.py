@@ -106,9 +106,6 @@ def create_sprite_from_string(sprite_str, scale=4):
         'd': (87, 51, 25, 255),   # Pit base brown
         'D': (56, 33, 15, 255),   # Pit dark shadow
         'l': (110, 65, 30, 255),  # Pit light brown speckle
-        'c': (196, 120, 72, 255), # Terracotta clay
-        'C': (226, 158, 104, 255),# Terracotta highlight
-        'v': (146, 84, 50, 255),  # Terracotta shade
     }
     
     for y, line in enumerate(lines):
@@ -123,66 +120,50 @@ def _lerp(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def build_trashcan_sprite(S=4):
-    """회색 금속 쓰레기통 — 뚜껑이 비스듬히 열린 형태. 저해상도에 픽셀 단위로 그린 뒤
-    정수배 확대(transform.scale=nearest)해 픽셀 아트 톤을 유지한다."""
-    LW, LH = 32, 40
+def _smooth(t):
+    t = max(0.0, min(1.0, t)); return t * t * (3 - 2 * t)
+
+
+# 밭 정리(stage1) 두 통: 같은 '둥근 통' 한 모양을 색만 바꿔 한 쌍으로 → 대칭 + 통일성.
+_TUB_BASKET = ((212,172,112),(176,128,78),(120,82,46),(224,188,132),(78,54,34),(132,92,54),(60,42,28))
+_TUB_TRASH  = ((214,220,216),(166,173,171),(96,103,103),(224,230,226),(46,50,51),(110,117,117),(50,55,56))
+
+def build_tub_sprite(pal, S=6):
+    """좌우 완벽 대칭 둥근 통. 색이 |dx|(중심에서의 거리)에만 의존하므로 미러 대칭이 보장된다.
+    저해상도에 픽셀로 그린 뒤 정수배 nearest 확대 → 픽셀 톤 유지."""
+    LW, LH = 23, 19
     lo = pygame.Surface((LW, LH), pygame.SRCALPHA)
     cx = (LW - 1) / 2.0
-    OUT=(46,50,52); LITE=(216,222,219); MID=(170,176,174); DRK=(104,111,111); DARK=(72,79,80); INSIDE=(36,40,41)
-    rim_top, bot = 15, 37
-    hw_top, hw_bot = 12.0, 10.2
+    LITE, MID, DRK, RIM, MOUTH, BAND, OUT = pal
+    rim_y, body_top, bot = 2, 3, 16
+    hw_top, hw_mid, hw_bot = 10.2, 10.6, 8.4
     def hw(y):
-        f = (y - rim_top) / (bot - rim_top); return hw_top + (hw_bot - hw_top) * f
-    ridges = {rim_top + 5, rim_top + 11, rim_top + 16}
-    for y in range(rim_top, bot + 1):
+        f = (y - body_top) / (bot - body_top); base = hw_top + (hw_bot - hw_top) * f
+        return base + (hw_mid - (hw_top + hw_bot) / 2) * math.sin(f * math.pi)   # 살짝 둥근 배
+    bands = {body_top + 4, body_top + 9}
+    for y in range(body_top, bot + 1):
         w = hw(y)
         for x in range(LW):
-            dx = x - cx
-            if abs(dx) <= w:
-                t = (dx / w + 1) / 2
-                col = _lerp(LITE, DRK, t * 0.92)
-                if t < 0.24: col = _lerp(col, LITE, 0.45)
-                if y in ridges: col = _lerp(col, DARK, 0.55)
-                if abs(dx) >= w - 1: col = OUT
+            dx = abs(x - cx)
+            if dx <= w:
+                col = _lerp(LITE, DRK, _smooth((dx / w) * 0.92))
+                if y in bands: col = _lerp(col, BAND, 0.55)
+                if dx >= w - 1: col = OUT
                 lo.set_at((x, y), col)
-    for x in range(LW):                                  # 윗 림(턱)
-        dx = x - cx
-        if abs(dx) <= hw_top + 0.7:
-            for yy in (rim_top - 2, rim_top - 1):
-                lo.set_at((x, yy), OUT if abs(dx) >= hw_top - 0.3 else _lerp(LITE, MID, (dx / hw_top + 1) / 2))
-    for x in range(LW):                                  # 받침
-        dx = x - cx
-        if abs(dx) <= hw_bot + 0.7:
-            for yy in (bot, bot + 1):
-                lo.set_at((x, yy), OUT if abs(dx) >= hw_bot - 0.3 else MID)
-    for y in range(rim_top - 3, rim_top + 3):            # 열린 입구(어두운 안쪽)
+    for x in range(LW):                                          # 윗 림
+        dx = abs(x - cx)
+        if dx <= hw_top + 0.6:
+            for yy in (rim_y, rim_y + 1):
+                lo.set_at((x, yy), OUT if dx >= hw_top else _lerp(RIM, MID, _smooth(dx / hw_top)))
+    for y in range(rim_y, body_top + 3):                         # 어두운 입구(타원)
         for x in range(LW):
-            dx = x - cx
-            if (dx / (hw_top - 1.5)) ** 2 + ((y - (rim_top - 1)) / 3.0) ** 2 <= 1.0:
-                lo.set_at((x, y), INSIDE)
-    clx, cly = cx + 3.5, rim_top - 5.0                   # 기울어진 열린 뚜껑
-    rx, ry = 11.5, 5.4
-    th = math.radians(-21); ct, st = math.cos(th), math.sin(th)
-    for y in range(0, rim_top + 3):
-        for x in range(LW):
-            ux, uy = x - clx, y - cly
-            rxr = ux * ct + uy * st; ryr = -ux * st + uy * ct
-            e = (rxr / rx) ** 2 + (ryr / ry) ** 2
-            if e <= 1.0:
-                s = (ryr / ry + 1) / 2
-                col = _lerp(LITE, DRK, s * 0.95)
-                if s < 0.25: col = _lerp(col, LITE, 0.5)
-                if s > 0.80: col = DARK
-                lo.set_at((x, y), col)
-            elif e <= 1.16:
-                lo.set_at((x, y), OUT)
-    kcx, kcy = clx + 1.2, cly - 3.6                      # 손잡이(꼭지)
-    for y in range(0, rim_top):
-        for x in range(LW):
-            d = ((x - kcx) / 2.7) ** 2 + ((y - kcy) / 2.5) ** 2
-            if d <= 1.0: lo.set_at((x, y), _lerp(LITE, MID, (y - (kcy - 2.5)) / 5.0))
-            elif d <= 1.55 and y <= kcy + 1: lo.set_at((x, y), OUT)
+            dx = abs(x - cx)
+            if (dx / (hw_top - 1.4)) ** 2 + ((y - body_top) / 2.4) ** 2 <= 1.0:
+                lo.set_at((x, y), MOUTH if y > rim_y else _lerp(RIM, MID, 0.3))
+    for x in range(LW):                                          # 바닥 외곽
+        dx = abs(x - cx)
+        if dx <= hw_bot:
+            lo.set_at((x, bot), OUT if dx >= hw_bot - 1 else DRK)
     return pygame.transform.scale(lo, (LW * S, LH * S))
 
 sprites = {}
@@ -326,26 +307,10 @@ X.XkkX.X
 ..XB...BX...
 ..XX...XX...
 ''', 7)
-    # 밭 정리(stage1) 두 통 — 레퍼런스풍. 왼쪽=테라코타 화분(씨앗), 오른쪽=뚜껑 열린 회색 통(방해물).
-    # 화분은 실루엣 좌우대칭 + 방향성 음영. 통은 절차적(뚜껑 기울임).
-    sprites['seed_pot'] = create_sprite_from_string('''
-..XXXXXXXXXXXXXXXX..
-.XCCCCCCCCCCCCCCCCX.
-XCCccccccccccccccvvX
-XCdDDDDDDDDDDDDDDdvX
-XCdDlDDDlDDDlDDDdvvX
-XCvbbbbbbbbbbbbbvvvX
-.XCcccccccccccvvvX.
-.XCccccccccccccvvX.
-..XCccccccccccvvX..
-..XCccccccccccvvX..
-...XCcccccccvvvX...
-...XCccccccccvvX...
-....XvccccccvvX....
-.....XvccccvvX.....
-.....XXXXXXXX.....
-''', 8)
-    sprites['trashcan'] = build_trashcan_sprite(4)
+    # 밭 정리(stage1) 두 통 — 같은 둥근 통 모양을 색만 바꿔 한 쌍으로(완벽 대칭 + 통일).
+    # 왼쪽 = 씨앗 담는 따뜻한 통, 오른쪽 = 방해물 버리는 회색 통.
+    sprites['basket'] = build_tub_sprite(_TUB_BASKET, 6)
+    sprites['trashcan'] = build_tub_sprite(_TUB_TRASH, 6)
     sprites['watering_can'] = create_sprite_from_string('''
 ....XXXXX.........
 ....X...X.....XXX.
