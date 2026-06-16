@@ -261,7 +261,9 @@ def _build_all():
             print("SFX build failed:", name, e)
     for name, builder in _BGM_BUILDERS.items():
         try:
-            _bgm_sounds[name] = builder()
+            # 배경음 빌더는 numpy 파형을 돌려주므로 반드시 Sound로 변환해야 한다.
+            # (이 변환이 빠져 있어 play_bgm의 set_volume에서 조용히 실패, 배경음이 안 나오던 버그)
+            _bgm_sounds[name] = _to_sound(builder(), 0.9)
         except Exception as e:
             print("BGM build failed:", name, e)
 

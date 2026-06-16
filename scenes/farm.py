@@ -46,6 +46,12 @@ MINIGAME_INTROS = {
     ],
 }
 
+# 가끔 등장하는 특별 이벤트 미니게임 '씨앗 받기' 진입 문구
+SEED_CATCH_INTROS = [
+    "[특별한 새벽]\n\n간밤의 바람에 씨앗 봉지가 터졌다.\n흩날리는 씨앗을, 바구니로 받아 보자.",
+    "[돌발 상황]\n\n바람이 씨앗과 잎을 한꺼번에 날려 보낸다.\n쓸 것만 골라 바구니에 담아야 한다.",
+]
+
 
 class Button:
     def __init__(self, x, y, w, h, text, value, font_size=20):
@@ -96,6 +102,7 @@ class FarmScene:
         self.notice = "밭의 상태부터 천천히 살펴보자."
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
+        self.special_cooldown = random.randint(3, 5)   # 특별 이벤트('씨앗 받기')까지 남은 턴
         self.withers = 0                 # 작물이 완전히 시든 횟수 (3이면 끝내 시듦 — 배드엔딩)
         self.weak_turns = 0              # 비실비실(저체력)하게 흘려보낸 턴 — 오래 가면 끝내 시든다
         self.mistakes = 0
@@ -861,6 +868,19 @@ class FarmScene:
         if self.minigame_cooldown > 0:
             self.minigame_cooldown -= 1
             return
+
+        # 특별 이벤트 '씨앗 받기' — 밭 상태와 무관하게 몇 턴에 한 번씩 드물게 등장
+        self.special_cooldown -= 1
+        if self.special_cooldown <= 0 and random.random() < 0.6:
+            game_state.transition_text = random.choice(SEED_CATCH_INTROS)
+            game_state.current_scene = "transition"
+            game_state.is_clear_transition = False
+            game_state.transition_next = "seed_catch"
+            game_state.return_scene = "farm"
+            self.special_cooldown = random.randint(6, 9)
+            self.minigame_cooldown = 6
+            return
+
         if self.weeds < 48 and self.drainage > 38:
             return  # 밭이 충분히 정돈돼 있으면 굳이 부르지 않음
         if random.random() >= 0.14:

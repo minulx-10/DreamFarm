@@ -18,8 +18,8 @@ class SettingsOverlay:
         self.open = False
         self._drag = None  # None | "bgm" | "sfx"
 
-        # 오른쪽 위 고정 버튼 (점수/제목과 겹치지 않는 자리)
-        self.button = pygame.Rect(760, 21, 26, 26)
+        # 오른쪽 위 고정 버튼 (점수 박스 오른쪽, 상단 바 안쪽 자리)
+        self.button = pygame.Rect(746, 27, 28, 28)
 
         # 가운데 모달 패널
         self.panel = pygame.Rect(232, 166, 336, 272)

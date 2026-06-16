@@ -281,7 +281,8 @@ def draw_top_bar(screen, show_stats=True):
 
     if show_stats:
         timer_rect = pygame.Rect(28, 23, 222, 34)
-        score_rect = pygame.Rect(550, 23, 214, 34)
+        # 오른쪽 끝에 소리 설정 버튼 자리를 남기려고 점수 박스를 살짝 좁힘
+        score_rect = pygame.Rect(550, 23, 186, 34)
         pygame.draw.rect(screen, (29, 38, 40), timer_rect, border_radius=8)
         pygame.draw.rect(screen, (29, 38, 40), score_rect, border_radius=8)
         pygame.draw.rect(screen, (79, 96, 92), timer_rect, 1, border_radius=8)
