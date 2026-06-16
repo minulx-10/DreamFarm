@@ -62,25 +62,21 @@ class Stage1Scene:
         self.items.append(SortItem(itype, x, y))
 
     def draw_seed_bed(self, screen):
-        """왼쪽 '밭' — 씨앗을 담는 픽셀 아트 테라코타 화분(sprites['seed_pot'])."""
-        spr = sprites['seed_pot']
-        cx = self.bin_keep.x + self.bin_keep.width // 2
-        pw, ph = spr.get_width(), spr.get_height()
-        shadow = pygame.Surface((pw, 24), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (30, 22, 16, 120), (0, 0, pw, 24))
-        screen.blit(shadow, (cx - pw // 2, 492))
-        screen.blit(spr, (cx - pw // 2, 500 - ph))
+        """왼쪽 — 씨앗을 담는 픽셀 아트 나무 바구니(sprites['basket'])."""
+        self._blit_bin(screen, sprites['basket'], self.bin_keep)
 
     def draw_trash_zone(self, screen):
-        """오른쪽 '통' — 방해물을 여기로. 픽셀 아트 나무 거름통(sprites['barrel'])."""
-        spr = sprites['barrel']
-        cx = self.bin_trash.x + self.bin_trash.width // 2
-        bw, bh = spr.get_width(), spr.get_height()
-        # 바닥 그림자
-        shadow = pygame.Surface((bw, 24), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (30, 22, 16, 120), (0, 0, bw, 24))
-        screen.blit(shadow, (cx - bw // 2, 484))
-        screen.blit(spr, (cx - bw // 2, 492 - bh))
+        """오른쪽 — 방해물을 버리는 픽셀 아트 회색 금속통(sprites['trashcan'])."""
+        self._blit_bin(screen, sprites['trashcan'], self.bin_trash)
+
+    def _blit_bin(self, screen, spr, zone):
+        """두 통을 같은 방식·같은 바닥선으로 그려 통일감을 준다."""
+        cx = zone.x + zone.width // 2
+        w, h = spr.get_width(), spr.get_height()
+        shadow = pygame.Surface((w, 22), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (30, 22, 16, 120), (0, 0, w, 22))
+        screen.blit(shadow, (cx - w // 2, 490))
+        screen.blit(spr, (cx - w // 2, 500 - h))
 
     def handle_events(self, events):
         if self.stage_clear: return
