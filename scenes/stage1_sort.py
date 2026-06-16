@@ -49,8 +49,9 @@ class Stage1Scene:
         for _ in range(3): self.spawn_item('leaf')
             
         self.dragged_item = None
-        self.bin_keep = pygame.Rect(145, 348, 182, 148)
-        self.bin_trash = pygame.Rect(548, 326, 178, 170)
+        # 화면 중심(x=400) 기준 좌우 대칭으로 배치 — 한쪽으로 쏠리지 않게.
+        self.bin_keep = pygame.Rect(114, 366, 192, 146)    # 중심 x=210
+        self.bin_trash = pygame.Rect(494, 366, 192, 146)   # 중심 x=590
         self.hovered_name = "밭 준비하기"
         self.hovered_desc = "씨앗은 왼쪽 밭으로, 방해물은 오른쪽 통으로 옮기세요."
         self.stage_clear = False

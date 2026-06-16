@@ -258,25 +258,24 @@ X.XkkX.X
     # 밭 정리(stage1) 두 통 — 게임의 다른 스프라이트(돌멩이·당근 등)와 같은 납작 픽셀 방식.
     # 한 모양(좌우대칭)을 색만 바꿔: 왼쪽 = 나무색 통(씨앗), 오른쪽 = 회색 통(방해물).
     _BIN_ART = '''
-..XXXXXXXXXXXXX..
-.XYYYYYYYYYYYYYX.
-XYDDDDDDDDDDDDDYX
-XYBBBBBBBBBBBBBYX
-XYBBBBBBBBBBBBBYX
-XYBbBBBBBBBBBbBYX
-XYBBBBBBBBBBBBBYX
-XYBBBBBBBBBBBBBYX
-XYBbBBBBBBBBBbBYX
-XYBBBBBBBBBBBBBYX
-XYBBBBBBBBBBBBBYX
-.XYBBBBBBBBBBBYX.
+..XXXXXXXXXXXX..
+.XYYYYYYYYYYYYX.
+XYbDDDDDDDDDDbYX
 .XbBBBBBBBBBBbX.
-..XbbbbbbbbbbbX..
-...XXXXXXXXXXX...
+.XbBBBBBBBBBBbX.
+.XbBlBBBBBBlBbX.
+.XbBBBBBBBBBBbX.
+..XbBBBBBBBBbX..
+..XbBlBBBBlBbX..
+..XbBBBBBBBBbX..
+...XbBBBBBBbX...
+...XbbBBBBbbX...
+....XbbbbbbX....
+....XXXXXXXX....
 '''
     sprites['basket'] = create_sprite_from_string(_BIN_ART, 6)
     sprites['trashcan'] = create_sprite_from_string(
-        _BIN_ART.translate(str.maketrans({'Y': 'W', 'B': 'M', 'b': 'm', 'D': '#'})), 6)
+        _BIN_ART.translate(str.maketrans({'Y': 'W', 'B': 'M', 'b': 'm', 'D': '#', 'l': 'm'})), 6)
     sprites['watering_can'] = create_sprite_from_string('''
 ....XXXXX.........
 ....X...X.....XXX.
