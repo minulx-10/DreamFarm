@@ -343,6 +343,121 @@ class PestTap:
             _counter(screen, f"남은 벌레 {remain}", self.timer / 6.0)
 
 
+class SoilMound:
+    """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
+    잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""
+    PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
+
+    def __init__(self, farm):
+        self.farm = farm
+        pts = farm.crop_positions() or [(PLOT.centerx, PLOT.centery)]
+        self.spots = [
+            {"x": cx, "y": cy, "fill": 0.0,
+             "need": random.uniform(0.85, 1.0), "done": False}   # 변형: 자리마다 필요량
+            for (cx, cy) in pts
+        ]
+        self.total = len(self.spots)
+        self.raking = False
+        self.mx, self.my = 0, 0
+        self.timer = 6.5
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+        self.puffs = []
+        self.rake_played = False
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.raking = True
+            self.mx, self.my = event.pos
+        elif event.type == pygame.MOUSEMOTION:
+            self.mx, self.my = event.pos
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.raking = False
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self.timer -= dt
+        if self.raking:
+            near = False
+            for s in self.spots:
+                if s["done"]:
+                    continue
+                if abs(self.mx - s["x"]) < 40 and abs(self.my - s["y"]) < 34:
+                    near = True
+                    if not self.rake_played:
+                        audio.play("soil"); self.rake_played = True
+                    s["fill"] += 1.7 * dt
+                    if s["fill"] >= s["need"]:
+                        s["fill"] = s["need"]; s["done"] = True
+                        audio.play("soil")
+                        self.puffs.append([s["x"], s["y"] + 10, 0.4])
+            if not near:
+                self.rake_played = False   # 자리를 벗어나면 다시 닿을 때 사각사각
+        else:
+            self.rake_played = False
+        for p in self.puffs:
+            p[2] -= dt
+        self.puffs = [p for p in self.puffs if p[2] > 0]
+        if self.timer <= 0 or all(s["done"] for s in self.spots):
+            self._resolve()
+
+    def _resolve(self):
+        done = sum(1 for s in self.spots if s["done"])
+        frac = done / max(1, self.total)
+        if frac >= 0.85:
+            self.feedback = "두둑이 북돋우니 흙에 생기가 돈다!"; self.feedback_color = (150, 230, 150); audio.play("success")
+        elif frac >= 0.45:
+            self.feedback = "흙을 어느 정도 다독였다."; self.feedback_color = (220, 205, 140); audio.play("page")
+        else:
+            self.feedback = "북돋다 말아 뿌리가 허전하다."; self.feedback_color = (225, 175, 130); audio.play("page")
+        self.result = {"quality": "soil", "cleared_frac": frac}
+        self.settle = 1.0
+
+    def draw(self, screen):
+        _veil(screen)
+        for s in self.spots:
+            cx, cy = s["x"], s["y"]
+            f = s["fill"] / max(0.01, s["need"])
+            pit = pygame.Surface((52, 22), pygame.SRCALPHA)
+            pygame.draw.ellipse(pit, (40, 26, 16, 150), (0, 0, 52, 22))     # 파인 자리
+            screen.blit(pit, (cx - 26, cy + 6))
+            if f > 0.02:                                                    # 쌓이는 두둑
+                h = int(16 * f); w = int(20 + 26 * f)
+                mound = pygame.Surface((w, h + 12), pygame.SRCALPHA)
+                base = (150, 104, 62) if s["done"] else (120, 78, 48)
+                pygame.draw.ellipse(mound, (*base, 235), (0, 8, w, h + 2))
+                pygame.draw.ellipse(mound, (176, 128, 78, 230), (3, 6, w - 6, max(3, h - 2)))
+                screen.blit(mound, (cx - w // 2, cy + 6 - h))
+            if not s["done"]:                                              # 덮으라는 신호 빛
+                glow = pygame.Surface((46, 22), pygame.SRCALPHA)
+                pygame.draw.ellipse(glow, (255, 232, 150, 70), (0, 0, 46, 22))
+                screen.blit(glow, (cx - 23, cy + 6))
+        for p in self.puffs:
+            r = int(13 * (1 - p[2] / 0.4)) + 4
+            su = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(su, (150, 110, 70, int(150 * (p[2] / 0.4))), (r, r), r)
+            screen.blit(su, (p[0] - r, p[1] - r))
+        if self.raking and self.result is None:                            # 흙손 커서
+            ring = pygame.Surface((30, 30), pygame.SRCALPHA)
+            pygame.draw.circle(ring, (220, 195, 150, 120), (15, 15), 13, 3)
+            screen.blit(ring, (self.mx - 15, self.my - 15))
+
+        remain = sum(1 for s in self.spots if not s["done"])
+        cap = self.PROMPT if self.result is None else self.feedback
+        _caption(screen, cap, None if self.result is None else self.feedback_color)
+        if self.result is None:
+            _counter(screen, f"남은 자리 {remain}", self.timer / 6.5)
+
+
 # ---- 공통 그리기 헬퍼 ----
 
 def _veil(screen):
@@ -351,18 +466,31 @@ def _veil(screen):
     screen.blit(veil, (0, 0))
 
 
+def _pill(screen, rect, alpha=190):
+    """텍스트 가독성용 반투명 알약 배경 — 밭 위 어디서든 글자가 읽히게."""
+    bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    pygame.draw.rect(bg, (16, 18, 24, alpha), bg.get_rect(), border_radius=rect.height // 2)
+    pygame.draw.rect(bg, (96, 84, 64, 160), bg.get_rect(), 1, border_radius=rect.height // 2)
+    screen.blit(bg, rect.topleft)
+
+
 def _caption(screen, text, color=None, hot=False):
     if color is None:
-        color = (255, 235, 150) if hot else (236, 228, 206)
+        color = (255, 235, 150) if hot else (244, 236, 214)
     f = _font(18)
     t = f.render(text, True, color)
-    screen.blit(t, (PLOT.centerx - t.get_width() // 2, 468))
+    x = PLOT.centerx - t.get_width() // 2
+    y = 466
+    _pill(screen, pygame.Rect(x - 12, y - 5, t.get_width() + 24, t.get_height() + 8))
+    screen.blit(t, (x, y))
 
 
 def _counter(screen, text, time_frac):
     f = _font(15)
-    t = f.render(text, True, (224, 214, 188))
-    screen.blit(t, (PLOT.x + 6, PLOT.y + 6))
+    t = f.render(text, True, (236, 228, 204))
+    x, y = PLOT.x + 8, PLOT.y + 6
+    _pill(screen, pygame.Rect(x - 7, y - 3, t.get_width() + 14, t.get_height() + 5), alpha=170)
+    screen.blit(t, (x, y))
     # 남은 시간 바
     w = 120
     pygame.draw.rect(screen, (40, 34, 28), (PLOT.right - w - 8, PLOT.y + 8, w, 6), border_radius=3)

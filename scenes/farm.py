@@ -16,13 +16,14 @@ from core.ui import (
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
     wrap_text, mix_color,
 )
-from scenes.tending import WaterPour, WeedPull, PestTap, WEATHER_MINIGAMES
+from scenes.tending import WaterPour, WeedPull, PestTap, SoilMound, WEATHER_MINIGAMES
 
 # 행동 → 손맛 인터랙션 클래스 (없는 행동은 즉시 적용)
 TACTILE_INTERACTIONS = {
     "물 주기": WaterPour,
     "잡초 뽑기": WeedPull,
     "해충 살피기": PestTap,
+    "흙 북돋기": SoilMound,
 }
 
 # 행동별 효과음 매핑
@@ -564,6 +565,17 @@ class FarmScene:
             return "지금은 배수로를 손볼 때가 아니다.", True
 
         if action == "흙 북돋기":
+            if quality is not None:
+                # 손맛: 잘 덮을수록 효과가 크다. 못해도 소폭은 보장(소프트락 방지).
+                frac = quality.get("cleared_frac", 1.0)
+                self.health += max(2, int(8 * frac))
+                self.stress = max(0, self.stress - max(2, int(10 * frac)))
+                self.drainage += int(4 * frac)
+                if frac >= 0.85:
+                    return "흙을 두둑이 북돋우니 한결 생기가 돈다.", False
+                if frac >= 0.45:
+                    return "흙을 어느 정도 다독였다.", False
+                return "북돋다 말아 뿌리가 아직 허전하다.", False
             if self.health < 65 or self.stress > 24:
                 self.health += 8
                 self.stress = max(0, self.stress - 10)

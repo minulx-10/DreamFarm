@@ -255,15 +255,18 @@ X.XkkX.X
 ..XX...XX...
 ''', 7)
     sprites['basket'] = create_sprite_from_string('''
-..XXXXXX..
-.XBBBBBBX.
-XbBBbbBBbX
-XBBbbbbBBX
-XBBbbbbBBX
-XbBBbbBBbX
-.XBBBBBBX.
-..XXXXXX..
-''', 15)
+..XXXXXXXXX..
+.XYyYyYyYyYX.
+.XdDDDDDDDdX.
+XYbYyYbYyYbYX
+XbYyYbYyYbYyX
+XYbYyYbYyYbYX
+XbYyYbYyYbYyX
+.XYbYyYbYyYX.
+.XbYyYbYyYbX.
+..XbBBBBBbX..
+...XXXXXXX...
+''', 12)
     sprites['trashcan'] = create_sprite_from_string('''
 ...XXXX...
 ..XMMMMX..

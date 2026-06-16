@@ -250,12 +250,17 @@ class Stage4Scene:
                 gauge_color = mix_color((80, 175, 110), (220, 60, 45), self.tension / 100.0)
                 pygame.draw.rect(screen, gauge_color, (gx + 2, gy + 2, fill_w, gh - 4), border_radius=3)
 
-            # 경고 텍스트
+            # 경고 텍스트 — 어두운 흙 위에서도 읽히도록 알약 배경 + 밝은 색
             font_t = get_font(14)
-            txt = "너무 빨라요! 천천히 클릭하세요." if self.tension > 50.0 else "적당한 속도로 클릭하세요."
-            color = (230, 80, 60) if self.tension > 50.0 else TEXT_MUTED
+            warn = self.tension > 50.0
+            txt = "너무 빨라요! 천천히 클릭하세요." if warn else "적당한 속도로 클릭하세요."
+            color = (255, 124, 96) if warn else (236, 224, 200)
             surf = font_t.render(txt, True, color)
-            screen.blit(surf, (400 - surf.get_width() // 2, gy + 22))
+            wx, wy = 400 - surf.get_width() // 2, gy + 22
+            chip = pygame.Surface((surf.get_width() + 18, surf.get_height() + 7), pygame.SRCALPHA)
+            pygame.draw.rect(chip, (20, 16, 14, 195), chip.get_rect(), border_radius=9)
+            screen.blit(chip, (wx - 9, wy - 4))
+            screen.blit(surf, (wx, wy))
 
         # 5. 피드백 텍스트
         if self.pull_phase == "feedback" and self.feedback_text:
