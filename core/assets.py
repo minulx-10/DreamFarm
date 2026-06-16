@@ -33,7 +33,6 @@ ACCENT_MINT = (104, 164, 118)
 ACCENT_CORAL = (213, 104, 72)
 
 import os
-import math
 import urllib.request
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "Galmuri11.ttf")
@@ -114,57 +113,6 @@ def create_sprite_from_string(sprite_str, scale=4):
                 pygame.draw.rect(surf, colors[char], (x*scale, y*scale, scale, scale))
     return surf
 
-
-def _lerp(a, b, t):
-    t = max(0.0, min(1.0, t))
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
-
-
-def _smooth(t):
-    t = max(0.0, min(1.0, t)); return t * t * (3 - 2 * t)
-
-
-# 밭 정리(stage1) 두 통: 같은 '둥근 통' 한 모양을 색만 바꿔 한 쌍으로 → 대칭 + 통일성.
-_TUB_BASKET = ((212,172,112),(176,128,78),(120,82,46),(224,188,132),(78,54,34),(132,92,54),(60,42,28))
-_TUB_TRASH  = ((214,220,216),(166,173,171),(96,103,103),(224,230,226),(46,50,51),(110,117,117),(50,55,56))
-
-def build_tub_sprite(pal, S=6):
-    """좌우 완벽 대칭 둥근 통. 색이 |dx|(중심에서의 거리)에만 의존하므로 미러 대칭이 보장된다.
-    저해상도에 픽셀로 그린 뒤 정수배 nearest 확대 → 픽셀 톤 유지."""
-    LW, LH = 23, 19
-    lo = pygame.Surface((LW, LH), pygame.SRCALPHA)
-    cx = (LW - 1) / 2.0
-    LITE, MID, DRK, RIM, MOUTH, BAND, OUT = pal
-    rim_y, body_top, bot = 2, 3, 16
-    hw_top, hw_mid, hw_bot = 10.2, 10.6, 8.4
-    def hw(y):
-        f = (y - body_top) / (bot - body_top); base = hw_top + (hw_bot - hw_top) * f
-        return base + (hw_mid - (hw_top + hw_bot) / 2) * math.sin(f * math.pi)   # 살짝 둥근 배
-    bands = {body_top + 4, body_top + 9}
-    for y in range(body_top, bot + 1):
-        w = hw(y)
-        for x in range(LW):
-            dx = abs(x - cx)
-            if dx <= w:
-                col = _lerp(LITE, DRK, _smooth((dx / w) * 0.92))
-                if y in bands: col = _lerp(col, BAND, 0.55)
-                if dx >= w - 1: col = OUT
-                lo.set_at((x, y), col)
-    for x in range(LW):                                          # 윗 림
-        dx = abs(x - cx)
-        if dx <= hw_top + 0.6:
-            for yy in (rim_y, rim_y + 1):
-                lo.set_at((x, yy), OUT if dx >= hw_top else _lerp(RIM, MID, _smooth(dx / hw_top)))
-    for y in range(rim_y, body_top + 3):                         # 어두운 입구(타원)
-        for x in range(LW):
-            dx = abs(x - cx)
-            if (dx / (hw_top - 1.4)) ** 2 + ((y - body_top) / 2.4) ** 2 <= 1.0:
-                lo.set_at((x, y), MOUTH if y > rim_y else _lerp(RIM, MID, 0.3))
-    for x in range(LW):                                          # 바닥 외곽
-        dx = abs(x - cx)
-        if dx <= hw_bot:
-            lo.set_at((x, bot), OUT if dx >= hw_bot - 1 else DRK)
-    return pygame.transform.scale(lo, (LW * S, LH * S))
 
 sprites = {}
 def init_sprites():
@@ -307,10 +255,28 @@ X.XkkX.X
 ..XB...BX...
 ..XX...XX...
 ''', 7)
-    # 밭 정리(stage1) 두 통 — 같은 둥근 통 모양을 색만 바꿔 한 쌍으로(완벽 대칭 + 통일).
-    # 왼쪽 = 씨앗 담는 따뜻한 통, 오른쪽 = 방해물 버리는 회색 통.
-    sprites['basket'] = build_tub_sprite(_TUB_BASKET, 6)
-    sprites['trashcan'] = build_tub_sprite(_TUB_TRASH, 6)
+    # 밭 정리(stage1) 두 통 — 게임의 다른 스프라이트(돌멩이·당근 등)와 같은 납작 픽셀 방식.
+    # 한 모양(좌우대칭)을 색만 바꿔: 왼쪽 = 나무색 통(씨앗), 오른쪽 = 회색 통(방해물).
+    _BIN_ART = '''
+..XXXXXXXXXXXXX..
+.XYYYYYYYYYYYYYX.
+XYDDDDDDDDDDDDDYX
+XYBBBBBBBBBBBBBYX
+XYBBBBBBBBBBBBBYX
+XYBbBBBBBBBBBbBYX
+XYBBBBBBBBBBBBBYX
+XYBBBBBBBBBBBBBYX
+XYBbBBBBBBBBBbBYX
+XYBBBBBBBBBBBBBYX
+XYBBBBBBBBBBBBBYX
+.XYBBBBBBBBBBBYX.
+.XbBBBBBBBBBBbX.
+..XbbbbbbbbbbbX..
+...XXXXXXXXXXX...
+'''
+    sprites['basket'] = create_sprite_from_string(_BIN_ART, 6)
+    sprites['trashcan'] = create_sprite_from_string(
+        _BIN_ART.translate(str.maketrans({'Y': 'W', 'B': 'M', 'b': 'm', 'D': '#'})), 6)
     sprites['watering_can'] = create_sprite_from_string('''
 ....XXXXX.........
 ....X...X.....XXX.
