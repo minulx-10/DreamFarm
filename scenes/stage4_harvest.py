@@ -81,7 +81,7 @@ class Stage4Scene:
                     interval = now - self.last_click_time
 
                     # 당근 위로 이동
-                    self.carrot_y = max(self.carrot_target_y, self.carrot_y - self.pull_per_click)
+                    self.carrot_y = max(self.carrot_target_y - 15.0, self.carrot_y - self.pull_per_click)
                     audio.play("pop")
 
                     # 연타 속도 체크: 너무 빠르면 tension 증가
