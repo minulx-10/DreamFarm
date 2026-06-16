@@ -105,6 +105,9 @@ def create_sprite_from_string(sprite_str, scale=4):
         'd': (87, 51, 25, 255),   # Pit base brown
         'D': (56, 33, 15, 255),   # Pit dark shadow
         'l': (110, 65, 30, 255),  # Pit light brown speckle
+        'c': (198, 120, 70, 255), # Terracotta clay
+        'C': (228, 158, 104, 255),# Terracotta highlight
+        'v': (150, 86, 48, 255),  # Terracotta shade
     }
     
     for y, line in enumerate(lines):
@@ -254,18 +257,41 @@ X.XkkX.X
 ..XB...BX...
 ..XX...XX...
 ''', 7)
-    sprites['trashcan'] = create_sprite_from_string('''
-...XXXX...
-..XMMMMX..
-.XXXXXXXX.
-.XMmmMMmX.
-.XMmMMmmX.
-.XMmmMMmX.
-.XMmMMmmX.
-.XMmmMMmX.
-..XmmmmX..
-...XXXX...
-''', 12)
+    # 나무 거름통 — 방해물을 버리는 통(stage1). 픽셀 아트: 세로 판자 + 금속 테 2줄 + 열린 윗면.
+    sprites['barrel'] = create_sprite_from_string('''
+...XXXXXXXXXX...
+..XYYYYYYYYYYX..
+.XYbdDDDDDDddbX.
+.XYBddDDDDdddBX.
+XXBYBYBYBYBYBYXX
+XWMMMMMMMMMMMmmX
+XYBYbBYBYbBYBYbX
+XYBYbBYBYbBYBYbX
+XYBYbBYBYbBYBYbX
+XWMMMMMMMMMMMmmX
+XYBYbBYBYbBYBYbX
+.XBYbBYBYbBYBbX.
+.XyBbBYBYbBbByX.
+..XXbbbBBBbbXX..
+...XXXXXXXXXX...
+''', 10)
+    # 테라코타 화분 — 씨앗을 담는 '밭'(stage1). 픽셀 아트: 림 턱 + 흙 표면 + 사다리꼴 몸통.
+    sprites['seed_pot'] = create_sprite_from_string('''
+.XXXXXXXXXXXXXXXX.
+XCCccccccccccccvvX
+XCldllldlldllldvvX
+XClddlddldlddldvvX
+XXccccccccccccccXX
+.XCccccccccccccvX.
+.XCccccccccccccvX.
+.XCccccccccccvvX..
+..XCccccccccvvX...
+..XCccccccccvX....
+...XCccccccvX.....
+...XCcccccvvX.....
+....XvbbbbvX......
+....XXXXXXXX......
+''', 10)
     sprites['watering_can'] = create_sprite_from_string('''
 ....XXXXX.........
 ....X...X.....XXX.
