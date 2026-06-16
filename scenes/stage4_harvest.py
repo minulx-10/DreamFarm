@@ -49,10 +49,10 @@ class Stage4Scene:
         self.feedback_timer = 0.0
 
         # 연타 클릭 관련
-        self.pull_per_click = 10.0       # 클릭당 올라가는 픽셀
-        self.slide_speed = 50.0          # 클릭 안 할 때 내려가는 속도 (px/s)
+        self.pull_per_click = 16.0       # 클릭당 올라가는 픽셀 (10 -> 16 버프)
+        self.slide_speed = 32.0          # 클릭 안 할 때 내려가는 속도 (50 -> 32 너프)
         self.last_click_time = 0.0       # 마지막 클릭 시각 (pygame.time.get_ticks 기반)
-        self.rapid_threshold = 0.08      # 이 시간(초) 미만 간격이면 과도한 연타로 판정
+        self.rapid_threshold = 0.055     # 이 시간(초) 미만 간격이면 과도한 연타로 판정 (0.08 -> 0.055)
 
         self.stage_clear = False
         self.clear_timer = 2.0
@@ -62,7 +62,8 @@ class Stage4Scene:
         if self.stage_clear or self.phase == "intro":
             return
 
-        carrot_rect = pygame.Rect(400 - 35, self.carrot_y, 70, 90)
+        # 클릭하기 쉽게 충돌 범위를 넉넉히 확장 (특히 Y축 위쪽 잎사귀 영역 포함)
+        carrot_rect = pygame.Rect(400 - 55, self.carrot_y - 30, 110, 120)
 
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
