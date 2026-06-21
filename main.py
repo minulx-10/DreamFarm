@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from core.game_state import game_state, apply_second_run
 from core import audio
 from core.settings_overlay import SettingsOverlay
+from scenes.title import TitleScene
 from scenes.name_input import NameInputScene
 from scenes.intro import IntroScene
 from scenes.transition import TransitionScene
@@ -40,7 +41,7 @@ def main():
     # 밭 단계 중간에 끼는 회상·스토리·아버지의 하루·별 잇기는 곡을 바꾸지 않아
     # 밭 배경음이 끊기지 않고 길게 이어진다. 곡 전환은 도입(밤)과 엔딩에서만.
     BGM_BY_SCENE = {
-        "name_input": "night", "intro": "night",
+        "title": "night", "name_input": "night", "intro": "night",
         "memory": None, "story_choice": None, "father_day": None,
         "farm": "farm", "stage1": "farm", "stage2": "farm",
         "stage3": "farm", "stage4": "farm", "star_connect": None,
@@ -50,6 +51,7 @@ def main():
 
     # 씬 이름 → 생성자 레지스트리
     SCENE_FACTORIES = {
+        "title": TitleScene,
         "name_input": NameInputScene,
         "intro": IntroScene,
         "transition": TransitionScene,
@@ -67,7 +69,7 @@ def main():
     }
     # 진입할 때마다 새 상태로 재생성해야 하는 씬 (farm/name_input/transition은 유지)
     FRESH_ON_ENTER = {
-        "intro", "memory", "epiphany", "story_choice", "father_day",
+        "title", "intro", "memory", "epiphany", "story_choice", "father_day",
         "stage1", "stage2", "stage3", "stage4", "star_connect", "ending",
     }
 

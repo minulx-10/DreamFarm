@@ -9,7 +9,7 @@ class GameState:
         self.understanding = 0
         self.score = 0
         self.timer = 0
-        self.current_scene = "name_input"
+        self.current_scene = "title"
         self.running = True
 
         self.transition_text = ""

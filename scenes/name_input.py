@@ -1,19 +1,32 @@
 import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_DARK, TEXT_MUTED, GOLD, WHITE
-from core.ui import draw_light_panel, draw_story_backdrop
+from core.ui import draw_light_panel, draw_story_backdrop, draw_button
 from core import audio
 
 class NameInputScene:
     def __init__(self):
         self.font_large = get_font(36)
         self.font_small = get_font(24)
+        self.font_btn = get_font(20)
         self.input_text = ""
         self.ime_text = ""
+        
+        # '시작하기' 입력 완료 버튼 Rect
+        self.start_btn = pygame.Rect(310, 355, 180, 44)
+        self.hovered = False
+        
         pygame.key.start_text_input()
         pygame.key.set_text_input_rect(pygame.Rect(250, 280, 300, 50))
 
     def handle_events(self, events):
+        mouse_pos = pygame.mouse.get_pos()
+        new_hover = self.start_btn.collidepoint(mouse_pos)
+        if new_hover != self.hovered:
+            self.hovered = new_hover
+            if self.hovered:
+                audio.play("hover")
+
         for event in events:
             if event.type == pygame.TEXTEDITING:
                 if len(self.input_text) + len(event.text) <= 8:
@@ -24,6 +37,14 @@ class NameInputScene:
                 if len(self.input_text) + len(event.text) <= 8:
                     self.input_text += event.text
                     audio.type_tick(event.text)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 마우스로 시작하기 버튼 클릭 시
+                if self.start_btn.collidepoint(event.pos):
+                    if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
+                        audio.play("success")
+                        game_state.player_name = self.input_text.strip()
+                        game_state.current_scene = "intro"
+                        pygame.key.stop_text_input()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
@@ -43,13 +64,13 @@ class NameInputScene:
     def draw(self, screen):
         draw_story_backdrop(screen, "night")
 
-        card = pygame.Rect(160, 150, 480, 300)
+        card = pygame.Rect(160, 140, 480, 310)
         draw_light_panel(screen, card)
 
         prompt = self.font_large.render("꿈속 밭에 남길 이름은?", True, TEXT_DARK)
-        screen.blit(prompt, (400 - prompt.get_width()//2, 196))
+        screen.blit(prompt, (400 - prompt.get_width()//2, 185))
 
-        input_rect = pygame.Rect(230, 275, 340, 58)
+        input_rect = pygame.Rect(230, 260, 340, 58)
         pygame.draw.rect(screen, (255, 249, 230), input_rect, border_radius=8)
         pygame.draw.rect(screen, (109, 84, 60), input_rect, 2, border_radius=8)
         
@@ -67,8 +88,12 @@ class NameInputScene:
         if pygame.time.get_ticks() % 1000 < 500:
             pygame.draw.line(screen, (109, 84, 60), (cursor_x, input_rect.y + 12), (cursor_x, input_rect.bottom - 12), 2)
 
-        desc = self.font_small.render("입력 후 Enter", True, TEXT_MUTED)
-        screen.blit(desc, (400 - desc.get_width()//2, 378))
+        # 시작하기 완료 버튼 그리기
+        draw_button(screen, self.start_btn, "시작하기", self.font_btn, hovered=self.hovered)
+
+        desc = self.font_small.render("Enter 키로도 입력 완료 가능", True, TEXT_MUTED)
+        screen.blit(desc, (400 - desc.get_width()//2, 412))
 
         shine = self.font_small.render("몽중농원", True, WHITE)
-        screen.blit(shine, (400 - shine.get_width() // 2, 92))
+        screen.blit(shine, (400 - shine.get_width() // 2, 85))
+
