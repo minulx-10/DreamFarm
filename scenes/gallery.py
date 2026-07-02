@@ -9,6 +9,7 @@ class GalleryScene:
     def __init__(self):
         self.font_title = get_font(28)
         self.font_section = get_font(20)
+        self.font_card_title = get_font(17)   # 엔딩 카드 제목(폭이 좁아 작은 폰트로 넘침 방지)
         self.font_body = get_font(15)
         self.font_small = get_font(13)
         self.font_btn = get_font(16)
@@ -169,12 +170,16 @@ class GalleryScene:
             if unlocked:
                 # 해금된 카드 그리기
                 draw_light_panel(screen, rect)
-                title_surf = self.font_section.render(meta["title"], True, GOLD)
-                screen.blit(title_surf, (rect.x + 18, rect.y + 14))
-                
+                # 제목이 카드 밖으로 튀어나오지 않게 폭에 맞춰 줄바꿈
+                y = rect.y + 14
+                for tline in wrap_text(meta["title"], self.font_card_title, rect.w - 36, max_lines=2):
+                    title_surf = self.font_card_title.render(tline, True, GOLD)
+                    screen.blit(title_surf, (rect.x + 18, y))
+                    y += self.font_card_title.get_height() + 2
+
                 # 설명줄
-                y = rect.y + 44
-                for line in wrap_text(meta["desc"], self.font_small, rect.w - 36, max_lines=4):
+                y += 4
+                for line in wrap_text(meta["desc"], self.font_small, rect.w - 36, max_lines=3):
                     line_surf = self.font_small.render(line, True, TEXT_DARK)
                     screen.blit(line_surf, (rect.x + 18, y))
                     y += 18

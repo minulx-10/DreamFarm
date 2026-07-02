@@ -57,14 +57,25 @@ STAR_CONNECT_INTROS = [
 
 
 class Button:
-    def __init__(self, x, y, w, h, text, value, font_size=20):
+    def __init__(self, x, y, w, h, text, value, font_size=20, kind="normal"):
         self.rect = pygame.Rect(x, y, w, h)
         self.text = text
         self.value = value
         self.font = get_font(font_size)
         self.hovered = False
+        self.kind = kind   # "normal" | "close" — 닫기 버튼은 다른 스타일로 그린다
 
     def draw(self, screen):
+        if self.kind == "close":
+            # 나무결 행동 버튼과 확연히 다르게 — 어두운 회색 알약형 '✕ 닫기'
+            base = (86, 78, 70) if not self.hovered else (110, 100, 90)
+            r = self.rect
+            pygame.draw.rect(screen, base, r, border_radius=r.height // 2)
+            pygame.draw.rect(screen, (150, 138, 126), r, 1, border_radius=r.height // 2)
+            surf = self.font.render("✕ " + self.text, True, (236, 228, 214))
+            screen.blit(surf, (r.centerx - surf.get_width() // 2,
+                               r.centery - surf.get_height() // 2))
+            return
         draw_button(screen, self.rect, self.text, self.font, hovered=self.hovered)
 
     def is_clicked(self, pos):
@@ -191,8 +202,8 @@ class FarmScene:
             return
 
         if self.turns_since_wait >= 5:
-            # 5턴 동안 한 번도 안 쉰 경우 강제 기다리기
-            self.buttons.append(Button(start_x, start_y, 300, 126, "강제 기다리기\n(돌발 상황 해결)", "__forced_wait__", font_size=26))
+            # 5턴 동안 한 번도 안 쉰 경우 강제 기다리기 (줄바꿈은 draw_button이 폭에 맞춰 처리)
+            self.buttons.append(Button(start_x, start_y, 300, 126, "강제 기다리기 (돌발 상황 해결)", "__forced_wait__", font_size=24))
             return
 
         if not self.action_menu_open:
@@ -208,8 +219,9 @@ class FarmScene:
             by = start_y + i * 31
             self.buttons.append(Button(start_x, by, 284, 28, self.action_label(action), action, font_size=17))
 
-        # 행동 닫기 (Cancel) 버튼 추가
-        self.buttons.append(Button(start_x, start_y + 128, 284, 26, "행동 닫기", "__close_actions__", font_size=15))
+        # 행동 닫기 — 할일 버튼과 헷갈리지 않게 아래에 간격을 두고 다른 스타일(알약형)로
+        self.buttons.append(Button(start_x + 90, start_y + 126, 120, 22,
+                                   "닫기", "__close_actions__", font_size=14, kind="close"))
 
     def is_harvest_ready(self):
         return self.growth >= self.growth_goal
@@ -1187,6 +1199,68 @@ class FarmScene:
             seed = sprites["seed"]
             screen.blit(seed, (x - seed.get_width() // 2, y - seed.get_height() // 2))
 
+    def _draw_tree(self, screen, ratio):
+        """나무류 작물: 한 그루의 나무가 성장 비율(ratio)에 따라 자란다.
+        어린 묘목 → 굵어지는 줄기와 우거지는 잎 → 수확기엔 열매가 맺힌다."""
+        import math
+        ratio = max(0.0, min(1.2, ratio))
+        base_x, base_y = 225, 420          # 밭 한가운데 땅에 심긴 밑동
+        trunk_h = int(24 + 96 * min(1.0, ratio))
+        trunk_w = int(8 + 16 * min(1.0, ratio))
+        canopy_r = int(16 + 62 * min(1.0, ratio))
+        top_y = base_y - trunk_h
+
+        # 밑동 그림자
+        shadow = pygame.Surface((canopy_r * 2 + 20, 24), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 60), shadow.get_rect())
+        screen.blit(shadow, (base_x - canopy_r - 10, base_y - 6))
+
+        # 줄기 (밑이 굵고 위가 가는 사다리꼴)
+        trunk_pts = [
+            (base_x - trunk_w // 2, base_y),
+            (base_x + trunk_w // 2, base_y),
+            (base_x + max(2, trunk_w // 4), top_y + canopy_r // 2),
+            (base_x - max(2, trunk_w // 4), top_y + canopy_r // 2),
+        ]
+        pygame.draw.polygon(screen, (110, 74, 44), trunk_pts)
+        pygame.draw.polygon(screen, (150, 104, 62), trunk_pts, 2)
+
+        if ratio < 0.12:
+            # 갓 심은 묘목: 줄기 끝에 작은 잎 두 장
+            pygame.draw.circle(screen, (86, 160, 78), (base_x - 5, top_y + 6), 6)
+            pygame.draw.circle(screen, (86, 160, 78), (base_x + 5, top_y + 6), 6)
+            return
+
+        # 잎 덮개 (여러 원을 겹쳐 뭉게뭉게)
+        cx, cy = base_x, top_y
+        dark = (46, 112, 60)
+        mid = (66, 150, 78)
+        light = (108, 190, 104)
+        blobs = [
+            (cx, cy, canopy_r), (cx - canopy_r // 2, cy + canopy_r // 4, int(canopy_r * 0.7)),
+            (cx + canopy_r // 2, cy + canopy_r // 4, int(canopy_r * 0.7)),
+            (cx, cy - canopy_r // 3, int(canopy_r * 0.72)),
+        ]
+        for bx, by, r in blobs:
+            pygame.draw.circle(screen, dark, (bx, by + 3), r)
+        for bx, by, r in blobs:
+            pygame.draw.circle(screen, mid, (bx, by), r)
+        pygame.draw.circle(screen, light, (cx - canopy_r // 3, cy - canopy_r // 3), max(4, canopy_r // 3))
+
+        # 수확기: 잎 사이로 붉은 열매(사과 등) — 작물 색조 사용
+        if ratio >= 0.7:
+            fruit = self.crop_cfg.get("tint") or (200, 60, 50)
+            import random as _r
+            rng = _r.Random(7)   # 매 프레임 같은 자리에 맺히도록 고정 시드
+            n = 4 if ratio < 1.0 else 7
+            for _ in range(n):
+                ang = rng.uniform(0, 6.28)
+                dist = rng.uniform(0.2, 0.9) * canopy_r
+                fx = int(cx + dist * math.cos(ang))
+                fy = int(cy + dist * math.sin(ang) * 0.85)
+                pygame.draw.circle(screen, fruit, (fx, fy), 5)
+                pygame.draw.circle(screen, (255, 240, 220), (fx - 1, fy - 1), 1)
+
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         # Individual growth variation per crop
         offset_val = self.crop_offsets[crop_idx] if crop_idx < len(self.crop_offsets) else 0
@@ -1258,8 +1332,12 @@ class FarmScene:
 
         # 3. Draw actual crop sprites
         growth_stage = max(0, min(self.growth, self.growth_goal))
-        for idx, (x, y) in enumerate(self.crop_positions()):
-            self.draw_crop(screen, x, y, growth_stage, idx)
+        if self.crop_cfg.get("family") == "나무류":
+            # 나무류(사과 등)는 밭 구덩이가 아니라 한 그루의 나무로 자란다
+            self._draw_tree(screen, self.growth / max(1, self.growth_goal))
+        else:
+            for idx, (x, y) in enumerate(self.crop_positions()):
+                self.draw_crop(screen, x, y, growth_stage, idx)
 
         # 4. Draw weeds & bugs on top of the scene
         # 손맛 인터랙션 중에는 배경 잡초/벌레를 숨긴다 — 뽑을/잡을 '대상'과 헷갈리지 않게.
@@ -1335,7 +1413,9 @@ class FarmScene:
 
         self.draw_field_summary(screen)
         self.draw_meters(screen)
-        action_panel = pygame.Rect(430, 300, 320, 164)
+        # 액션 메뉴가 열렸을 땐 '닫기' 알약이 들어갈 자리만큼 패널을 조금 더 길게
+        panel_h = 176 if self.action_menu_open else 164
+        action_panel = pygame.Rect(430, 300, 320, panel_h)
         draw_light_panel(screen, action_panel)
         action_title = get_font(20).render("오늘 할 일", True, TEXT_DARK)
         screen.blit(action_title, (450, 306))

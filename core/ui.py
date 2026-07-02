@@ -260,9 +260,12 @@ def draw_understanding_badge(screen, x, y, w):
     label = label_font.render("마음", True, TEXT_MUTED)
     screen.blit(label, (x, y - 1))
 
-    draw_moon_phase(screen, x + 30, y - 2, phase, 18)
+    # 라벨 실제 폭 뒤로 달·단계명을 배치해 서로 겹치지 않게 한다
+    moon_x = x + label.get_width() + 8
+    draw_moon_phase(screen, moon_x, y - 2, phase, 18)
+    name_x = moon_x + 18 + 6
     name_surf = font.render(stage_name, True, TEXT_DARK)
-    screen.blit(name_surf, (x + 52, y))
+    screen.blit(name_surf, (name_x, y))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))
