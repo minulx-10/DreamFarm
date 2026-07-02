@@ -29,10 +29,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      # exe 파일명은 ASCII로 (GitHub 릴리스가 한글 자산명을 default.exe로 바꿔버림).
+      # 창 제목은 코드에서 "몽중농원"으로 표시된다.
       - name: EXE 빌드 (PyInstaller onefile)
         run: >
           pyinstaller --noconfirm --clean --onefile --windowed
-          --name 몽중농원
+          --name DreamFarm
           --add-data "core/Galmuri11.ttf;core"
           --add-data "core/dad.png;core"
           --add-data "core/field_bed.jpg;core"
@@ -41,12 +43,12 @@ jobs:
       - name: 빌드 산출물 업로드 (아티팩트)
         uses: actions/upload-artifact@v4
         with:
-          name: 몽중농원-windows
-          path: dist/몽중농원.exe
+          name: DreamFarm-windows
+          path: dist/DreamFarm.exe
 
       - name: GitHub 릴리스에 EXE 첨부
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/몽중농원.exe
+          files: dist/DreamFarm.exe
           generate_release_notes: true
