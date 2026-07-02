@@ -1226,25 +1226,31 @@ class FarmScene:
         pygame.draw.rect(screen, (100, 75, 55), frame, border_radius=18)          # 논둑 몸통 (흙둑)
         pygame.draw.rect(screen, (75, 55, 40), frame, 3, border_radius=18)         # 논둑 어두운 선
         
-        # 논 물바닥 (진흙 기저)
-        pygame.draw.rect(screen, (55, 42, 32), inner, border_radius=14)
+        # 논 물바닥 (진흙 기저 - 침울한 회색에서 밝고 비옥한 황토빛 진흙색으로 개선)
+        pygame.draw.rect(screen, (92, 72, 52), inner, border_radius=14)
         
-        # 자작하게 고인 물 (수분에 따라 물의 밝기와 비침이 달라짐)
-        water_alpha = min(220, max(80, int(self.moisture * 2.2)))
+        # 자작하게 고인 물 (수분에 따라 물의 밝기와 비침이 달라짐 - 맑은 하늘빛 투사)
+        water_alpha = min(160, max(50, int(self.moisture * 1.5)))
         water_surf = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
-        water_surf.fill((65, 115, 145, water_alpha))
+        water_surf.fill((70, 155, 200, water_alpha))
+        
+        # 수면 위 햇살 반사광 (중앙부에 부드러운 하이라이트 추가)
+        for r in range(140, 0, -10):
+            alpha = int(24 * (1.0 - r / 140.0) * (water_alpha / 160.0))
+            pygame.draw.ellipse(water_surf, (255, 255, 255, alpha), (inner.w // 2 - r, inner.h // 2 - int(r * 0.4), r * 2, int(r * 0.8)))
+            
         screen.blit(water_surf, (inner.x, inner.y))
         
-        # 물 반사광/하이라이트 (가로로 긴 맑은 물결선들)
+        # 물 반사광/하이라이트 (가로로 긴 맑은 물결선들 - 색상 한층 더 밝게 보정)
         for i in range(1, 4):
             ly = inner.y + inner.h * i // 4
-            pygame.draw.ellipse(screen, (160, 205, 235, 100), (inner.x + 20, ly - 4, inner.w - 40, 8), 1)
+            pygame.draw.ellipse(screen, (200, 235, 255, 140), (inner.x + 20, ly - 4, inner.w - 40, 8), 1)
             
         # 6개의 모내기 자리 주변에 자작한 물결(동심원 잔물결) 그리기
         for cx, cy in self.crop_positions():
             rx, ry = cx, cy + 8
-            pygame.draw.ellipse(screen, (120, 180, 210, 140), (rx - 16, ry - 5, 32, 10), 1)
-            pygame.draw.ellipse(screen, (120, 180, 210, 80), (rx - 26, ry - 8, 52, 16), 1)
+            pygame.draw.ellipse(screen, (190, 230, 255, 200), (rx - 16, ry - 5, 32, 10), 1)
+            pygame.draw.ellipse(screen, (190, 230, 255, 120), (rx - 26, ry - 8, 52, 16), 1)
 
     def _draw_tree(self, screen, ratio):
         """나무류 작물: 한 그루의 나무가 성장 비율(ratio)에 따라 자란다.
