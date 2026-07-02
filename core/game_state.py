@@ -103,6 +103,7 @@ class GameState:
         # main 루프에 보내는 요청 플래그 (씬에서 직접 처리할 수 없는 일)
         self.request_load = False       # 슬롯 불러오기
         self.request_settings = False   # 설정 오버레이 열기
+        self.request_quit = False       # 게임 종료 확인 모달 열기
 
         # 갤러리에서 특정 엔딩을 감상용으로 강제 지정 (EndingScene이 소비 후 비운다)
         self.forced_ending = None
@@ -635,6 +636,7 @@ def save_progress():
         understanding=game_state.understanding,
         empathy_choices=game_state.empathy_choices,
         patience_score=game_state.patience_score,
+        crop=game_state.crop, # 마지막으로 키웠던 작물 정보를 갤러리를 위해 함께 기록
     )
 
 

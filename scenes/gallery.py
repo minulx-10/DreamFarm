@@ -106,6 +106,9 @@ class GalleryScene:
                                 # EndingScene이 이 값을 읽어 해당 엔딩을 강제 재생한다
                                 game_state.forced_ending = "wither" if is_wilt else key
                                 game_state.crop_failed = is_wilt
+                                # 메타에 저장되어 있던 작물 값을 갤러리 감상 시에도 로드해 보여준다
+                                meta_crop = save_system.load_meta().get("crop", "carrot")
+                                game_state.crop = meta_crop
                                 game_state.current_scene = "ending"
                                 return
                 else:

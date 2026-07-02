@@ -118,6 +118,8 @@ def main():
     scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}
 
     settings_overlay = SettingsOverlay()
+    from core.quit_overlay import QuitOverlay
+    quit_overlay = QuitOverlay()
 
     current_key = game_state.current_scene
     current_scene_obj = scenes[current_key]
@@ -171,7 +173,7 @@ def main():
         mapped_events = []
         for event in events:
             if event.type == pygame.QUIT:
-                game_state.running = False
+                game_state.request_quit = True
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 is_fullscreen = not is_fullscreen
                 update_display_mode()
@@ -193,12 +195,13 @@ def main():
                 mapped_events.append(event)
 
         # 2. 모든 입력을 가상 좌표 이벤트로 흘려보냄
-        # 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
-        if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
-            for event in mapped_events:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
-                    audio.toggle_mute()
-            current_scene_obj.handle_events(mapped_events)
+        # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
+        if not quit_overlay.handle_events(mapped_events):
+            if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
+                for event in mapped_events:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                        audio.toggle_mute()
+                current_scene_obj.handle_events(mapped_events)
 
         current_scene_obj.update(dt)
         settings_overlay.update(dt)
@@ -206,6 +209,7 @@ def main():
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
         settings_overlay.draw(virtual_screen)
+        quit_overlay.draw(virtual_screen)
 
         # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사
         pygame.transform.scale(virtual_screen, (actual_w, actual_h), screen)

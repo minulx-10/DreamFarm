@@ -605,6 +605,10 @@ class EndingScene:
                     pygame.draw.ellipse(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (370, 314, 60, 28))
                     for gx, gy in [(375, 330), (390, 322), (410, 325), (425, 332), (395, 334)]:
                         pygame.draw.ellipse(screen, (min(tc, 240), min(tc, 238), min(tc, 230)), (gx, gy, 4, 3))
+                    # 사기 대접의 그릇 외벽을 그려 대접 안에 소복이 쌓인 모양으로 완성
+                    bowl = pygame.Rect(356, 330, 88, 38)
+                    pygame.draw.arc(screen, (min(tc, 208), min(tc, 214), min(tc, 224)), bowl, 3.30, 6.12, 5)
+                    pygame.draw.arc(screen, (min(tc, 150), min(tc, 176), min(tc, 190)), bowl, 3.30, 6.12, 2)
                 else:
                     # 당근 반찬
                     chunks = [

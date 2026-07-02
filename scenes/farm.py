@@ -1133,8 +1133,10 @@ class FarmScene:
         if label == "성장":
             fill_w = int(bar.w * (shown_value / max_value))
             carrot_x = max(bar.x, bar.x + fill_w - 3)
-            # Render a cute mini carrot moving along with the growth progress
-            screen.blit(sprites["mini_carrot"], (carrot_x, bar.y - 1))
+            # 현재 작물에 맞는 미니 아이콘을 가져와 세로 중앙 정렬하여 그린다
+            crop_key = game_state.crop
+            mini_spr = sprites.get(f"mini_{crop_key}", sprites["mini_carrot"])
+            screen.blit(mini_spr, (carrot_x, bar.y + 7 - mini_spr.get_height() // 2))
 
     def draw_field_summary(self, screen):
         panel = pygame.Rect(430, 82, 320, 100)
@@ -1320,6 +1322,26 @@ class FarmScene:
 
         # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 패치 마스킹 렌더링
         screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
+
+        if game_state.crop == "rice" and adj_stage < self.growth_goal:
+            # 벼의 성장기: 일반 잎사귀 스프라이트 대신 뾰족하고 길게 서 자라는 벼 잎사귀 다발을 그린다
+            if adj_stage < 10:
+                pygame.draw.line(screen, (80, 160, 90), (x, y + 8), (x - 4, y - 1), 2)
+                pygame.draw.line(screen, (90, 175, 100), (x, y + 8), (x, y - 6), 2)
+                pygame.draw.line(screen, (80, 160, 90), (x, y + 8), (x + 4, y - 1), 2)
+            elif adj_stage < 16:
+                pygame.draw.line(screen, (70, 145, 80), (x, y + 8), (x - 7, y - 8), 2)
+                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x - 2, y - 14), 2)
+                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x + 2, y - 14), 2)
+                pygame.draw.line(screen, (70, 145, 80), (x, y + 8), (x + 7, y - 8), 2)
+            else:
+                pygame.draw.line(screen, (60, 135, 70), (x, y + 8), (x - 12, y - 16), 2)
+                pygame.draw.line(screen, (75, 150, 85), (x, y + 8), (x - 5, y - 24), 2)
+                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x - 1, y - 28), 2)
+                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x + 2, y - 28), 2)
+                pygame.draw.line(screen, (75, 150, 85), (x, y + 8), (x + 6, y - 24), 2)
+                pygame.draw.line(screen, (60, 135, 70), (x, y + 8), (x + 12, y - 16), 2)
+            return
 
         if adj_stage < 10:
             sprite, offset = sprites["sprout1"], (-15, 9)

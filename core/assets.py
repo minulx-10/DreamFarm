@@ -148,6 +148,31 @@ HOo
 .oX
 .qX
 ''', 2)
+    sprites['mini_apple'] = create_sprite_from_string('''
+.L.
+.X.
+iYi
+iii
+iii
+.i.
+''', 2)
+    sprites['mini_potato'] = create_sprite_from_string('''
+.g.
+.X.
+BYB
+BYB
+bBb
+.b.
+''', 2)
+    sprites['mini_rice'] = create_sprite_from_string('''
+.Y.
+yYy
+.Y.
+yYy
+.Y.
+yYy
+.y.
+''', 2)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
 ..XooX..

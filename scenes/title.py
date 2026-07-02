@@ -101,7 +101,7 @@ class TitleScene:
                 # 끝내기
                 elif self.hovered_quit:
                     audio.play("click")
-                    game_state.running = False
+                    game_state.request_quit = True
             elif event.type == pygame.KEYDOWN:
                 # Enter 또는 Space 누르면 시작하기 작동
                 if event.key in (pygame.K_RETURN, pygame.K_SPACE):
