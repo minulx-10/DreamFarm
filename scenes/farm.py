@@ -1142,7 +1142,18 @@ class FarmScene:
         panel = pygame.Rect(430, 82, 320, 100)
         draw_light_panel(screen, panel)
         title_font = get_font(20)
-        title = title_font.render("밭 상태", True, TEXT_DARK)
+        
+        # 기르는 작물 종류에 맞게 이름과 접미사(나무/논/밭)를 조합해 타이틀을 출력
+        crop_name = current_crop()["name"]
+        if game_state.crop == "apple":
+            suffix = "나무"
+        elif game_state.crop == "rice":
+            suffix = " 논"
+        else:
+            suffix = "밭"
+        title_text = f"밭 상태 ({crop_name}{suffix})"
+        
+        title = title_font.render(title_text, True, TEXT_DARK)
         screen.blit(title, (450, 96))
 
         self.draw_labeled_meter(screen, "성장", self.growth, self.growth_goal, 450, 123, 116, (235, 150, 55))
