@@ -76,9 +76,10 @@ def main():
     update_display_mode()
     pygame.display.set_caption("몽중농원")
     
-    # 윈도우 창 아이콘 설정
+    # 윈도우 창 아이콘 설정 (exe로 묶였을 때도 찾도록 resource_path 사용)
     try:
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "core", "logo.png")
+        from core.assets import resource_path
+        icon_path = resource_path("logo.png")
         if os.path.exists(icon_path):
             icon_surf = pygame.image.load(icon_path)
             pygame.display.set_icon(icon_surf)
@@ -243,11 +244,12 @@ def main():
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
         
-        # 좌상단 디버그 버전 표시 (회색 소형 텍스트)
+        # 좌상단 디버그 버전 표시 (회색 소형 텍스트) — core/version.py 한 곳에서 관리
         try:
             from core.assets import get_font
+            from core.version import display_version
             font_ver = get_font(12)
-            ver_surf = font_ver.render("v1.0.4.8", True, (120, 120, 120))
+            ver_surf = font_ver.render(display_version(), True, (120, 120, 120))
             virtual_screen.blit(ver_surf, (8, 6))
         except Exception:
             pass

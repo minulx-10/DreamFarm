@@ -1,6 +1,8 @@
 name: Build & Release (Windows EXE)
 
-# v1.0.0 같은 태그를 push하면 자동으로 exe를 빌드해 GitHub 릴리스로 올린다.
+# 태그를 push하면 exe를 빌드해 GitHub 릴리스로 올린다.
+#  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시, 반 친구들이 받는 것)
+#  - 개발 태그   (예: v1.0.5-dev.1)  → 프리릴리스 (테스터용, 'Latest' 아님)
 # Actions 탭에서 수동 실행(workflow_dispatch)도 가능.
 on:
   push:
@@ -38,6 +40,7 @@ jobs:
           --add-data "core/Galmuri11.ttf;core"
           --add-data "core/dad.png;core"
           --add-data "core/field_bed.jpg;core"
+          --add-data "core/logo.png;core"
           main.py
 
       - name: 빌드 산출물 업로드 (아티팩트)
@@ -46,9 +49,24 @@ jobs:
           name: DreamFarm-windows
           path: dist/DreamFarm.exe
 
+      # 태그 이름에 -dev / -beta / -rc 가 들어가면 프리릴리스로 취급한다.
+      - name: 릴리스 채널 판별
+        id: channel
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-dev* || "${GITHUB_REF_NAME}" == *-beta* || "${GITHUB_REF_NAME}" == *-rc* ]]; then
+            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true"  >> "$GITHUB_OUTPUT"
+          fi
+
       - name: GitHub 릴리스에 EXE 첨부
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/DreamFarm.exe
           generate_release_notes: true
+          prerelease: ${{ steps.channel.outputs.prerelease }}
+          make_latest: ${{ steps.channel.outputs.make_latest }}
