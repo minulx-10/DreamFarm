@@ -33,9 +33,20 @@ ACCENT_MINT = (104, 164, 118)
 ACCENT_CORAL = (213, 104, 72)
 
 import os
+import sys
 import urllib.request
 
-FONT_PATH = os.path.join(os.path.dirname(__file__), "Galmuri11.ttf")
+
+def resource_path(rel):
+    """core/ 안의 데이터 파일 경로를 돌려준다.
+    PyInstaller로 묶인 exe에서는 _MEIPASS 임시 폴더 아래를 가리키게 한다."""
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        return os.path.join(base, "core", rel)
+    return os.path.join(os.path.dirname(__file__), rel)
+
+
+FONT_PATH = resource_path("Galmuri11.ttf")
 FONT_URL = "https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.ttf"
 
 fonts = {}
@@ -225,7 +236,7 @@ XkKKKKkX
 X.XkkX.X
 .XX..XX.
 ''', 5)
-    dad_path = os.path.join(os.path.dirname(__file__), "dad.png")
+    dad_path = resource_path("dad.png")
     loaded_dad = False
     if os.path.exists(dad_path):
         try:
@@ -294,7 +305,7 @@ XYbDDDDDDDDDDbYX
 ''', 5)
 
     # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
-    field_bed_path = os.path.join(os.path.dirname(__file__), "field_bed.jpg")
+    field_bed_path = resource_path("field_bed.jpg")
     if os.path.exists(field_bed_path):
         try:
             raw_img = pygame.image.load(field_bed_path).convert_alpha()
@@ -333,6 +344,15 @@ _SKY_STOPS = [
     (0.82, (232, 126, 86)),  # 노을 주황
     (1.00, (252, 178, 116)), # 지평선 따뜻한 빛
 ]
+
+# 악)몽중농원 검붉은 하늘 그라데이션
+_NIGHTMARE_SKY_STOPS = [
+    (0.00, (0, 0, 0)),        # 검은색 (천정)
+    (0.35, (40, 5, 5)),       # 매우 어두운 붉은색
+    (0.70, (110, 15, 15)),    # 검붉은색
+    (1.00, (160, 20, 20)),    # 피빛 빨간색 (지평선)
+]
+
 # 별·구름은 매 프레임 같은 자리에 있어야 깜빡이지 않으므로 고정 배치
 _STARS = [(58, 26, 2), (124, 52, 1), (208, 20, 2), (332, 44, 1), (96, 92, 1),
           (470, 28, 1), (250, 70, 2), (150, 130, 1), (560, 22, 1), (40, 120, 1),
@@ -346,19 +366,35 @@ _SOIL_SPECKS = [(_speck_rng.randint(18, 700), _speck_rng.randint(18, 330), _spec
 
 
 def _sky_color(t):
-    for i in range(len(_SKY_STOPS) - 1):
-        t0, c0 = _SKY_STOPS[i]
-        t1, c1 = _SKY_STOPS[i + 1]
-        if t <= t1:
-            return _mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
-    return _SKY_STOPS[-1][1]
+    from core.game_state import game_state
+    if game_state.nightmare:
+        for i in range(len(_NIGHTMARE_SKY_STOPS) - 1):
+            t0, c0 = _NIGHTMARE_SKY_STOPS[i]
+            t1, c1 = _NIGHTMARE_SKY_STOPS[i + 1]
+            if t <= t1:
+                return _mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
+        return _NIGHTMARE_SKY_STOPS[-1][1]
+    else:
+        for i in range(len(_SKY_STOPS) - 1):
+            t0, c0 = _SKY_STOPS[i]
+            t1, c1 = _SKY_STOPS[i + 1]
+            if t <= t1:
+                return _mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
+        return _SKY_STOPS[-1][1]
 
 
 def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, dirt_dk=None):
-    gc = grass or (70, 128, 96)    # Twilight teal-green grass
-    gd = grass_dk or (42, 88, 64)  # Dark grass shadow
-    dc = dirt or DIRT_COLOR
-    dd = dirt_dk or DIRT_DARK
+    from core.game_state import game_state
+    if game_state.nightmare:
+        gc = (34, 16, 16)      # Charcoal/dark red grass
+        gd = (18, 8, 8)        # Even darker grass shadow
+        dc = (54, 20, 20)      # Demonic soil
+        dd = (32, 10, 10)      # Dark demonic soil shadow
+    else:
+        gc = grass or (70, 128, 96)    # Twilight teal-green grass
+        gd = grass_dk or (42, 88, 64)  # Dark grass shadow
+        dc = dirt or DIRT_COLOR
+        dd = dirt_dk or DIRT_DARK
     horizon = 166
 
     # --- 하늘: 다단 황혼 그라데이션 ---
@@ -369,41 +405,60 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     for sx, sy, sb in _STARS:
         if sx < 540 or sy > 110:
             tw = 200 + sb * 22
-            pygame.draw.circle(screen, (min(255, tw), min(255, tw), 210), (sx, sy), sb)
+            # 악몽 모드에서는 붉은 빛 별로 변경
+            col = (min(255, tw), 60, 60) if game_state.nightmare else (min(255, tw), min(255, tw), 210)
+            pygame.draw.circle(screen, col, (sx, sy), sb)
 
     # --- 태양 + 부드러운 블룸 ---
     sun_x, sun_y = 640, 78
     bloom = pygame.Surface((260, 260), pygame.SRCALPHA)
     for r in range(126, 0, -7):
         a = int(54 * (1.0 - r / 126.0))
-        pygame.draw.circle(bloom, (255, 188, 120, a), (130, 130), r)
+        glow_c = (180, 20, 20, a) if game_state.nightmare else (255, 188, 120, a)
+        pygame.draw.circle(bloom, glow_c, (130, 130), r)
     screen.blit(bloom, (sun_x - 130, sun_y - 130))
-    pygame.draw.circle(screen, (255, 152, 86), (sun_x, sun_y), 40)
-    pygame.draw.circle(screen, (255, 206, 142), (sun_x, sun_y), 29)
-    pygame.draw.circle(screen, (255, 240, 206), (sun_x, sun_y), 15)
+    if game_state.nightmare:
+        pygame.draw.circle(screen, (30, 0, 0), (sun_x, sun_y), 40)
+        pygame.draw.circle(screen, (90, 10, 10), (sun_x, sun_y), 29)
+        pygame.draw.circle(screen, (150, 15, 15), (sun_x, sun_y), 15)
+    else:
+        pygame.draw.circle(screen, (255, 152, 86), (sun_x, sun_y), 40)
+        pygame.draw.circle(screen, (255, 206, 142), (sun_x, sun_y), 29)
+        pygame.draw.circle(screen, (255, 240, 206), (sun_x, sun_y), 15)
 
     # --- 노을 구름 (반투명, 빛을 받은 아랫면이 환하게) ---
     for cx, cy, cw, ch in _CLOUDS:
         cloud = pygame.Surface((cw, ch * 2), pygame.SRCALPHA)
-        pygame.draw.ellipse(cloud, (90, 52, 84, 120), (0, 0, cw, ch))
-        pygame.draw.ellipse(cloud, (236, 158, 120, 110), (cw * 0.18, ch * 0.5, cw * 0.7, ch))
+        cloud_c1 = (60, 20, 20, 120) if game_state.nightmare else (90, 52, 84, 120)
+        cloud_c2 = (140, 30, 30, 110) if game_state.nightmare else (236, 158, 120, 110)
+        pygame.draw.ellipse(cloud, cloud_c1, (0, 0, cw, ch))
+        pygame.draw.ellipse(cloud, cloud_c2, (cw * 0.18, ch * 0.5, cw * 0.7, ch))
         screen.blit(cloud, (cx - cw // 2, cy - ch // 2))
 
     # --- 안개 낀 산 3겹 (멀수록 옅고 푸르게) ---
-    pygame.draw.polygon(screen, (108, 74, 116), [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104), (800, horizon + 10), (0, horizon + 10)])
-    pygame.draw.polygon(screen, (78, 52, 98), [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122), (800, h), (0, h)])
-    pygame.draw.polygon(screen, (46, 70, 78), [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50), (800, h), (0, h)])
+    if game_state.nightmare:
+        m1 = (48, 10, 10)
+        m2 = (34, 6, 6)
+        m3 = (20, 3, 3)
+    else:
+        m1 = (108, 74, 116)
+        m2 = (78, 52, 98)
+        m3 = (46, 70, 78)
+    pygame.draw.polygon(screen, m1, [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104), (800, horizon + 10), (0, horizon + 10)])
+    pygame.draw.polygon(screen, m2, [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122), (800, h), (0, h)])
+    pygame.draw.polygon(screen, m3, [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50), (800, h), (0, h)])
 
     # --- 지평선 햇무리 (따뜻한 가로 빛띠) ---
     haze = pygame.Surface((w, 40), pygame.SRCALPHA)
     for i in range(20):
         a = int(70 * (1 - abs(i - 10) / 10))
-        pygame.draw.line(haze, (255, 196, 140, a), (0, i * 2), (w, i * 2))
+        col = (180, 20, 20, a) if game_state.nightmare else (255, 196, 140, a)
+        pygame.draw.line(haze, col, (0, i * 2), (w, i * 2))
     screen.blit(haze, (0, horizon - 20))
 
     # --- 잔디: 세로 그라데이션 + 결 ---
     for i in range(h - horizon):
-        c = _mix_color(_mix_color(gc, (255, 200, 150), 0.12), gd, min(1.0, i / 150.0))
+        c = _mix_color(_mix_color(gc, (255, 200, 150) if not game_state.nightmare else (100, 40, 40), 0.12), gd, min(1.0, i / 150.0))
         pygame.draw.line(screen, c, (0, horizon + i), (w, horizon + i))
     for y in range(horizon, h, 34):
         c = _mix_color(gc, gd, 0.30 if (y // 34) % 2 == 0 else 0.50)
@@ -419,25 +474,28 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)
     # 나무 테두리
     frame = dirt_rect.inflate(12, 12)
-    pygame.draw.rect(screen, (52, 36, 25), frame.move(0, 6), border_radius=15)
-    pygame.draw.rect(screen, (122, 86, 53), frame, border_radius=15)
-    pygame.draw.rect(screen, (156, 114, 74), frame, 2, border_radius=15)
+    border_c1 = (40, 15, 15) if game_state.nightmare else (52, 36, 25)
+    border_c2 = (100, 30, 30) if game_state.nightmare else (122, 86, 53)
+    border_c3 = (130, 45, 45) if game_state.nightmare else (156, 114, 74)
+    pygame.draw.rect(screen, border_c1, frame.move(0, 6), border_radius=15)
+    pygame.draw.rect(screen, border_c2, frame, border_radius=15)
+    pygame.draw.rect(screen, border_c3, frame, 2, border_radius=15)
     # 흙 바닥
     pygame.draw.rect(screen, dd, dirt_rect.move(0, 4), border_radius=12)
     pygame.draw.rect(screen, dc, dirt_rect, border_radius=12)
     # 위쪽 빛 밴드 / 아래쪽 그늘 밴드로 깊이감
     top_band = pygame.Surface((dirt_rect.w, 64), pygame.SRCALPHA)
     for i in range(64):
-        top_band.fill((255, 205, 150, int(58 * (1 - i / 64))), (0, i, dirt_rect.w, 1))
+        top_band.fill((255, 205, 150, int(58 * (1 - i / 64))) if not game_state.nightmare else (200, 50, 50, int(58 * (1 - i / 64))), (0, i, dirt_rect.w, 1))
     screen.blit(top_band, (dirt_rect.x, dirt_rect.y))
     bot_band = pygame.Surface((dirt_rect.w, 90), pygame.SRCALPHA)
     for i in range(90):
-        bot_band.fill((26, 16, 10, int(72 * (i / 90))), (0, i, dirt_rect.w, 1))
+        bot_band.fill((26, 16, 10, int(72 * (i / 90))) if not game_state.nightmare else (20, 5, 5, int(72 * (i / 90))), (0, i, dirt_rect.w, 1))
     screen.blit(bot_band, (dirt_rect.x, dirt_rect.bottom - 90))
     # 입체 이랑 (어두운 고랑 + 윗면 노을 하이라이트)
     for y in range(dirt_rect.y + 30, dirt_rect.bottom - 16, 40):
         pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.20), (dirt_rect.x + 14, y + 6, dirt_rect.w - 28, 6), border_radius=3)
-        pygame.draw.rect(screen, _mix_color(dc, (255, 205, 150), 0.24), (dirt_rect.x + 14, y, dirt_rect.w - 28, 4), border_radius=2)
+        pygame.draw.rect(screen, _mix_color(dc, (255, 205, 150) if not game_state.nightmare else (200, 80, 80), 0.24), (dirt_rect.x + 14, y, dirt_rect.w - 28, 4), border_radius=2)
     # 흙 알갱이 텍스처
     speck = _mix_color(dc, dd, 0.65)
     for sx_, sy_, ss in _SOIL_SPECKS:

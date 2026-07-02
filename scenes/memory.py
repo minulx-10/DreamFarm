@@ -23,6 +23,10 @@ class MemoryScene:
         self.transition_alpha = 255
         self.exit_flash = 0
         audio.play("memory_in")
+        
+        # Record memory in meta save data
+        from core import save_system
+        save_system.record_memory(game_state.memory_title, game_state.memory_text)
 
     def prepare_text(self, text):
         lines = []

@@ -91,9 +91,21 @@ class GameState:
 
         # Ending type for save
         self.last_ending = ""
-        
+
         # 플레이 시간 측정용 변수 (초 단위)
         self.play_time = 0.0
+
+        # 기르는 작물 (core/crops.py의 키) — 엔딩을 한 번 보면 다른 작물이 열린다
+        self.crop = "carrot"
+        # 악)몽중농원 모드 (진엔딩 해금)
+        self.nightmare = False
+
+        # main 루프에 보내는 요청 플래그 (씬에서 직접 처리할 수 없는 일)
+        self.request_load = False       # 슬롯 불러오기
+        self.request_settings = False   # 설정 오버레이 열기
+
+        # 갤러리에서 특정 엔딩을 감상용으로 강제 지정 (EndingScene이 소비 후 비운다)
+        self.forced_ending = None
 
     def reset(self):
         """새 플레이를 위해 상태를 초기화한다.
@@ -104,6 +116,8 @@ class GameState:
             "is_second_run": self.is_second_run,
             "prev_ending": self.prev_ending,
             "prev_understanding": self.prev_understanding,
+            "crop": self.crop,
+            "nightmare": self.nightmare,
         }
         self.__init__()
         for key, value in preserved.items():
@@ -293,10 +307,6 @@ FATHER_DAY_NARRATIONS = {
 # 엔딩별 일지 '마지막 장' — 결말에 따라 일지의 닫는 글이 달라진다.
 ENDING_JOURNAL_CLOSINGS = {
     "true": ("[마지막 장 · 수확의 날]\n흙을 처음 만지던 날이 떠오른다. 그땐 아무것도 몰랐다.\n이제는 안다 — 이 밭의 모든 새벽이 누군가의 사랑이었다는 걸.\n내일 새벽, 아버지 곁에서 다시 흙을 만질 것이다."),
-    "happy": ("[마지막 장 · 수확의 날]\n당근은 달았다. 기다린 만큼, 꼭 그만큼.\n서툴렀지만 마음만은 흙을 따라 한 뼘 자랐다."),
-    "growth": ("[마지막 장 · 수확의 날]\n실수투성이였다. 그래도 매번 다시 흙을 만졌다.\n서툰 손도 매일이면 단단해진다는 걸, 이 밭이 가르쳐 줬다."),
-    "skill": ("[마지막 장 · 수확의 날]\n밭일은 익혔고 수확도 넉넉했다.\n그런데 식탁 앞에서 왜 멈칫했을까. 아직 못 배운 것이 남아 있다."),
-    "rush": ("[마지막 장 · 수확의 날]\n급히 뽑은 당근은 어딘가 설었다.\n기다리는 법을, 나는 아직 배우지 못했다."),
     "normal": ("[마지막 장 · 수확의 날]\n잘한 것도 못한 것도 있던 하루였다.\n조금은 알 것 같은, 그런 마음으로 밭을 나선다."),
     "bad": ("[마지막 장 · 수확의 날]\n끝내 입에 넣지 못한 당근.\n그래도 예전처럼 밀어내지는 않았다. 그거면, 시작은 된 셈이다."),
     "wither": ("[마지막 장 · 시든 밭]\n수확은 없었다. 흙만 남았다.\n아버지가 매일 무엇과 싸웠는지, 이제야 조금 안다.\n다음 새벽엔, 조금 다르게 해볼 수 있을 것 같다."),
@@ -307,7 +317,8 @@ def append_ending_journal():
     """엔딩에 도달했을 때, 그 결말에 맞는 '마지막 장'을 일지에 딱 한 번 더한다."""
     if game_state.journal_closed:
         return
-    text = ENDING_JOURNAL_CLOSINGS.get(game_state.last_ending)
+    key = "wither" if game_state.crop_failed else game_state.last_ending
+    text = ENDING_JOURNAL_CLOSINGS.get(key)
     if text:
         game_state.journal_entries.append(text)
         game_state.journal_closed = True
@@ -325,6 +336,9 @@ JOURNAL_RETROSPECTIVES = {
     "흙이 바짝 말라 있었다.": "→ 마른 흙을 기억하기에, 물의 소중함을 안다.",
 }
 
+# 선택형 이벤트.
+# 몸을 쓰는 선택지에는 "task"가 붙는다 — 고르는 것으로 끝나지 않고,
+# 제한 시간 안에 직접 손을 놀려야(클릭 과제) 온전한 결과를 얻는다.
 STORY_EVENTS = [
     {
         "title": "이웃 밭의 물난리",
@@ -338,6 +352,8 @@ STORY_EVENTS = [
             "understanding": 8,
             "result_text": "함께 막으니 오히려 물길이 잘 잡혔다. 혼자가 아니었다.",
             "impact_text": "함께 막은 물길 덕분에 이웃 밭도 장마를 버텼다.",
+            "task": {"prompt": "터진 물길을 눌러 막으세요!", "count": 4, "time": 8.0,
+                     "fail_text": "몇 군데는 미처 막지 못해 물이 스몄다."},
         }),
     },
     {
@@ -352,6 +368,8 @@ STORY_EVENTS = [
             "understanding": 6,
             "result_text": "시간은 걸렸지만 튼튼해졌다. 급할수록 돌아가라는 말이 떠오른다.",
             "impact_text": "돌로 고정한 허수아비는 강풍 뒤에도 밭을 지켰다.",
+            "task": {"prompt": "밭가의 돌을 주워 모으세요!", "count": 5, "time": 9.0,
+                     "fail_text": "돌이 모자라 받침이 조금 헐거워졌다."},
         }),
     },
     {
@@ -366,6 +384,56 @@ STORY_EVENTS = [
             "understanding": 7,
             "result_text": "벌이 날아간 뒤, 밭 위로 따뜻한 바람이 불었다.",
             "impact_text": "옮겨 준 벌은 꽃밭을 찾아갔고, 밭가에는 작은 열매가 맺혔다.",
+            "task": {"prompt": "벌이 앉을 잎을 따라 천천히 눌러 이동시키세요.", "count": 3, "time": 8.0,
+                     "fail_text": "벌이 놀라 몇 번 날아올랐지만, 끝내는 꽃밭 쪽으로 향했다."},
+        }),
+    },
+    {
+        "title": "무너진 이랑",
+        "text": "간밤의 비에 이랑 한 켠이 무너져 내렸다.\n뿌리가 드러난 곳도 보인다.\n손을 대면 한나절은 걸릴 일이다.",
+        "choice_a": ("급한 일부터 하고 나중에 손본다", {
+            "understanding": 1,
+            "result_text": "무너진 자리를 지날 때마다 마음이 쓰인다.",
+            "impact_text": "미뤄 둔 이랑은 다음 비에 조금 더 무너졌다.",
+        }),
+        "choice_b": ("지금 흙을 퍼 올려 다시 쌓는다", {
+            "understanding": 6,
+            "result_text": "손바닥이 얼얼하다. 아버지는 이 일을 몇 번이나 했을까.",
+            "impact_text": "다시 쌓은 이랑은 장마를 버텼다.",
+            "task": {"prompt": "무너진 자리에 흙을 눌러 다지세요!", "count": 5, "time": 9.0,
+                     "fail_text": "다 다지지 못한 자리가 조금 주저앉았다."},
+        }),
+    },
+    {
+        "title": "새벽의 고라니",
+        "text": "울타리 틈으로 고라니 한 마리가 서성인다.\n어린 잎을 노리는 눈치다.\n쫓아도 틈이 있으면 또 온다.",
+        "choice_a": ("소리를 질러 당장 쫓아낸다", {
+            "understanding": 2,
+            "result_text": "고라니는 달아났지만, 울타리 틈은 그대로다.",
+            "impact_text": "고라니는 며칠 뒤 다시 찾아와 가장자리 잎을 뜯어 갔다.",
+        }),
+        "choice_b": ("울타리 틈을 나뭇가지로 막는다", {
+            "understanding": 7,
+            "result_text": "쫓는 것보다 막는 것이 먼저였다. 아버지라면 그렇게 했을 것이다.",
+            "impact_text": "막아 둔 울타리 덕에 어린 잎들이 무사히 자랐다.",
+            "task": {"prompt": "울타리 틈을 눌러 막으세요!", "count": 4, "time": 8.0,
+                     "fail_text": "한 군데는 엉성하게 막혔지만, 큰 틈은 사라졌다."},
+        }),
+    },
+    {
+        "title": "아버지의 낡은 호미",
+        "text": "창고 구석에서 손잡이가 반질반질한 호미를 찾았다.\n날은 녹슬었지만, 손에 감기는 각도가 묘하게 편하다.\n오래 쓰인 물건의 각도다.",
+        "choice_a": ("새 호미를 꺼내 쓴다", {
+            "understanding": 1,
+            "result_text": "새 호미는 잘 든다. 그런데 어딘가 낯설다.",
+            "impact_text": "낡은 호미는 창고에서 계속 녹슬어 갔다.",
+        }),
+        "choice_b": ("녹을 닦아내고 그 호미를 쓴다", {
+            "understanding": 6,
+            "result_text": "녹을 닦자 날이 살아났다. 손잡이의 닳은 자리가 내 손에 꼭 맞았다.",
+            "impact_text": "손질한 호미는 밭일 내내 손에서 떠나지 않았다.",
+            "task": {"prompt": "녹슨 자리를 문질러 닦으세요!", "count": 4, "time": 8.0,
+                     "fail_text": "녹이 조금 남았지만, 쓰기엔 충분했다."},
         }),
     },
 ]
@@ -534,12 +602,9 @@ def check_father_day():
 
 
 def get_attitude_ending():
-    """#11 Determine ending type based on attitude, not just scores."""
+    """#11 엔딩 판정 — 배드/노멀/진 3종."""
     p = game_state.patience_score
-    c = game_state.care_score
     e = game_state.empathy_choices
-    r = game_state.recovery_count
-    rush = game_state.rush_count
     u = game_state.understanding
     h = game_state.final_health
     m = game_state.farm_mistakes
@@ -547,48 +612,34 @@ def get_attitude_ending():
     # 진엔딩: 솜씨·이해·인내·공감이 모두 무르익고 실수도 적음
     if u >= 40 and e >= 2 and p >= 3 and h >= 55 and m < 3:
         return "true"
-    # 해피: 따뜻한 성공 — 마음의 흔적(공감 또는 인내)이 하나라도 있음
-    if h >= 65 and u >= 30 and m < 4 and (e >= 1 or p >= 2):
-        return "happy"
-    # 기술: 잘 길렀지만 마음은 헤아리지 못함 (공감 0 · 거의 안 기다림)
-    if h >= 60 and u >= 25 and e == 0 and p <= 1:
-        return "skill"
-    # 성장: 실수가 많았지만 다시 일어선 손
-    if r >= 2 and u >= 18:
-        return "growth"
-    # 조급함: 끝내 기다리지 못함
-    if rush >= 4:
-        return "rush"
-    # 노멀
+    # 노멀: 밭도 마음도 무너지지 않은 하루
     if h >= 45 and u >= 15:
         return "normal"
     # 배드
     return "bad"
 
 
-# #14 Save/Load for 2nd playthrough
-SAVE_PATH = os.path.join(os.path.dirname(__file__), "save_data.json")
+# #14 Save/Load for 2nd playthrough — 실제 파일 경로는 core/save_system.py가 관리한다.
 
 
 def save_progress():
-    data = {
-        "completed": True,
-        "ending": game_state.last_ending,
-        "understanding": game_state.understanding,
-        "empathy_choices": game_state.empathy_choices,
-        "patience_score": game_state.patience_score,
-    }
-    try:
-        with open(SAVE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f)
-    except Exception:
-        pass
+    # 갤러리 해금 기록(endings_seen 등)을 지우지 않도록 병합 저장한다.
+    from core import save_system
+    save_system.update_meta(
+        completed=True,
+        ending=game_state.last_ending,
+        understanding=game_state.understanding,
+        empathy_choices=game_state.empathy_choices,
+        patience_score=game_state.patience_score,
+    )
 
 
 def load_progress():
+    # 저장 경로 결정은 save_system이 전담한다 (exe/개발 환경 모두 동일 파일을 보게).
+    from core import save_system
     try:
-        if os.path.exists(SAVE_PATH):
-            with open(SAVE_PATH, 'r', encoding='utf-8') as f:
+        if os.path.exists(save_system.META_PATH):
+            with open(save_system.META_PATH, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception:
         pass

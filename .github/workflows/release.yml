@@ -1,0 +1,52 @@
+name: Build & Release (Windows EXE)
+
+# v1.0.0 같은 태그를 push하면 자동으로 exe를 빌드해 GitHub 릴리스로 올린다.
+# Actions 탭에서 수동 실행(workflow_dispatch)도 가능.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 릴리스 생성 및 자산 업로드 권한
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: EXE 빌드 (PyInstaller onefile)
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name 몽중농원
+          --add-data "core/Galmuri11.ttf;core"
+          --add-data "core/dad.png;core"
+          --add-data "core/field_bed.jpg;core"
+          main.py
+
+      - name: 빌드 산출물 업로드 (아티팩트)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 몽중농원-windows
+          path: dist/몽중농원.exe
+
+      - name: GitHub 릴리스에 EXE 첨부
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/몽중농원.exe
+          generate_release_notes: true

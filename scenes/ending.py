@@ -9,6 +9,7 @@ from core.game_state import (
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
 from core import audio
+from core.crops import current_crop, swap_crop_word
 
 
 class EndingScene:
@@ -24,9 +25,16 @@ class EndingScene:
         self.char_timer = 0
         self.char_delay = 0.065
         self.finished = False
-        # 작물이 끝내 시들었으면 수확 못 한 '시듦' 엔딩으로 강제 (연출은 아래 advance에서 단축)
-        self.crop_failed = game_state.crop_failed
-        self.ending_data = self.get_ending("wither" if self.crop_failed else None)
+        # 갤러리에서 특정 엔딩을 감상하려고 들어온 경우, 그 엔딩을 강제한다.
+        forced = game_state.forced_ending
+        game_state.forced_ending = None
+        if forced:
+            self.crop_failed = (forced == "wither")
+            self.ending_data = self.get_ending(forced)
+        else:
+            # 작물이 끝내 시들었으면 수확 못 한 '시듦' 엔딩으로 강제 (연출은 아래 advance에서 단축)
+            self.crop_failed = game_state.crop_failed
+            self.ending_data = self.get_ending("wither" if self.crop_failed else None)
         # 이 엔딩에 맞는 '마지막 장'을 일지에 한 번 더한다 (엔딩별로 닫는 글이 달라짐)
         append_ending_journal()
         self.pages = self.build_pages()
@@ -48,6 +56,17 @@ class EndingScene:
         self.carrot_pulse = 0
         self.letter_written = False
         self.credit_lines = self.build_credit_lines()
+        
+        # 마인크래프트 credits 스크롤을 위한 별 입자 생성
+        import random
+        self.credits_stars = []
+        for _ in range(40):
+            self.credits_stars.append({
+                "x": random.randint(10, 790),
+                "y": random.randint(10, 590),
+                "speed": random.uniform(8.0, 22.0),
+                "alpha_phase": random.uniform(0, 6.28)
+            })
         self.credits_y = 620
 
         # 엔딩 타입에 따라 BGM 분기
@@ -70,8 +89,9 @@ class EndingScene:
             filepath = os.path.join(desktop, "아버지의_편지.txt")
             if not os.path.exists(filepath):
                 with open(filepath, 'w', encoding='utf-8') as f:
+                    food = current_crop()["food"]
                     f.write("아들, 밥은 먹었냐.\n")
-                    f.write("바쁘다고 굶지 말고, 당근은 몸에 좋으니까 남기지 마라.\n\n")
+                    f.write(swap_crop_word("바쁘다고 굶지 말고, 당근은 몸에 좋으니까 남기지 마라.\n\n", food))
                     f.write("- 아빠가")
         except Exception:
             pass
@@ -81,6 +101,10 @@ class EndingScene:
         name_eun = append_josa(name, "은/는")
         ending_type = force_type or get_attitude_ending()
         game_state.last_ending = ending_type
+
+        # Record ending in meta save data
+        from core import save_system
+        save_system.record_ending(ending_type)
 
         endings = {
             "true": {
@@ -93,63 +117,24 @@ class EndingScene:
                     f"'아빠, 내일 새벽에 같이 나갈게요. 다 알려주세요.'"
                 ),
             },
-            "happy": {
-                "title": "해피엔딩: 가장 달콤한 수확",
-                "result": "Happy Ending!",
-                "text": (
-                    f"수확한 당근을 베어 문 순간, 꿈속의 세상은 황금빛으로 물든다.\n"
-                    f"아버지가 흘린 땀과 오랜 기다림의 무게가 담긴 달콤한 맛이었다.\n"
-                    f"잠에서 깬 {name_eun} 식탁 위의 당근을 망설임 없이 입에 넣는다.\n"
-                    f"'아빠, 오늘부터 제가 삽질할게요. 다 알려주세요.'"
-                ),
-            },
-            "growth": {
-                "title": "성장엔딩: 서툴러도 포기하지 않은 손",
-                "result": "Growth Ending",
-                "text": (
-                    f"{name_eun} 수확한 당근을 바라본다.\n"
-                    f"서툴렀고, 실수도 많았다.\n"
-                    f"하지만 매번 다시 흙을 만졌다.\n"
-                    f"잠에서 깨어난 뒤, 식탁의 당근 반찬을 천천히 씹는다.\n"
-                    f"'서툴러도 괜찮다'고 아버지가 말해준 것 같았다."
-                ),
-            },
-            "skill": {
-                "title": "기술엔딩: 능숙하지만 부족한 것",
-                "result": "Skill Ending",
-                "text": (
-                    f"{name_eun} 밭일을 잘 해냈다.\n"
-                    f"수확량도 충분하고, 실수도 적었다.\n"
-                    f"하지만 꿈에서 깨어난 뒤 식탁 앞에서 멈칫한다.\n"
-                    f"농사는 배웠지만, 아버지의 마음은 아직 모르겠다."
-                ),
-            },
-            "rush": {
-                "title": "조급함엔딩: 아직 기다리지 못하는 마음",
-                "result": "Rush Ending",
-                "text": (
-                    f"{name_eun} 당근을 급하게 뽑았다.\n"
-                    f"기다리는 법을 배우지 못했다.\n"
-                    f"잠에서 깬 뒤에도 식탁 앞을 지나치며 생각한다.\n"
-                    f"'아직... 뭔가 부족한 것 같다.'"
-                ),
-            },
             "normal": {
                 "title": "노멀엔딩: 조금은 알 것 같은 마음",
                 "result": "Normal Ending",
                 "text": (
-                    f"{name_eun} 수확한 당근을 아주 조금 베어 문다.\n"
-                    f"잠에서 깬 뒤 식탁에서 머뭇거리다가 당근 반찬 한 조각을 집어 먹는다.\n"
-                    f"아버지는 아무 말 없이 조용히 웃는다."
+                    f"수확한 당근을 베어 문 순간, 다정한 침묵이 밭을 감싼다.\n"
+                    f"모든 것을 완전히 알지는 못하지만, 아버지가 흘린 땀방울의 가치가 마음속에 조용히 차오른다.\n"
+                    f"잠에서 깬 {name_eun} 식탁의 당근을 가만히 바라보다 천천히 씹어 넘긴다.\n"
+                    f"'조금은 알 것 같아요. 아빠의 그 침묵을.'"
                 ),
             },
             "bad": {
                 "title": "배드엔딩: 아직은 쓰기만 한 맛",
-                "result": "Bad Ending...",
+                "result": "Bad Ending",
                 "text": (
-                    f"{name_eun} 수확한 당근을 바라보았지만 끝내 입에 넣지 못한다.\n"
-                    f"잠에서 깬 뒤에도 식탁 위 당근 반찬을 가만히 바라볼 뿐이다.\n"
-                    f"하지만 예전처럼 무작정 밀어내지는 않는다."
+                    f"수확한 당근은 너무 작았고, 성급함이 묻어 있었다.\n"
+                    f"기다리는 법도, 아버지가 매일 새벽 무엇을 홀로 마주해 왔는지도 아직 와닿지 않는다.\n"
+                    f"잠에서 깬 {name_eun} 식탁 앞을 말없이 스쳐 지나가며 생각한다.\n"
+                    f"'아직은 쓰다. 조금 더 서 있어야 할 것 같다.'"
                 ),
             },
             "wither": {
@@ -165,7 +150,12 @@ class EndingScene:
         }
 
         data = endings.get(ending_type, endings["normal"])
-        self.is_happy = ending_type in ("true", "happy", "growth")
+        self.is_happy = ending_type == "true"
+        # 고른 작물에 맞춰 '당근'을 먹기 좋은 이름으로 갈아 끼운다 (조사까지)
+        food = current_crop()["food"]
+        if food != "당근":
+            data = dict(data)
+            data["text"] = swap_crop_word(data["text"], food)
         return data
 
     def build_pages(self):
@@ -179,14 +169,33 @@ class EndingScene:
         ]
 
     def build_credit_lines(self):
-        impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "rush", "wither") else "이어진 일들"
+        impact_heading = "남겨진 일들" if game_state.last_ending in ("bad", "wither") else "이어진 일들"
         
         # 플레이 타임 포맷팅 (분, 초)
         m = int(game_state.play_time // 60)
         s = int(game_state.play_time % 60)
         play_time_str = f"플레이 시간: {m}분 {s}초" if m > 0 else f"플레이 시간: {s}초"
 
-        lines = [
+        dialogue = [
+            "«어둠 속의 목소리»",
+            "그가 작물을 심었구나.",
+            "그래. 흙을 길들이고, 마침내 기다림의 가치를 배웠지.",
+            "그는 아버지가 이 황혼 아래 무엇을 외로이 지켜왔는지 알게 되었을까?",
+            "알게 되었지. 말없는 흙 아래 묻어둔 고단한 마음을.",
+            swap_crop_word("그가 정성껏 당근을 한 뿌리 거두었을 때,", current_crop()["food"]),
+            "그것은 단순한 양식이 아닌, 아버지의 묵묵한 세월이었다.",
+            "그가 이제 꿈에서 깨어나려 하는구나.",
+            "그래. 잠에서 깨어난 뒤, 식탁에 마주 앉을 날이 올 것이다.",
+            "밭의 바람은 불고, 태양은 매일 새로이 떠오르니.",
+            "그의 앞에 따뜻한 아침이 기다리기를.",
+            "너는 아직 꿈속에 있단다.",
+            "하지만 곧 깨어나겠지. 사랑하는 이의 곁에서.",
+            "",
+            "---------------------------------------",
+            "",
+        ]
+
+        lines = dialogue + [
             "몽중농원",
             "",
             "이번 꿈에서 남은 기록",
@@ -291,9 +300,7 @@ class EndingScene:
 
     # 엔딩 갤러리 키 (1회 클리어 이후에만 활성화 — 첫 플레이에서는 엔딩을 직접 얻어야 함)
     GALLERY_KEYS = {
-        pygame.K_1: "true", pygame.K_2: "happy", pygame.K_3: "growth",
-        pygame.K_4: "skill", pygame.K_5: "rush", pygame.K_6: "normal",
-        pygame.K_7: "bad",
+        pygame.K_1: "true", pygame.K_2: "normal", pygame.K_3: "bad",
     }
 
     def gallery_unlocked(self):
@@ -434,7 +441,14 @@ class EndingScene:
 
         elif self.phase == "credits":
             self.phase_timer += dt
-            self.credits_y -= 34 * dt
+            self.credits_y -= 26 * dt
+            import random
+            for star in self.credits_stars:
+                star["y"] += star["speed"] * dt
+                star["alpha_phase"] += 1.5 * dt
+                if star["y"] > 600:
+                    star["y"] = 0
+                    star["x"] = random.randint(10, 790)
             if self.credits_y + self._credit_content_height() < 84:
                 self._finish_after_credits()
 
@@ -611,15 +625,20 @@ class EndingScene:
             screen.blit(sparkle, (px - size, py - size))
 
         # 4. Carrot sprite pulsing in center (Aligned properly inside the plate)
+        # 당근 스프라이트 하나뿐이라, 작물별 색조(tint)를 얹어 다른 작물처럼 보이게 한다.
         carrot = sprites["carrot"]
+        crop = current_crop()
+        if crop.get("tint"):
+            carrot = carrot.copy()
+            carrot.fill(crop["tint"], special_flags=pygame.BLEND_RGB_MULT)
         scale = 1.0 + 0.06 * math.sin(self.carrot_pulse * 3)
         cw = int(carrot.get_width() * scale)
         ch = int(carrot.get_height() * scale)
         scaled = pygame.transform.scale(carrot, (cw, ch))
         screen.blit(scaled, (400 - cw // 2, 344 - ch))
-        
+
         # Prompt
-        prompt = self.font_small.render("당근을 클릭하세요", True, (255, 225, 130))
+        prompt = self.font_small.render(f"{crop['food']}을(를) 클릭하세요", True, (255, 225, 130))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 430))
 
     def _draw_golden(self, screen):
@@ -743,11 +762,16 @@ class EndingScene:
             self._draw_exit_button(screen)
 
     def _draw_credits(self, screen):
-        draw_story_backdrop(screen, "night")
-        overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 88))
-        screen.blit(overlay, (0, 0))
-
+        screen.fill((10, 10, 15))
+        
+        # twinkling stars 그리기
+        for star in self.credits_stars:
+            a = int(140 + 115 * math.sin(star["alpha_phase"]))
+            a = max(0, min(255, a))
+            s = pygame.Surface((4, 4), pygame.SRCALPHA)
+            pygame.draw.circle(s, (220, 235, 255, a), (2, 2), 2)
+            screen.blit(s, (int(star["x"]), int(star["y"])))
+            
         y = self.credits_y
         for line in self.credit_lines:
             if not line:
@@ -756,8 +780,35 @@ class EndingScene:
 
             is_title = line == "몽중농원"
             is_section = line in ("이번 꿈에서 남은 기록", "남겨진 일들", "이어진 일들")
-            font = self.font_result if is_title else self.font if is_section else self.font_small
-            color = (255, 226, 150) if is_title else (232, 205, 156) if is_section else (226, 220, 198)
+            is_narrator = line == "«어둠 속의 목소리»"
+            
+            if is_narrator:
+                font = self.font
+                color = (255, 215, 0)
+            elif line in (
+                "그가 작물을 심었구나.",
+                "그는 아버지가 이 황혼 아래 무엇을 외로이 지켜왔는지 알게 되었을까?",
+                "그가 정성껏 당근을 한 뿌리 거두었을 때,",
+                "그가 이제 꿈에서 깨어나려 하는구나.",
+                "너는 아직 꿈속에 있단다."
+            ):
+                font = self.font
+                color = (154, 219, 149)
+            elif line in (
+                "그래. 흙을 길들이고, 마침내 기다림의 가치를 배웠지.",
+                "알게 되었지. 말없는 흙 아래 묻어둔 고단한 마음을.",
+                "그것은 단순한 양식이 아닌, 아버지의 묵묵한 세월이었다.",
+                "그래. 잠에서 깨어난 뒤, 식탁에 마주 앉을 날이 올 것이다.",
+                "밭의 바람은 불고, 태양은 매일 새로이 떠오르니.",
+                "그의 앞에 따뜻한 아침이 기다리기를.",
+                "하지만 곧 깨어나겠지. 사랑하는 이의 곁에서."
+            ):
+                font = self.font
+                color = (142, 196, 237)
+            else:
+                font = self.font_result if is_title else self.font if is_section else self.font_small
+                color = (255, 226, 150) if is_title else (232, 205, 156) if is_section else (226, 220, 198)
+
             max_width = 620 if not is_title else 760
 
             for wrapped in wrap_text(line, font, max_width):

@@ -11,6 +11,8 @@ from core.game_state import (
 )
 from core.assets import *
 from core import audio
+from core import save_system
+from core.crops import farm_config
 from core.ui import (
     draw_light_panel, draw_wood_panel, draw_top_bar,
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
@@ -88,9 +90,11 @@ class FarmScene:
     ]
 
     def __init__(self):
+        # 작물(+악몽 여부)에 따른 밭 성질 — 목표치, 버튼 이름, 마름/들끓음 속도
+        self.crop_cfg = farm_config()
         self.day = 1
         self.growth = 0
-        self.growth_goal = 20
+        self.growth_goal = self.crop_cfg["growth_goal"]
         self.moisture = 44
         self.health = 66
         self.weeds = 25
@@ -119,6 +123,10 @@ class FarmScene:
         self.interactions_enabled = True
         self.story_cooldown = 2
         self.stories_seen = set()
+        # 기다림 시스템: 마지막 '기다리기' 이후 흐른 턴 — 5턴을 넘기면 밭이 강제로 손을 멈추게 한다
+        self.turns_since_wait = 0
+        self.forced_wait_active = False
+        self.forced_wait_timer = 0.0
         # 통합 '속마음' 표시 채널 — 메아리/감각/선물/날씨지혜를 하나로 묶어
         # 겹치지 않는 한 곳에서 차례로 보여준다.
         self.thought_text = ""
@@ -170,6 +178,10 @@ class FarmScene:
 
         self.rebuild_buttons()
 
+    def action_label(self, action):
+        """작물에 따라 같은 행동도 다른 이름으로 보인다 (벼: 물 대기, 사과나무: 가지치기)."""
+        return self.crop_cfg["labels"].get(action, action)
+
     def rebuild_buttons(self):
         self.buttons = []
         start_x = 440
@@ -178,8 +190,15 @@ class FarmScene:
             self.buttons.append(Button(start_x, start_y, 300, 126, "수확하기", "수확하기", font_size=30))
             return
 
+        if self.turns_since_wait >= 5:
+            # 5턴 동안 한 번도 안 쉰 경우 강제 기다리기
+            self.buttons.append(Button(start_x, start_y, 300, 126, "강제 기다리기\n(돌발 상황 해결)", "__forced_wait__", font_size=26))
+            return
+
         if not self.action_menu_open:
-            self.buttons.append(Button(start_x, start_y, 300, 126, "행동하기", "__open_actions__", font_size=30))
+            # '행동하기'와 '기다리기'는 별개의 마음가짐 — 버튼도 나눈다
+            self.buttons.append(Button(start_x, start_y, 300, 80, "행동하기", "__open_actions__", font_size=28))
+            self.buttons.append(Button(start_x, start_y + 86, 300, 40, "기다리기", "기다리기", font_size=20))
             return
 
         actions = self.get_action_choices()
@@ -187,22 +206,26 @@ class FarmScene:
         self.action_scroll = max(0, min(self.action_scroll, max_scroll))
         for i, action in enumerate(actions[self.action_scroll:self.action_scroll + 4]):
             by = start_y + i * 31
-            self.buttons.append(Button(start_x, by, 284, 28, action, action, font_size=17))
+            self.buttons.append(Button(start_x, by, 284, 28, self.action_label(action), action, font_size=17))
+
+        # 행동 닫기 (Cancel) 버튼 추가
+        self.buttons.append(Button(start_x, start_y + 128, 284, 26, "행동 닫기", "__close_actions__", font_size=15))
 
     def is_harvest_ready(self):
         return self.growth >= self.growth_goal
 
     def get_needed_actions(self):
         needs = []
+        lo, hi = self.crop_cfg["moist_lo"], self.crop_cfg["moist_hi"]
 
         def add(action, score, order):
             if score > 0:
                 needs.append((action, score, order))
 
-        if self.moisture < 35:
-            add("물 주기", 35 - self.moisture, 0)
-        if self.moisture > 72 or self.drainage < 35:
-            add("배수로 정리", max(self.moisture - 72, 35 - self.drainage), 1)
+        if self.moisture < lo + 5:
+            add("물 주기", lo + 5 - self.moisture, 0)
+        if self.moisture > hi or self.drainage < 35:
+            add("배수로 정리", max(self.moisture - hi, 35 - self.drainage), 1)
         if self.weeds > 20:
             weed_score = self.weeds - 20
             if self.weeds > 32:
@@ -225,7 +248,8 @@ class FarmScene:
             if action not in choices:
                 choices.append(action)
 
-        fillers = ["기다리기", "물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
+        # '기다리기'는 행동 목록에서 분리 — 밭 화면의 전용 버튼으로만 한다
+        fillers = ["물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
         for action in fillers:
             if action not in choices:
                 choices.append(action)
@@ -302,6 +326,17 @@ class FarmScene:
                             self.action_menu_open = True
                             self.action_scroll = 0
                             self.rebuild_buttons()
+                        elif btn.value == "__close_actions__":
+                            audio.play("click")
+                            self.action_menu_open = False
+                            self.rebuild_buttons()
+                        elif btn.value == "__forced_wait__":
+                            audio.play("click")
+                            self.forced_wait_active = True
+                            self.forced_wait_timer = 30.0
+                            self.interaction_action = random.choice(["물 주기", "잡초 뽑기", "해충 살피기", "흙 북돋기"])
+                            self.interaction = TACTILE_INTERACTIONS[self.interaction_action](self)
+                            self.rebuild_buttons()
                         else:
                             self.action_menu_open = False
                             self.do_action(btn.value)
@@ -363,6 +398,11 @@ class FarmScene:
         self.actions_taken += 1
         self.last_action = action
         audio.play(ACTION_SFX.get(action, "click"))
+        if action == "기다리기":
+            self.turns_since_wait = 0
+        elif action != "살펴보기":
+            self.turns_since_wait += 1
+            
         if action == "물 주기":
             game_state.water_count += 1
         elif action == "잡초 뽑기":
@@ -473,6 +513,10 @@ class FarmScene:
             self.try_trigger_minigame(action)
         self.rebuild_buttons()
 
+        # 자동 저장 기능
+        if save_system.get_setting("autosave"):
+            save_system.save_game(self)
+
     def push_thought(self, text, dur=4.5):
         """통합 '속마음' 채널에 한 줄 추가. 여러 개면 순서대로 표시(겹치지 않음)."""
         if not text:
@@ -490,9 +534,12 @@ class FarmScene:
             self.stress = max(0, self.stress - 4)
             return self.inspect_message(), False
 
+        lo, hi = self.crop_cfg["moist_lo"], self.crop_cfg["moist_hi"]
+        w_mult = self.crop_cfg["water_mult"]
+
         if action == "물 주기":
             if quality is not None:
-                add = quality["moisture_add"]
+                add = int(quality["moisture_add"] * w_mult)
                 self.moisture += add
                 if quality["quality"] == "over":
                     # 실수는 따끔하되 회복 가능하게 — 손맛을 못해도 소프트락에 빠지지 않도록.
@@ -505,18 +552,18 @@ class FarmScene:
                 self.health += 4
                 self.stress = max(0, self.stress - 6)
                 return "딱 알맞게, 흙이 촉촉해졌다.", False
-            if self.moisture < 35:
-                self.moisture += 34
+            if self.moisture < lo + 5:
+                self.moisture += int(34 * w_mult)
                 self.health += 4
                 self.stress = max(0, self.stress - 6)
                 return "흙이 촉촉해졌다.", False
-            if self.moisture > 70:
-                self.moisture += 18
+            if self.moisture > hi - 2:
+                self.moisture += int(18 * w_mult)
                 self.health -= 12 + difficulty
                 self.stress += 10
                 self.mistakes += 1
                 return "물이 너무 많았다. 뿌리가 숨을 못 쉰다.", True
-            self.moisture += 18
+            self.moisture += int(18 * w_mult)
             return "물을 주었다.", False
 
         if action == "잡초 뽑기":
@@ -925,6 +972,24 @@ class FarmScene:
         self.minigame_cooldown = 6
 
     def update(self, dt):
+        if self.forced_wait_active:
+            self.forced_wait_timer -= dt
+            if self.forced_wait_timer <= 0:
+                self.forced_wait_timer = 0.0
+                self.forced_wait_active = False
+                self.interaction = None
+                audio.play("break")
+                self.health = max(0, self.health - 15)
+                self.stress = min(100, self.stress + 20)
+                self.mistakes += 1
+                self.turns_since_wait = 0
+                self.message = "돌발 상황을 제시간에 해결하지 못해 작물이 큰 충격을 받았습니다."
+                self.notice = "기다려야 할 때는 서두르지 말고 밭의 부름에 집중합시다."
+                self.rebuild_buttons()
+                if save_system.get_setting("autosave"):
+                    save_system.save_game(self)
+                return
+
         # 손맛 인터랙션 진행 중에는 그것만 갱신 (나머지 밭은 잠시 멈춤)
         if self.interaction:
             self.interaction.update(dt)
@@ -932,8 +997,19 @@ class FarmScene:
                 result = self.interaction.result
                 action = self.interaction_action
                 self.interaction = None
+                
+                if self.forced_wait_active:
+                    self.forced_wait_active = False
+                    self.turns_since_wait = 0
+                    self._run_action(action, result)
+                    self.message = f"돌발 상황({action})을 30초 내에 무사히 해결했습니다!"
+                    self.notice = "기다림이 작물을 더 튼튼하게 만듭니다."
+                    game_state.patience_score += 1
+                    game_state.understanding += 4
+                    if save_system.get_setting("autosave"):
+                        save_system.save_game(self)
                 # 날씨 미니게임 결과 — 스탯 보너스 직접 적용
-                if result and "weather_bonus" in result:
+                elif result and "weather_bonus" in result:
                     bonus = result["weather_bonus"]
                     for stat, val in bonus.items():
                         cur = getattr(self, stat, None)
@@ -1271,6 +1347,23 @@ class FarmScene:
 
         # 하단바: 1줄 = 방금 일어난 일, 2줄 = 지금 밭의 증상
         draw_bottom_bar(screen, "농장 일지", f"{self.message}\n{self.notice}")
+
+        # 강제 기다리기 돌발 상황 배너 및 타이머 표시
+        if self.forced_wait_active:
+            import math
+            pulse = abs(math.sin(pygame.time.get_ticks() * 0.005))
+            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+            overlay.fill((200, 30, 30, int(20 + 20 * pulse)))
+            screen.blit(overlay, (0, 0))
+            
+            # 상단 타이머 박스
+            timer_box = pygame.Rect(220, 20, 360, 42)
+            draw_light_panel(screen, timer_box, fill=(255, 230, 230), border=(200, 50, 50))
+            
+            timer_font = get_font(16)
+            timer_text = f"돌발 상황 해결 중! 남은 시간: {self.forced_wait_timer:.1f}초"
+            ts = timer_font.render(timer_text, True, (200, 30, 30))
+            screen.blit(ts, (400 - ts.get_width() // 2, 31))
 
         # 손맛 인터랙션 오버레이 (모든 것 위에)
         if self.interaction:

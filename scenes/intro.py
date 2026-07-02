@@ -19,23 +19,40 @@ class IntroScene:
         self.text_to_print = self.prepare_page(self.page_index)
 
     def get_intro_pages(self):
+        from core.crops import current_crop, swap_crop_word, NIGHTMARE_INTRO
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
+        crop = current_crop()
+        crop_name = crop["name"]
 
-        return [
-            (
-                "[몽중농원]\n당근 한 뿌리의 시간\n\n"
-                f"{name_eun} 식탁 위 당근 반찬을 슬쩍 밀어냈다.\n"
-                "아버지는 아무 말 없이 그릇을 바라보다가 작게 한숨을 쉬었다.\n"
-                "'언젠가는 이 한 조각에도 시간이 들어 있다는 걸 알게 되겠지.'"
-            ),
-            (
-                f"그날 밤, {name_eun} 낯선 흙냄새 속에서 눈을 뜬다.\n"
-                "발밑에는 끝이 보이지 않는 당근밭이 펼쳐져 있었다.\n\n"
-                "어디선가 낮은 목소리가 들린다.\n"
-                "'네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.'"
-            ),
-        ]
+        # 악)몽중농원 — 진엔딩 해금 모드의 전용 도입부
+        if game_state.nightmare:
+            return [
+                "[악)몽중농원]\n남긴 것들의 밭\n\n" + NIGHTMARE_INTRO,
+                (
+                    f"{name_eun} 검붉은 흙 앞에 선다.\n"
+                    f"이 지옥의 밭에서 {crop_name}를 끝까지 길러 거두어야\n"
+                    "비로소 꿈에서 놓여날 수 있다.\n\n"
+                    "'남기지 마라. 이번엔, 끝까지.'"
+                ),
+            ]
+
+        # 일반 도입부 — 고른 작물에 맞춰 '당근'을 갈아 끼운다
+        page1 = swap_crop_word(
+            "[몽중농원]\n당근 한 뿌리의 시간\n\n"
+            f"{name_eun} 식탁 위 당근 반찬을 슬쩍 밀어냈다.\n"
+            "아버지는 아무 말 없이 그릇을 바라보다가 작게 한숨을 쉬었다.\n"
+            "'언젠가는 이 한 조각에도 시간이 들어 있다는 걸 알게 되겠지.'",
+            crop_name,
+        )
+        page2 = swap_crop_word(
+            f"그날 밤, {name_eun} 낯선 흙냄새 속에서 눈을 뜬다.\n"
+            "발밑에는 끝이 보이지 않는 당근밭이 펼쳐져 있었다.\n\n"
+            "어디선가 낮은 목소리가 들린다.\n"
+            "'네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.'",
+            crop_name,
+        )
+        return [page1, page2]
 
     def prepare_page(self, index):
         lines = []

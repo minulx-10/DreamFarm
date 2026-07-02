@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import math
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -8,6 +9,8 @@ from core.game_state import game_state, apply_second_run
 from core import audio
 from core.settings_overlay import SettingsOverlay
 from scenes.title import TitleScene
+from scenes.crop_select import CropSelectScene
+from scenes.gallery import GalleryScene
 from scenes.name_input import NameInputScene
 from scenes.intro import IntroScene
 from scenes.transition import TransitionScene
@@ -23,9 +26,29 @@ from scenes.epiphany import EpiphanyScene
 from scenes.story_choice import StoryChoiceScene
 from scenes.father_day import FatherDayScene
 
+
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((800, 600))
+    
+    # 디스플레이 초기화 변수
+    is_fullscreen = False
+    current_nightmare = False
+    screen = None
+    
+    def update_display_mode():
+        nonlocal screen, current_nightmare
+        current_nightmare = game_state.nightmare
+
+        if is_fullscreen:
+            # (0,0) + FULLSCREEN → 모니터 native 해상도로 꽉 채운다.
+            # 그리기는 800x600 가상 버퍼에 하고 실제 창 크기로 스케일하므로 어떤 해상도든 무방하다.
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.DOUBLEBUF)
+        else:
+            w = 960 if current_nightmare else 800
+            h = 720 if current_nightmare else 600
+            screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
+        
+    update_display_mode()
     pygame.display.set_caption("몽중농원")
     clock = pygame.time.Clock()
     
@@ -36,12 +59,20 @@ def main():
     # #14 Check for 2nd playthrough
     apply_second_run()
 
-    # 씬별 배경음 매핑 (None이면 현재 곡 유지)
-    # None = 현재 곡 유지(전환마다 처음부터 다시 트는 '리셋' 방지).
-    # 밭 단계 중간에 끼는 회상·스토리·아버지의 하루·별 잇기는 곡을 바꾸지 않아
-    # 밭 배경음이 끊기지 않고 길게 이어진다. 곡 전환은 도입(밤)과 엔딩에서만.
+    # 가상 화면 800x600 버퍼 생성
+    virtual_screen = pygame.Surface((800, 600))
+
+    # 마우스 좌표 역계산(역배율 스케일링)을 위한 get_pos 재정의
+    orig_get_pos = pygame.mouse.get_pos
+    def mapped_get_pos():
+        ax, ay = orig_get_pos()
+        aw, ah = screen.get_size()
+        return (int(ax * 800.0 / aw), int(ay * 600.0 / ah))
+    pygame.mouse.get_pos = mapped_get_pos
+
     BGM_BY_SCENE = {
-        "title": "night", "name_input": "night", "intro": "night",
+        "title": "night", "crop_select": "night", "gallery": "night", 
+        "name_input": "night", "intro": "night",
         "memory": None, "story_choice": None, "father_day": None,
         "farm": "farm", "stage1": "farm", "stage2": "farm",
         "stage3": "farm", "stage4": "farm", "star_connect": None,
@@ -49,9 +80,10 @@ def main():
         "transition": None, "epiphany": None,
     }
 
-    # 씬 이름 → 생성자 레지스트리
     SCENE_FACTORIES = {
         "title": TitleScene,
+        "crop_select": CropSelectScene,
+        "gallery": GalleryScene,
         "name_input": NameInputScene,
         "intro": IntroScene,
         "transition": TransitionScene,
@@ -67,10 +99,11 @@ def main():
         "story_choice": StoryChoiceScene,
         "father_day": FatherDayScene,
     }
-    # 진입할 때마다 새 상태로 재생성해야 하는 씬 (farm/name_input/transition은 유지)
+    
     FRESH_ON_ENTER = {
-        "title", "intro", "memory", "epiphany", "story_choice", "father_day",
-        "stage1", "stage2", "stage3", "stage4", "star_connect", "ending",
+        "title", "crop_select", "gallery", "intro", "memory", "epiphany", 
+        "story_choice", "father_day", "stage1", "stage2", "stage3", 
+        "stage4", "star_connect", "ending",
     }
 
     scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}
@@ -86,8 +119,11 @@ def main():
 
         target_scene = game_state.current_scene
 
+        # 지옥 모드 진입/해제에 따른 동적 해상도 창 크기 재설정
+        if game_state.nightmare != current_nightmare:
+            update_display_mode()
+
         if target_scene != current_key:
-            # 인트로 진입은 새 게임이므로 밭도 함께 초기화
             if target_scene == "intro":
                 scenes["farm"] = SCENE_FACTORIES["farm"]()
             if target_scene in FRESH_ON_ENTER:
@@ -95,31 +131,81 @@ def main():
             current_scene_obj = scenes[target_scene]
             current_key = target_scene
 
-        # 씬에 맞는 배경음 재생 (같은 곡이면 내부에서 무시됨)
+        # 타이틀 등에서 '설정' 버튼을 누르면 소리/저장 오버레이를 연다
+        if game_state.request_settings:
+            game_state.request_settings = False
+            settings_overlay.open = True
+
+        # 설정 오버레이에서 이어하기 로드 요청 시 처리
+        if game_state.request_load:
+            game_state.request_load = False
+            from core import save_system
+            data = save_system.load_slot()
+            if data:
+                save_system.restore(data, scenes["farm"])
+                game_state.current_scene = "farm"
+                current_scene_obj = scenes["farm"]
+                current_key = "farm"
+                # 지옥 모드 여부에 맞게 창 크기 즉시 갱신
+                if game_state.nightmare != current_nightmare:
+                    update_display_mode()
+                audio.play_bgm("farm")
+
         desired_bgm = BGM_BY_SCENE.get(target_scene)
         if desired_bgm:
             audio.play_bgm(desired_bgm)
 
         events = pygame.event.get()
+        actual_w, actual_h = screen.get_size()
+        
+        # 1. F11 전체화면 감지 및 마우스 좌표 가상 해상도로 역배율 보정
+        mapped_events = []
         for event in events:
             if event.type == pygame.QUIT:
                 game_state.running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                is_fullscreen = not is_fullscreen
+                update_display_mode()
+            
+            # 마우스 입력 좌표 역배율 보정
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+                vx = int(event.pos[0] * 800.0 / actual_w)
+                vy = int(event.pos[1] * 600.0 / actual_h)
+                mapped_event = pygame.event.Event(event.type, pos=(vx, vy), button=event.button)
+                mapped_events.append(mapped_event)
+            elif event.type == pygame.MOUSEMOTION:
+                vx = int(event.pos[0] * 800.0 / actual_w)
+                vy = int(event.pos[1] * 600.0 / actual_h)
+                vrx = int(event.rel[0] * 800.0 / actual_w)
+                vry = int(event.rel[1] * 600.0 / actual_h)
+                mapped_event = pygame.event.Event(event.type, pos=(vx, vy), rel=(vrx, vry), buttons=event.buttons)
+                mapped_events.append(mapped_event)
+            else:
+                mapped_events.append(event)
 
-        # 소리 설정 창이 입력을 가로채면 씬으로 넘기지 않는다
-        if not settings_overlay.handle_events(events):
-            for event in events:
+        # 2. 모든 입력을 가상 좌표 이벤트로 흘려보냄
+        # 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
+        if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
+            for event in mapped_events:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                     audio.toggle_mute()
-            current_scene_obj.handle_events(events)
+            current_scene_obj.handle_events(mapped_events)
 
         current_scene_obj.update(dt)
-        current_scene_obj.draw(screen)
-        settings_overlay.draw(screen)
+        settings_overlay.update(dt)
+
+        # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
+        current_scene_obj.draw(virtual_screen)
+        settings_overlay.draw(virtual_screen)
+
+        # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사
+        pygame.transform.scale(virtual_screen, (actual_w, actual_h), screen)
 
         pygame.display.flip()
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()

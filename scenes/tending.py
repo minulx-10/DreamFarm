@@ -23,6 +23,7 @@ class WaterPour:
     PROMPT = "꾹 눌러 물을 붓고, 초록 칸에서 손을 떼세요"
 
     def __init__(self, farm):
+        from core.game_state import game_state
         self.farm = farm
         m = farm.moisture
         self.level = 0.0
@@ -35,6 +36,9 @@ class WaterPour:
         self.drops = []
         self.pour_played = False
         self.fill_rate = 55.0 * random.uniform(0.9, 1.14)   # 변형: 물줄기 세기
+
+        # 작물별 프롬프트 정의
+        self.PROMPT = "물꼬를 터 물을 넉넉히 대고, 초록 칸에서 손을 떼세요" if game_state.crop == "rice" else "꾹 눌러 물을 붓고, 초록 칸에서 손을 떼세요"
 
         def lvl_for(target):
             return max(0.0, (target - m) / self.PER_LEVEL)
@@ -86,20 +90,39 @@ class WaterPour:
         self.settle = 1.1
 
     def draw(self, screen):
+        from core.game_state import game_state
         _veil(screen)
-        can = sprites["watering_can"]
-        tilt = 28 + (22 if self.pouring else 0)
-        rot = pygame.transform.rotate(can, tilt)
-        screen.blit(rot, (PLOT.x + 150 - rot.get_width() // 2, 150))
+        
+        if game_state.crop == "rice":
+            # 목재 물꼬 틀 그리기
+            gate_rect = pygame.Rect(PLOT.x + 130, 140, 40, 60)
+            pygame.draw.rect(screen, (80, 50, 30), gate_rect)
+            pygame.draw.rect(screen, (122, 86, 53), gate_rect.inflate(-4, -4))
+            
+            # 들어 올려지는 나무 판자
+            offset_y = -22 if self.pouring else 0
+            panel_rect = pygame.Rect(PLOT.x + 136, 150 + offset_y, 28, 40)
+            pygame.draw.rect(screen, (60, 35, 20), panel_rect)
+            pygame.draw.rect(screen, (87, 51, 25), panel_rect.inflate(-4, -4))
+            
+            # 쏟아지는 물줄기
+            if self.pouring:
+                pygame.draw.rect(screen, (100, 170, 240), (PLOT.x + 140, 190, 20, 50))
+                pygame.draw.rect(screen, (222, 242, 252), (PLOT.x + 145, 190, 10, 50))
+        else:
+            can = sprites["watering_can"]
+            tilt = 28 + (22 if self.pouring else 0)
+            rot = pygame.transform.rotate(can, tilt)
+            screen.blit(rot, (PLOT.x + 150 - rot.get_width() // 2, 150))
 
-        spout_x = PLOT.x + 150 + 64
-        if self.pouring:
-            # 물줄기 — 반투명 리본 여러 겹 + 밝은 심줄
-            ribbon = pygame.Surface((48, 56), pygame.SRCALPHA)
-            for ox, a, wd in ((-2, 70, 6), (1, 120, 4), (4, 80, 5)):
-                pygame.draw.line(ribbon, (150, 205, 235, a), (8 + ox, 0), (26 + ox, 46), wd)
-            pygame.draw.line(ribbon, (222, 242, 252, 210), (8, 0), (26, 44), 2)
-            screen.blit(ribbon, (spout_x - 8, 196))
+            spout_x = PLOT.x + 150 + 64
+            if self.pouring:
+                # 물줄기 — 반투명 리본 여러 겹 + 밝은 심줄
+                ribbon = pygame.Surface((48, 56), pygame.SRCALPHA)
+                for ox, a, wd in ((-2, 70, 6), (1, 120, 4), (4, 80, 5)):
+                    pygame.draw.line(ribbon, (150, 205, 235, a), (8 + ox, 0), (26 + ox, 46), wd)
+                pygame.draw.line(ribbon, (222, 242, 252, 210), (8, 0), (26, 44), 2)
+                screen.blit(ribbon, (spout_x - 8, 196))
         for d in self.drops:
             glow = pygame.Surface((10, 10), pygame.SRCALPHA)
             pygame.draw.circle(glow, (170, 215, 240, 110), (5, 5), 5)
@@ -144,6 +167,7 @@ class WeedPull:
     PROMPT = "잡초를 잡고 쭉 끌어내 뽑으세요"
 
     def __init__(self, farm):
+        from core.game_state import game_state
         self.farm = farm
         n = min(6, max(3, farm.weeds // 11)) + random.randint(0, 1)   # 변형: 개수
         self.items = []
@@ -163,6 +187,8 @@ class WeedPull:
         self.feedback = ""
         self.feedback_color = (255, 255, 255)
         self.puffs = []
+        
+        self.PROMPT = "가지를 잡아 밭 밖으로 끌어내어 가지치기 하세요" if game_state.crop == "apple" else "잡초를 잡고 쭉 끌어내 뽑으세요"
 
     def handle(self, event):
         if self.done or self.result is not None:
@@ -202,45 +228,65 @@ class WeedPull:
             self._resolve()
 
     def _resolve(self):
+        from core.game_state import game_state
         cleared = sum(1 for w in self.items if w["pulled"])
         frac = cleared / max(1, self.total)
+        is_apple = (game_state.crop == "apple")
         if frac >= 0.85:
-            self.feedback = "잡초를 말끔히 걷어냈다!"; self.feedback_color = (150, 230, 150); audio.play("success")
+            self.feedback = "가지를 깨끗하게 정리했습니다!" if is_apple else "잡초를 말끔히 걷어냈다!"
+            self.feedback_color = (150, 230, 150)
+            audio.play("success")
         elif frac >= 0.45:
-            self.feedback = "그런대로 정리했다."; self.feedback_color = (220, 205, 140); audio.play("page")
+            self.feedback = "어느 정도 가지를 쳤습니다." if is_apple else "그런대로 정리했다."
+            self.feedback_color = (220, 205, 140)
+            audio.play("page")
         else:
-            self.feedback = "손이 더뎠다. 잡초가 남았다."; self.feedback_color = (225, 175, 130); audio.play("page")
+            self.feedback = "정리가 덜 되었습니다." if is_apple else "손이 더뎠다. 잡초가 남았다."
+            self.feedback_color = (225, 175, 130)
+            audio.play("page")
         self.result = {"quality": "weed", "cleared_frac": frac}
         self.settle = 1.0
 
     def draw(self, screen):
+        from core.game_state import game_state
         _veil(screen)
         wsp = sprites["weed"]
+        is_apple = (game_state.crop == "apple")
+        
         for w in self.items:
             if w["pulled"]:
                 continue
             ox, oy = int(w["ox"]), int(w["oy"])
             gx2, gy2 = w["x"] + ox, w["y"] + oy
-            # 대상 표시 — 발밑에 옅은 빛 (이걸 뽑으라는 신호)
+            # 대상 표시
             glow = pygame.Surface((46, 24), pygame.SRCALPHA)
-            pygame.draw.ellipse(glow, (255, 236, 165, 80), (0, 0, 46, 24))
-            pygame.draw.ellipse(glow, (255, 250, 210, 120), (9, 6, 28, 12))
+            pygame.draw.ellipse(glow, (255, 236, 165, 80) if not is_apple else (230, 255, 200, 80), (0, 0, 46, 24))
+            pygame.draw.ellipse(glow, (255, 250, 210, 120) if not is_apple else (240, 255, 210, 120), (9, 6, 28, 12))
             screen.blit(glow, (gx2 - 23, gy2 + 6))
-            # 뿌리에서 늘어나는 줄기 표시
+            # 줄기 표시
             if self.grabbed is w and (ox or oy):
-                pygame.draw.line(screen, (96, 132, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
-            screen.blit(wsp, (gx2 - wsp.get_width() // 2, gy2 - wsp.get_height() // 2))
+                pygame.draw.line(screen, (96, 132, 70) if not is_apple else (120, 90, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
+            
+            if is_apple:
+                pygame.draw.line(screen, (101, 67, 33), (gx2 - 12, gy2 + 8), (gx2 + 12, gy2 - 8), 4) # 나무줄기
+                pygame.draw.circle(screen, (76, 139, 58), (gx2 - 4, gy2 - 2), 6) # 나뭇잎 1
+                pygame.draw.circle(screen, (96, 169, 78), (gx2 + 6, gy2 - 6), 5) # 나뭇잎 2
+            else:
+                screen.blit(wsp, (gx2 - wsp.get_width() // 2, gy2 - wsp.get_height() // 2))
+                
         for p in self.puffs:
             r = int(14 * (1 - p[2] / 0.45)) + 4
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(s, (150, 110, 70, int(150 * (p[2] / 0.45))), (r, r), r)
+            color = (130, 160, 110, int(150 * (p[2] / 0.45))) if is_apple else (150, 110, 70, int(150 * (p[2] / 0.45)))
+            pygame.draw.circle(s, color, (r, r), r)
             screen.blit(s, (p[0] - r, p[1] - r))
 
         remain = sum(1 for w in self.items if not w["pulled"])
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"남은 잡초 {remain}", self.timer / 6.5)
+            remain_txt = f"남은 가지 {remain}" if is_apple else f"남은 잡초 {remain}"
+            _counter(screen, remain_txt, self.timer / 6.5)
 
 
 class PestTap:
@@ -248,6 +294,7 @@ class PestTap:
     PROMPT = "잎의 벌레를 빠르게 잡으세요"
 
     def __init__(self, farm):
+        from core.game_state import game_state
         self.farm = farm
         n = min(8, max(4, farm.pests // 7)) + random.randint(0, 1)   # 변형: 개수
         self.bugs = []
@@ -269,6 +316,8 @@ class PestTap:
         self.feedback = ""
         self.feedback_color = (255, 255, 255)
         self.puffs = []
+        
+        self.PROMPT = "밭의 굼벵이를 빠르게 잡으세요" if game_state.crop == "potato" else "잎의 벌레를 빠르게 잡으세요"
 
     def handle(self, event):
         if self.done or self.result is not None:
@@ -306,41 +355,60 @@ class PestTap:
             self._resolve()
 
     def _resolve(self):
+        from core.game_state import game_state
         killed = sum(1 for b in self.bugs if b["dead"])
         frac = killed / max(1, self.total)
+        is_potato = (game_state.crop == "potato")
         if frac >= 0.85:
-            self.feedback = "벌레를 거의 다 잡았다!"; self.feedback_color = (150, 230, 150); audio.play("success")
+            self.feedback = "굼벵이를 거의 다 잡았다!" if is_potato else "벌레를 거의 다 잡았다!"
+            self.feedback_color = (150, 230, 150)
+            audio.play("success")
         elif frac >= 0.45:
-            self.feedback = "절반쯤 잡았다."; self.feedback_color = (220, 205, 140); audio.play("page")
+            self.feedback = "굼벵이를 절반쯤 잡았다." if is_potato else "절반쯤 잡았다."
+            self.feedback_color = (220, 205, 140)
+            audio.play("page")
         else:
-            self.feedback = "놓친 벌레가 많다."; self.feedback_color = (225, 175, 130); audio.play("page")
+            self.feedback = "굼벵이가 많이 남았다." if is_potato else "놓친 벌레가 많다."
+            self.feedback_color = (225, 175, 130)
+            audio.play("page")
         self.result = {"quality": "pest", "cleared_frac": frac}
         self.settle = 1.0
 
     def draw(self, screen):
+        from core.game_state import game_state
         _veil(screen)
         bsp = sprites["bug"]
+        is_potato = (game_state.crop == "potato")
         for b in self.bugs:
             if b["dead"]:
                 continue
             bx, by = int(b["x"]), int(b["y"])
-            # 조준 고리 — 이 벌레를 잡으라는 신호 (움직여도 따라다님)
+            # 조준 고리
             ring = pygame.Surface((36, 36), pygame.SRCALPHA)
-            pygame.draw.circle(ring, (255, 90, 60, 70), (18, 18), 16)        # 옅은 채움
-            pygame.draw.circle(ring, (255, 140, 95, 210), (18, 18), 15, 3)   # 또렷한 테두리
+            pygame.draw.circle(ring, (255, 90, 60, 70) if not is_potato else (240, 200, 100, 70), (18, 18), 16)
+            pygame.draw.circle(ring, (255, 140, 95, 210) if not is_potato else (229, 180, 50, 210), (18, 18), 15, 3)
             screen.blit(ring, (bx - 18, by - 18))
-            screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
+            
+            if is_potato:
+                pygame.draw.ellipse(screen, (242, 239, 230), (bx - 12, by - 6, 24, 12))
+                pygame.draw.circle(screen, (120, 60, 20), (bx + 8, by), 4)
+                pygame.draw.line(screen, (200, 190, 180), (bx - 4, by - 5), (bx - 4, by + 5), 1)
+                pygame.draw.line(screen, (200, 190, 180), (bx + 2, by - 5), (bx + 2, by + 5), 1)
+            else:
+                screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
         for p in self.puffs:
             r = int(10 * (1 - p[2] / 0.35)) + 3
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(s, (210, 220, 120, int(180 * (p[2] / 0.35))), (r, r), r)
+            color = (245, 240, 220, int(180 * (p[2] / 0.35))) if is_potato else (210, 220, 120, int(180 * (p[2] / 0.35)))
+            pygame.draw.circle(s, color, (r, r), r)
             screen.blit(s, (p[0] - r, p[1] - r))
 
         remain = sum(1 for b in self.bugs if not b["dead"])
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"남은 벌레 {remain}", self.timer / 6.0)
+            remain_txt = f"남은 굼벵이 {remain}" if is_potato else f"남은 벌레 {remain}"
+            _counter(screen, remain_txt, self.timer / 6.0)
 
 
 class SoilMound:
@@ -349,6 +417,7 @@ class SoilMound:
     PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
 
     def __init__(self, farm):
+        from core.game_state import game_state
         self.farm = farm
         pts = farm.crop_positions() or [(PLOT.centerx, PLOT.centery)]
         self.spots = [
@@ -367,6 +436,8 @@ class SoilMound:
         self.feedback_color = (255, 255, 255)
         self.puffs = []
         self.rake_played = False
+        
+        self.PROMPT = "마우스를 누른 채 거름을 골고루 주어 영양을 채우세요" if game_state.crop == "apple" else "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
 
     def handle(self, event):
         if self.done or self.result is not None:
@@ -411,40 +482,59 @@ class SoilMound:
             self._resolve()
 
     def _resolve(self):
+        from core.game_state import game_state
         done = sum(1 for s in self.spots if s["done"])
         frac = done / max(1, self.total)
+        is_apple = (game_state.crop == "apple")
         if frac >= 0.85:
-            self.feedback = "두둑이 북돋우니 흙에 생기가 돈다!"; self.feedback_color = (150, 230, 150); audio.play("success")
+            self.feedback = "거름을 골고루 잘 주었습니다!" if is_apple else "두둑이 북돋우니 흙에 생기가 돈다!"
+            self.feedback_color = (150, 230, 150)
+            audio.play("success")
         elif frac >= 0.45:
-            self.feedback = "흙을 어느 정도 다독였다."; self.feedback_color = (220, 205, 140); audio.play("page")
+            self.feedback = "거름을 적당히 나누어 주었습니다." if is_apple else "흙을 어느 정도 다독였다."
+            self.feedback_color = (220, 205, 140)
+            audio.play("page")
         else:
-            self.feedback = "북돋다 말아 뿌리가 허전하다."; self.feedback_color = (225, 175, 130); audio.play("page")
+            self.feedback = "거름이 한쪽에 뭉쳤거나 부족합니다." if is_apple else "북돋다 말아 뿌리가 허전하다."
+            self.feedback_color = (225, 175, 130)
+            audio.play("page")
         self.result = {"quality": "soil", "cleared_frac": frac}
         self.settle = 1.0
 
     def draw(self, screen):
+        from core.game_state import game_state
         _veil(screen)
+        is_apple = (game_state.crop == "apple")
         for s in self.spots:
             cx, cy = s["x"], s["y"]
             f = s["fill"] / max(0.01, s["need"])
             pit = pygame.Surface((52, 22), pygame.SRCALPHA)
-            pygame.draw.ellipse(pit, (40, 26, 16, 150), (0, 0, 52, 22))     # 파인 자리
+            pygame.draw.ellipse(pit, (40, 26, 16, 150) if not is_apple else (30, 20, 10, 150), (0, 0, 52, 22))     # 파인 자리
             screen.blit(pit, (cx - 26, cy + 6))
             if f > 0.02:                                                    # 쌓이는 두둑
                 h = int(16 * f); w = int(20 + 26 * f)
                 mound = pygame.Surface((w, h + 12), pygame.SRCALPHA)
-                base = (150, 104, 62) if s["done"] else (120, 78, 48)
-                pygame.draw.ellipse(mound, (*base, 235), (0, 8, w, h + 2))
-                pygame.draw.ellipse(mound, (176, 128, 78, 230), (3, 6, w - 6, max(3, h - 2)))
+                
+                if is_apple:
+                    base = (60, 48, 40) if s["done"] else (45, 35, 30)
+                    pygame.draw.ellipse(mound, (*base, 235), (0, 8, w, h + 2))
+                    pygame.draw.ellipse(mound, (80, 70, 60, 230), (3, 6, w - 6, max(3, h - 2)))
+                    for ox in (w//3, w//2, 2*w//3):
+                        pygame.draw.rect(mound, (15, 10, 5), (ox, h // 2 + 5, 2, 2))
+                else:
+                    base = (150, 104, 62) if s["done"] else (120, 78, 48)
+                    pygame.draw.ellipse(mound, (*base, 235), (0, 8, w, h + 2))
+                    pygame.draw.ellipse(mound, (176, 128, 78, 230), (3, 6, w - 6, max(3, h - 2)))
                 screen.blit(mound, (cx - w // 2, cy + 6 - h))
             if not s["done"]:                                              # 덮으라는 신호 빛
                 glow = pygame.Surface((46, 22), pygame.SRCALPHA)
-                pygame.draw.ellipse(glow, (255, 232, 150, 70), (0, 0, 46, 22))
+                pygame.draw.ellipse(glow, (255, 232, 150, 70) if not is_apple else (200, 255, 150, 70), (0, 0, 46, 22))
                 screen.blit(glow, (cx - 23, cy + 6))
         for p in self.puffs:
             r = int(13 * (1 - p[2] / 0.4)) + 4
             su = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(su, (150, 110, 70, int(150 * (p[2] / 0.4))), (r, r), r)
+            color = (80, 70, 60, int(150 * (p[2] / 0.4))) if is_apple else (150, 110, 70, int(150 * (p[2] / 0.4)))
+            pygame.draw.circle(su, color, (r, r), r)
             screen.blit(su, (p[0] - r, p[1] - r))
         if self.raking and self.result is None:                            # 흙손 커서
             ring = pygame.Surface((30, 30), pygame.SRCALPHA)

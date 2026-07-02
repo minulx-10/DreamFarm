@@ -5,6 +5,13 @@ __pycache__/
 
 # 로컬 플레이 상태 (플레이마다 변경됨, 추적 제외)
 core/save_data.json
+core/save_slot.json
+core/user_settings.json
+
+# 빌드 산출물 (PyInstaller)
+build/
+dist/
+*.spec
 
 # 개발용 임시 파일
 scratch/
