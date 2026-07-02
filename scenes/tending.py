@@ -131,14 +131,23 @@ class WaterPour:
 
         wet = min(1.0, self.level / max(1.0, self.overflow))
         if wet > 0:
-            for (cx, cy) in self.farm.crop_positions():
+            if self.farm.is_tree:
                 if self.level <= self.overflow:
                     col = (90, 150, 190, int(70 * wet))
                 else:
                     col = (70, 110, 200, 150)
-                puddle = pygame.Surface((54, 18), pygame.SRCALPHA)
-                pygame.draw.ellipse(puddle, col, (0, 0, 54, 18))
-                screen.blit(puddle, (cx - 27, cy + 20))
+                puddle = pygame.Surface((80, 26), pygame.SRCALPHA)
+                pygame.draw.ellipse(puddle, col, (0, 0, 80, 26))
+                screen.blit(puddle, (225 - 40, 360 - 10))
+            else:
+                for (cx, cy) in self.farm.crop_positions():
+                    if self.level <= self.overflow:
+                        col = (90, 150, 190, int(70 * wet))
+                    else:
+                        col = (70, 110, 200, 150)
+                    puddle = pygame.Surface((54, 18), pygame.SRCALPHA)
+                    pygame.draw.ellipse(puddle, col, (0, 0, 54, 18))
+                    screen.blit(puddle, (cx - 27, cy + 20))
 
         # 세로 게이지
         gx, gtop, gh, gw = PLOT.right - 26, 178, 252, 18
@@ -419,7 +428,10 @@ class SoilMound:
     def __init__(self, farm):
         from core.game_state import game_state
         self.farm = farm
-        pts = farm.crop_positions() or [(PLOT.centerx, PLOT.centery)]
+        if farm.is_tree:
+            pts = [(225, 360)]
+        else:
+            pts = farm.crop_positions() or [(PLOT.centerx, PLOT.centery)]
         self.spots = [
             {"x": cx, "y": cy, "fill": 0.0,
              "need": random.uniform(0.85, 1.0), "done": False}   # 변형: 자리마다 필요량

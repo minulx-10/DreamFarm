@@ -1249,7 +1249,7 @@ class FarmScene:
         어린 묘목 → 굵어지는 줄기와 우거지는 잎 → 수확기엔 열매가 맺힌다."""
         import math
         ratio = max(0.0, min(1.2, ratio))
-        base_x, base_y = 225, 420          # 밭 한가운데 땅에 심긴 밑동
+        base_x, base_y = 225, 360          # 밭 한가운데 땅에 심긴 밑동
         trunk_h = int(24 + 96 * min(1.0, ratio))
         trunk_w = int(8 + 16 * min(1.0, ratio))
         canopy_r = int(16 + 62 * min(1.0, ratio))
