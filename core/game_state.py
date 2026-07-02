@@ -132,21 +132,25 @@ def append_josa(text, josa_type):
     if not text:
         return text
     last_char = text[-1]
+    
+    # 1. 한글 판정
     if ord('가') <= ord(last_char) <= ord('힣'):
         has_batchim = (ord(last_char) - ord('가')) % 28 > 0
-        if josa_type == "은/는":
-            return text + ("은" if has_batchim else "는")
-        if josa_type == "이/가":
-            return text + ("이" if has_batchim else "가")
-        if josa_type == "을/를":
-            return text + ("을" if has_batchim else "를")
+    # 2. 영어 알파벳 판정 (발음 기호 기준 받침 유무 추정)
+    elif last_char.isalpha():
+        lc = last_char.lower()
+        # 모음(aeiou) 및 반모음(y), 복합음(w), 스/즈 발음(s,z,x)은 받침이 없는 소리로 취급
+        has_batchim = lc not in "aeiouywszx"
+    # 3. 기타 문자 (기본값)
+    else:
+        has_batchim = False
 
     if josa_type == "은/는":
-        return text + "는(은)"
+        return text + ("은" if has_batchim else "는")
     if josa_type == "이/가":
-        return text + "가(이)"
+        return text + ("이" if has_batchim else "가")
     if josa_type == "을/를":
-        return text + "를(을)"
+        return text + ("을" if has_batchim else "를")
     return text
 
 

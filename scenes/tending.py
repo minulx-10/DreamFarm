@@ -68,8 +68,9 @@ class WaterPour:
             return
         if self.pouring:
             self.level += self.fill_rate * dt
-            sx = PLOT.x + 150 + 70
-            self.drops.append([sx, 210.0, 40.0 + random.uniform(-12, 12), 120.0])
+            if game_state.crop != "rice":
+                sx = PLOT.x + 150 + 70
+                self.drops.append([sx, 210.0, 40.0 + random.uniform(-12, 12), 120.0])
             if self.level >= self.GAUGE_MAX:
                 self.pouring = False
                 self._resolve()
@@ -123,11 +124,12 @@ class WaterPour:
                     pygame.draw.line(ribbon, (150, 205, 235, a), (8 + ox, 0), (26 + ox, 46), wd)
                 pygame.draw.line(ribbon, (222, 242, 252, 210), (8, 0), (26, 44), 2)
                 screen.blit(ribbon, (spout_x - 8, 196))
-        for d in self.drops:
-            glow = pygame.Surface((10, 10), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (170, 215, 240, 110), (5, 5), 5)
-            screen.blit(glow, (int(d[0]) - 5, int(d[1]) - 5))
-            pygame.draw.circle(screen, (226, 244, 253), (int(d[0]), int(d[1])), 2)
+        if game_state.crop != "rice":
+            for d in self.drops:
+                glow = pygame.Surface((10, 10), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (170, 215, 240, 110), (5, 5), 5)
+                screen.blit(glow, (int(d[0]) - 5, int(d[1]) - 5))
+                pygame.draw.circle(screen, (226, 244, 253), (int(d[0]), int(d[1])), 2)
 
         wet = min(1.0, self.level / max(1.0, self.overflow))
         if wet > 0:

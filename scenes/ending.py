@@ -678,35 +678,61 @@ class EndingScene:
         g = self.golden_alpha
         ending = game_state.last_ending
         
+        crop = game_state.crop
         if ending in ("true", "happy"):
             # Golden glow
+            sound = "아삭."
+            if crop == "rice":
+                sound = "냠냠."
+            elif crop == "potato":
+                sound = "포슬."
             screen.fill((min(255, g), min(200, int(g * 0.78)), min(80, int(g * 0.3))))
             if g > 200:
-                t = self.font.render("아삭.", True, WHITE)
+                t = self.font.render(sound, True, WHITE)
                 screen.blit(t, (400 - t.get_width() // 2, 290))
         elif ending == "growth":
             # Warm brown glow
+            sound = "오도독."
+            if crop == "rice":
+                sound = "냠냠."
+            elif crop == "potato":
+                sound = "서걱."
             screen.fill((min(200, int(g*0.8)), min(150, int(g * 0.6)), min(100, int(g * 0.4))))
             if g > 200:
-                t = self.font.render("오도독.", True, WHITE)
+                t = self.font.render(sound, True, WHITE)
                 screen.blit(t, (400 - t.get_width() // 2, 290))
         elif ending == "skill":
             # Cold white glow
+            sound = "사각."
+            if crop == "rice":
+                sound = "우물."
+            elif crop == "potato":
+                sound = "스근."
             screen.fill((min(240, g), min(240, g), min(255, g)))
             if g > 200:
-                t = self.font.render("사각.", True, (100, 100, 100))
+                t = self.font.render(sound, True, (100, 100, 100))
                 screen.blit(t, (400 - t.get_width() // 2, 290))
         elif ending == "rush":
             # Fast red flash
+            sound = "우적."
+            if crop == "rice":
+                sound = "쩝쩝."
+            elif crop == "potato":
+                sound = "우물."
             screen.fill((min(200, g), min(50, int(g*0.2)), min(50, int(g*0.2))))
             if g > 200:
-                t = self.font.render("우적.", True, WHITE)
+                t = self.font.render(sound, True, WHITE)
                 screen.blit(t, (400 - t.get_width() // 2, 290))
         elif ending == "normal":
             # Dim yellow
+            sound = "사각."
+            if crop == "rice":
+                sound = "우물."
+            elif crop == "potato":
+                sound = "스근."
             screen.fill((min(150, int(g*0.6)), min(150, int(g*0.6)), min(100, int(g*0.4))))
             if g > 200:
-                t = self.font.render("사각.", True, WHITE)
+                t = self.font.render(sound, True, WHITE)
                 screen.blit(t, (400 - t.get_width() // 2, 290))
         else: # bad
             # Fade to gray

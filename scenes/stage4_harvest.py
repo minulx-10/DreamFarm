@@ -38,10 +38,25 @@ class Stage4Scene:
                 'stage': bstage
             })
 
-        # 당근 물리
-        self.carrot_y = 360.0
-        self.carrot_start_y = 360.0
-        self.carrot_target_y = 230.0  # 이 높이까지 뽑으면 성공 (130px 끌어올리기)
+        # 당근/감자/사과 물리
+        self.is_apple = (game_state.crop == "apple")
+        self.is_potato = (game_state.crop == "potato")
+        if self.is_apple:
+            self.carrot_y = 200.0
+            self.carrot_start_y = 200.0
+            self.carrot_target_y = 330.0  # 아래로 당겨 따냄 (130px 끌어내리기)
+        elif self.is_potato:
+            self.potato_x = 400.0
+            self.potato_start_x = 400.0
+            self.potato_target_x = 530.0  # 옆으로 드래그해 캐냄 (130px 끌어당기기)
+            self.dragging = False
+            self.drag_start_x = 400.0
+            self.drag_current_x = 400.0
+            self.last_drag_x = 400.0
+        else:
+            self.carrot_y = 360.0
+            self.carrot_start_y = 360.0
+            self.carrot_target_y = 230.0  # 이 높이까지 뽑으면 성공 (130px 끌어올리기)
 
         self.pull_phase = "ready"  # ready → pulling → feedback
         self.tension = 0.0
@@ -63,45 +78,74 @@ class Stage4Scene:
         if self.stage_clear or self.phase == "intro":
             return
 
-        # 클릭하기 쉽게 충돌 범위를 넉넉히 확장 (특히 Y축 위쪽 잎사귀 영역 포함)
-        carrot_rect = pygame.Rect(400 - 55, self.carrot_y - 30, 110, 120)
-
         for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.pull_phase == "ready":
-                    # 당근 클릭 시 pulling 상태로 전환
-                    if carrot_rect.collidepoint(event.pos):
-                        self.pull_phase = "pulling"
-                        self.tension = 0.0
-                        self.last_click_time = pygame.time.get_ticks() / 1000.0
+            if self.is_potato:
+                # 감자는 좌우 드래그 방식
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.pull_phase == "ready":
+                        potato_rect = pygame.Rect(self.potato_x - 55, 366 - 30, 110, 120)
+                        if potato_rect.collidepoint(event.pos):
+                            self.pull_phase = "pulling"
+                            self.dragging = True
+                            self.drag_start_x = event.pos[0]
+                            self.drag_current_x = event.pos[0]
+                            self.last_drag_x = event.pos[0]
+                            self.tension = 0.0
+                            audio.play("pop")
+                elif event.type == pygame.MOUSEMOTION:
+                    if self.pull_phase == "pulling" and self.dragging:
+                        self.drag_current_x = event.pos[0]
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if self.dragging:
+                        self.dragging = False
+            else:
+                # 그 외 작물은 연타 클릭 방식
+                carrot_rect = pygame.Rect(400 - 55, self.carrot_y - 30, 110, 120)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.pull_phase == "ready":
+                        if carrot_rect.collidepoint(event.pos):
+                            self.pull_phase = "pulling"
+                            self.tension = 0.0
+                            self.last_click_time = pygame.time.get_ticks() / 1000.0
+                            audio.play("pop")
+                    elif self.pull_phase == "pulling":
+                        now = pygame.time.get_ticks() / 1000.0
+                        interval = now - self.last_click_time
+
+                        if self.is_apple:
+                            self.carrot_y = min(self.carrot_target_y + 15.0, self.carrot_y + self.pull_per_click)
+                        else:
+                            self.carrot_y = max(self.carrot_target_y - 15.0, self.carrot_y - self.pull_per_click)
                         audio.play("pop")
 
-                elif self.pull_phase == "pulling":
-                    # 클릭할 때마다 당근을 위로 올림
-                    now = pygame.time.get_ticks() / 1000.0
-                    interval = now - self.last_click_time
+                        if interval < self.rapid_threshold:
+                            self.tension = min(100.0, self.tension + 8.0)
 
-                    # 당근 위로 이동
-                    self.carrot_y = max(self.carrot_target_y - 15.0, self.carrot_y - self.pull_per_click)
-                    audio.play("pop")
+                        self.last_click_time = now
 
-                    # 연타 속도 체크: 너무 빠르면 tension 증가
-                    if interval < self.rapid_threshold:
-                        self.tension = min(100.0, self.tension + 8.0)
-
-                    self.last_click_time = now
-
-                    # 흙 파티클 생성
-                    for _ in range(random.randint(1, 3)):
-                        self.dirt_particles.append({
-                            'x': random.uniform(370, 430),
-                            'y': random.uniform(330, 360),
-                            'vx': random.uniform(-65, 65),
-                            'vy': random.uniform(-40, 20),
-                            'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
-                            'size': random.randint(2, 5),
-                            'life': random.uniform(0.3, 0.6)
-                        })
+                        # 파티클 생성
+                        if self.is_apple:
+                            for _ in range(random.randint(1, 2)):
+                                self.dirt_particles.append({
+                                    'x': random.uniform(370, 430),
+                                    'y': random.uniform(160, 180),
+                                    'vx': random.uniform(-40, 40),
+                                    'vy': random.uniform(40, 100),
+                                    'color': random.choice([(76, 150, 78), (96, 180, 98), (56, 120, 58)]),
+                                    'size': random.randint(3, 6),
+                                    'life': random.uniform(0.5, 0.9)
+                                })
+                        else:
+                            for _ in range(random.randint(1, 3)):
+                                self.dirt_particles.append({
+                                    'x': random.uniform(370, 430),
+                                    'y': random.uniform(330, 360),
+                                    'vx': random.uniform(-65, 65),
+                                    'vy': random.uniform(-40, 20),
+                                    'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                                    'size': random.randint(2, 5),
+                                    'life': random.uniform(0.3, 0.6)
+                                })
 
     def update(self, dt):
         if self.phase == "intro":
@@ -136,43 +180,117 @@ class Stage4Scene:
 
         # pulling 상태 업데이트
         if self.pull_phase == "pulling":
-            # tension 자연 감소
-            self.tension = max(0.0, self.tension - 25.0 * dt)
+            if self.is_potato:
+                if self.dragging:
+                    # 마우스 속도 측정으로 과도한 드래그 감지
+                    speed = abs(self.drag_current_x - self.last_drag_x) / max(0.001, dt)
+                    if speed > 600.0:  # 600 px/sec 임계값
+                        self.tension = min(100.0, self.tension + 18.0 * dt * (speed / 600.0))
+                    else:
+                        self.tension = max(0.0, self.tension - 40.0 * dt)
 
-            # 클릭이 없으면 당근이 중력처럼 아래로 미끄러짐
-            if self.carrot_y < self.carrot_start_y:
-                self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * dt)
+                    # 흙 파티클 생성
+                    if abs(self.drag_current_x - self.last_drag_x) > 2.0:
+                        for _ in range(random.randint(0, 1)):
+                            self.dirt_particles.append({
+                                'x': random.uniform(self.potato_x - 30, self.potato_x + 30),
+                                'y': random.uniform(340, 370),
+                                'vx': random.uniform(-45, 45),
+                                'vy': random.uniform(-60, -15),
+                                'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                                'size': random.randint(2, 5),
+                                'life': random.uniform(0.3, 0.6)
+                            })
 
-            # 완전히 내려갔으면 다시 ready 상태로
-            if self.carrot_y >= self.carrot_start_y:
-                self.carrot_y = self.carrot_start_y
+                    self.potato_x = max(255.0, min(545.0, 400.0 + (self.drag_current_x - self.drag_start_x)))
+                    self.last_drag_x = self.drag_current_x
 
-            # 부러짐 체크 (tension 과다)
-            if self.tension >= 100.0:
-                self.pull_phase = "feedback"
-                self.feedback_text = "너무 세게... 상했다."
-                self.feedback_timer = 2.0
-                audio.play("break")
-                self.results.append("broken")
-                self.shake = 0.4
-                self.attempts += 1
-                game_state.score -= 50
+                    # 부러짐 체크 (tension 과다)
+                    if self.tension >= 100.0:
+                        self.pull_phase = "feedback"
+                        self.feedback_text = "너무 세게... 상했다."
+                        self.feedback_timer = 2.0
+                        audio.play("break")
+                        self.results.append("broken")
+                        self.shake = 0.4
+                        self.attempts += 1
+                        game_state.score -= 50
+                        self.dragging = False
+                    # 성공 체크 (130px 이상 좌/우 드래그)
+                    elif abs(self.potato_x - 400.0) >= 130.0:
+                        self.pull_phase = "feedback"
+                        self.feedback_text = "쏙! 완벽하게 캐냈다."
+                        self.feedback_timer = 2.0
+                        audio.play("harvest")
+                        self.results.append("perfect")
+                        self.attempts += 1
+                        game_state.score += 300
+                        self.dragging = False
+                else:
+                    # 드래그를 안 하고 있으면 제자리로 복귀
+                    self.tension = max(0.0, self.tension - 60.0 * dt)
+                    if self.potato_x < 400.0:
+                        self.potato_x = min(400.0, self.potato_x + self.slide_speed * 4.0 * dt)
+                    elif self.potato_x > 400.0:
+                        self.potato_x = max(400.0, self.potato_x - self.slide_speed * 4.0 * dt)
+                    if self.potato_x == 400.0:
+                        self.pull_phase = "ready"
+            else:
+                # tension 자연 감소
+                self.tension = max(0.0, self.tension - 25.0 * dt)
 
-            # 수확 성공 체크
-            elif self.carrot_y <= self.carrot_target_y:
-                self.pull_phase = "feedback"
-                self.feedback_text = "쏙! 완벽하게 뽑혔다."
-                self.feedback_timer = 2.0
-                audio.play("harvest")
-                self.results.append("perfect")
-                self.attempts += 1
-                game_state.score += 300
+                # 클릭이 없으면 제자리로 미끄러짐
+                if self.is_apple:
+                    if self.carrot_y > self.carrot_start_y:
+                        self.carrot_y = max(self.carrot_start_y, self.carrot_y - self.slide_speed * dt)
+                    if self.carrot_y <= self.carrot_start_y:
+                        self.carrot_y = self.carrot_start_y
+                else:
+                    if self.carrot_y < self.carrot_start_y:
+                        self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * dt)
+                    if self.carrot_y >= self.carrot_start_y:
+                        self.carrot_y = self.carrot_start_y
+
+                # 부러짐 체크 (tension 과다)
+                if self.tension >= 100.0:
+                    self.pull_phase = "feedback"
+                    self.feedback_text = "너무 세게... 상했다."
+                    self.feedback_timer = 2.0
+                    audio.play("break")
+                    self.results.append("broken")
+                    self.shake = 0.4
+                    self.attempts += 1
+                    game_state.score -= 50
+
+                # 수확 성공 체크
+                else:
+                    success = (self.carrot_y >= self.carrot_target_y) if self.is_apple else (self.carrot_y <= self.carrot_target_y)
+                    if success:
+                        self.pull_phase = "feedback"
+                        if game_state.crop == "apple":
+                            self.feedback_text = "툭! 완벽하게 땄다."
+                        elif game_state.crop == "rice":
+                            self.feedback_text = "툭! 완벽하게 거두었다."
+                        else:
+                            self.feedback_text = "쏙! 완벽하게 뽑혔다."
+                        self.feedback_timer = 2.0
+                        audio.play("harvest")
+                        self.results.append("perfect")
+                        self.attempts += 1
+                        game_state.score += 300
 
         elif self.pull_phase == "ready":
             # ready 상태에서도 자연 복귀 & tension 감소
-            if self.carrot_y < self.carrot_start_y:
-                self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
-            self.tension = max(0.0, self.tension - 120.0 * dt)
+            if self.is_potato:
+                self.tension = max(0.0, self.tension - 120.0 * dt)
+            else:
+                if self.is_apple:
+                    if self.carrot_y > self.carrot_start_y:
+                        self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
+                else:
+                    if self.carrot_y < self.carrot_start_y:
+                        self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
+                self.tension = max(0.0, self.tension - 120.0 * dt)
 
         elif self.pull_phase == "feedback":
             self.feedback_timer -= dt
@@ -181,8 +299,11 @@ class Stage4Scene:
                     self.stage_clear = True
                 else:
                     self.pull_phase = "ready"
-                    self.carrot_y = self.carrot_start_y
                     self.tension = 0.0
+                    if self.is_potato:
+                        self.potato_x = self.potato_start_x
+                    else:
+                        self.carrot_y = self.carrot_start_y
 
         # 흙 파티클 업데이트
         for p in self.dirt_particles[:]:
@@ -200,31 +321,70 @@ class Stage4Scene:
         if self.shake > 0:
             sx = random.randint(-4, 4)
 
-        # 1. 배경 당근밭 — 줄지어 심긴 모습 (종류·크기 살짝 다르게 + 발밑 그늘)
-        for i, crop in enumerate(self.bg_crops):
-            cx, cy = crop['x'], crop['y']
-            spr = sprites["sprout4"] if (crop['stage'] + i) % 3 else sprites["sprout3"]
-            bsw, bsh = spr.get_width(), spr.get_height()
-            sh = pygame.Surface((bsw, 12), pygame.SRCALPHA)
-            pygame.draw.ellipse(sh, (20, 12, 8, 120), (0, 0, bsw, 12))
-            screen.blit(sh, (cx - bsw // 2 + sx, cy + 16))
-            screen.blit(spr, (cx - bsw // 2 + sx, cy + 12 - bsh // 2))
+        if self.is_apple:
+            # 1. 배경 데코 (사과나무 가지와 매달린 사과)
+            bg_apples = [(110, 180), (220, 200), (580, 210), (690, 180)]
+            for bx, by in bg_apples:
+                pygame.draw.line(screen, (80, 50, 30), (bx - 30, by - 20), (bx + 30, by - 12), 4)
+                pygame.draw.line(screen, (96, 62, 36), (bx, by - 16), (bx, by), 2)
+                pygame.draw.circle(screen, (160, 30, 30), (bx, by), 12)
+                pygame.draw.circle(screen, (86, 168, 84), (bx + 4, by - 14), 5)
+            
+            # 2. 가운데 사과나무 가지와 꼭지 줄기
+            mcx = 400 + sx
+            pygame.draw.line(screen, (96, 62, 36), (mcx, 172), (mcx, int(self.carrot_y) - 16), 3)
+            pygame.draw.line(screen, (90, 60, 40), (260, 160), (540, 180), 8)
+            pygame.draw.circle(screen, (46, 112, 60), (320, 165), 18)
+            pygame.draw.circle(screen, (66, 150, 78), (480, 175), 15)
+        else:
+            # 1. 배경 밭 — 줄지어 심긴 모습 (작물별 잎사귀 색조/형태 다양화)
+            for i, crop in enumerate(self.bg_crops):
+                cx, cy = crop['x'], crop['y']
+                orig_spr = sprites["sprout4"] if (crop['stage'] + i) % 3 else sprites["sprout3"]
+                
+                if self.is_potato:
+                    # 감자는 누렇고 시든 잎
+                    spr = orig_spr.copy()
+                    tint = pygame.Surface(spr.get_size(), pygame.SRCALPHA)
+                    tint.fill((160, 150, 40, 95))
+                    spr.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                    sh = spr.get_height()
+                    spr = pygame.transform.scale(spr, (spr.get_width(), int(sh * 0.85)))
+                    bsw, bsh = spr.get_width(), spr.get_height()
+                    cy_offset = 12 - bsh // 2 + int(sh * 0.07)
+                elif game_state.crop == "rice":
+                    # 벼는 황금빛 노란 잎
+                    spr = orig_spr.copy()
+                    tint = pygame.Surface(spr.get_size(), pygame.SRCALPHA)
+                    tint.fill((210, 185, 45, 120))
+                    spr.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                    bsw, bsh = spr.get_width(), spr.get_height()
+                    cy_offset = 12 - bsh // 2
+                else:
+                    spr = orig_spr
+                    bsw, bsh = spr.get_width(), spr.get_height()
+                    cy_offset = 12 - bsh // 2
 
-        # 2. 가운데 당근이 솟은 흙두둑 — 봉긋한 둔덕 + 심긴 자리
-        mcx, mcy = 400 + sx, 392
-        pygame.draw.ellipse(screen, (40, 26, 16), (mcx - 150, mcy - 4, 300, 50))           # 바닥 그늘
-        pygame.draw.ellipse(screen, mix_color(DIRT_DARK, BLACK, 0.10), (mcx - 144, mcy - 26, 288, 64))
-        pygame.draw.ellipse(screen, DIRT_COLOR, (mcx - 144, mcy - 30, 288, 60))            # 둔덕
-        pygame.draw.ellipse(screen, mix_color(DIRT_COLOR, (255, 210, 150), 0.18), (mcx - 130, mcy - 30, 260, 28))  # 윗면 빛
-        pygame.draw.ellipse(screen, (52, 34, 22), (mcx - 36, mcy - 16, 72, 28))            # 심긴 자리
-        pygame.draw.ellipse(screen, (34, 22, 14), (mcx - 26, mcy - 12, 52, 20))
-        srng = random.Random(123)
-        for _ in range(16):
-            rx = mcx + srng.randint(-128, 128)
-            ry = mcy + srng.randint(-22, 16)
-            pygame.draw.rect(screen, mix_color(DIRT_COLOR, DIRT_DARK, 0.6), (rx, ry, 3, 3))
+                sh_surf = pygame.Surface((bsw, 12), pygame.SRCALPHA)
+                pygame.draw.ellipse(sh_surf, (20, 12, 8, 120), (0, 0, bsw, 12))
+                screen.blit(sh_surf, (cx - bsw // 2 + sx, cy + 16))
+                screen.blit(spr, (cx - bsw // 2 + sx, cy + cy_offset))
 
-        # 흙 파티클 그리기
+            # 2. 가운데 당근이 솟은 흙두둑 — 봉긋한 둔덕 + 심긴 자리
+            mcx, mcy = 400 + sx, 392
+            pygame.draw.ellipse(screen, (40, 26, 16), (mcx - 150, mcy - 4, 300, 50))           # 바닥 그늘
+            pygame.draw.ellipse(screen, mix_color(DIRT_DARK, BLACK, 0.10), (mcx - 144, mcy - 26, 288, 64))
+            pygame.draw.ellipse(screen, DIRT_COLOR, (mcx - 144, mcy - 30, 288, 60))            # 둔덕
+            pygame.draw.ellipse(screen, mix_color(DIRT_COLOR, (255, 210, 150), 0.18), (mcx - 130, mcy - 30, 260, 28))  # 윗면 빛
+            pygame.draw.ellipse(screen, (52, 34, 22), (mcx - 36, mcy - 16, 72, 28))            # 심긴 자리
+            pygame.draw.ellipse(screen, (34, 22, 14), (mcx - 26, mcy - 12, 52, 20))
+            srng = random.Random(123)
+            for _ in range(16):
+                rx = mcx + srng.randint(-128, 128)
+                ry = mcy + srng.randint(-22, 16)
+                pygame.draw.rect(screen, mix_color(DIRT_COLOR, DIRT_DARK, 0.6), (rx, ry, 3, 3))
+
+        # 파티클 그리기
         for p in self.dirt_particles:
             pygame.draw.rect(screen, p['color'], (int(p['x'] + sx), int(p['y']), p['size'], p['size']))
 
@@ -240,8 +400,73 @@ class Stage4Scene:
                 screen.blit(cropped, (400 - cw // 2 + sx, cy))
             else:
                 screen.blit(carrot, (400 - cw // 2 + sx, cy))
+        elif self.is_potato:
+            # 감자: 흙 위에 드러난 노랗게 시든 잎과 줄기, 그리고 아래에 달린 감자알
+            px = int(self.potato_x + sx)
+            py = 366
+            
+            # 감자알들
+            pygame.draw.ellipse(screen, (78, 52, 32), (px - 22, py + 12, 18, 12))
+            pygame.draw.ellipse(screen, (150, 108, 66), (px - 21, py + 11, 16, 10))
+            pygame.draw.ellipse(screen, (78, 52, 32), (px + 4, py + 14, 20, 14))
+            pygame.draw.ellipse(screen, (150, 108, 66), (px + 5, py + 13, 18, 12))
+            
+            # 줄기들
+            pygame.draw.line(screen, (100, 85, 45), (px, py - 20), (px - 14, py + 12), 2)
+            pygame.draw.line(screen, (100, 85, 45), (px, py - 20), (px + 10, py + 14), 2)
+            
+            # 위에 달린 시든 잎뭉치
+            orig_spr = sprites["sprout4"]
+            withered = orig_spr.copy()
+            tint = pygame.Surface(withered.get_size(), pygame.SRCALPHA)
+            tint.fill((160, 150, 40, 95))
+            withered.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            sh = withered.get_height()
+            withered = pygame.transform.scale(withered, (withered.get_width(), int(sh * 0.8)))
+            screen.blit(withered, (px - withered.get_width() // 2, py - 20 - withered.get_height() // 2))
+            
+            if broken:
+                # 감자알 상함 표시 (어두운 멍자국)
+                pygame.draw.ellipse(screen, (70, 30, 20, 190), (px - 22, py + 12, 18, 12))
+                pygame.draw.ellipse(screen, (70, 30, 20, 190), (px + 4, py + 14, 20, 14))
+        elif game_state.crop == "rice":
+            # 벼: 황금빛 벼 이삭과 노랗게 물든 벼 포기
+            px = 400 + sx
+            py = int(self.carrot_y)
+            
+            # 벼 잎/줄기 (황금빛 틴트된 sprout4)
+            orig_spr = sprites["sprout4"]
+            golden = orig_spr.copy()
+            tint = pygame.Surface(golden.get_size(), pygame.SRCALPHA)
+            tint.fill((210, 185, 45, 120))
+            golden.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            screen.blit(golden, (px - golden.get_width() // 2, py - 20 - golden.get_height() // 2))
+            
+            # 늘어진 벼 이삭들
+            gold_dark = (190, 160, 40)
+            gold_light = (245, 220, 95)
+            if broken:
+                # 상하면 이삭이 꺾이고 어둡게 변함
+                pygame.draw.line(screen, (100, 80, 20), (px, py - 25), (px - 14, py - 18), 2)
+                pygame.draw.line(screen, (100, 80, 20), (px - 14, py - 18), (px - 18, py - 8), 2)
+                for dx, dy in [(-10, -20), (-14, -18), (-18, -8)]:
+                    pygame.draw.circle(screen, (130, 110, 30), (px + dx, py + dy), 2)
+            else:
+                # 왼쪽 이삭
+                pygame.draw.line(screen, gold_dark, (px, py - 25), (px - 22, py - 3), 2)
+                for dx, dy in [(-12, -15), (-17, -9), (-22, -3)]:
+                    pygame.draw.circle(screen, gold_light, (px + dx, py + dy), 3)
+                # 오른쪽 이삭
+                pygame.draw.line(screen, gold_dark, (px, py - 28), (px + 22, py - 5), 2)
+                for dx, dy in [(12, -18), (17, -12), (22, -5)]:
+                    pygame.draw.circle(screen, gold_light, (px + dx, py + dy), 3)
         else:
-            draw_crop_food(screen, 400 + sx, int(self.carrot_y + 6), game_state.crop, r=24)
+            # 사과나무 등
+            if broken:
+                draw_crop_food(screen, 400 + sx, int(self.carrot_y + 6), game_state.crop, r=24)
+                pygame.draw.ellipse(screen, (110, 60, 45, 185), (400 + sx - 16, int(self.carrot_y) - 6, 32, 24))
+            else:
+                draw_crop_food(screen, 400 + sx, int(self.carrot_y + 6), game_state.crop, r=24)
 
         # 4. Tension 게이지 (pulling 중에만 표시)
         if self.pull_phase == "pulling" and not self.stage_clear:
@@ -299,9 +524,13 @@ class Stage4Scene:
             t2 = font_b.render("마우스 왼쪽 버튼을 연타해서", True, (200, 180, 140))
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
             food_eul = append_josa(current_crop()["food"], "을/를")
-            t3 = font_b.render(f"{food_eul} 조금씩 거둬 올리세요.", True, (200, 180, 140))
+            if self.is_apple:
+                t3 = font_b.render(f"{food_eul} 조금씩 당겨 따내세요.", True, (200, 180, 140))
+                t4 = font_b.render("너무 빠르게 하면 꼭지가 상해 못 쓰게 됩니다.", True, (230, 110, 90))
+            else:
+                t3 = font_b.render(f"{food_eul} 조금씩 거둬 올리세요.", True, (200, 180, 140))
+                t4 = font_b.render("너무 빠르게 하면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
             screen.blit(t3, (400 - t3.get_width() // 2, 290))
-            t4 = font_b.render("너무 빠르게 하면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
             screen.blit(t4, (400 - t4.get_width() // 2, 330))
         elif self.stage_clear:
             font = get_font(28)
@@ -312,4 +541,7 @@ class Stage4Scene:
             draw_bottom_bar(screen, "결과", f"수확 점수: {game_state.score}")
         else:
             food_eul = append_josa(current_crop()["food"], "을/를")
-            draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 거둬 올리세요. 너무 빠르면 상합니다.")
+            if self.is_apple:
+                draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 당겨 따내세요. 너무 빠르면 상합니다.")
+            else:
+                draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 거둬 올리세요. 너무 빠르면 상합니다.")

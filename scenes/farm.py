@@ -1331,18 +1331,35 @@ class FarmScene:
             sprite, offset = sprites["sprout4"], (-24, -18)
         else:
             if game_state.crop == "potato":
-                # 감자: sprout4 잎 아래에 흙을 헤치고 살짝 드러난 감자알들
-                sprite, offset = sprites["sprout4"], (-24, -18)
+                # 감자: 감자가 다 자라면 잎이 누렇게 시들고 아래로 처짐
+                orig_spr = sprites["sprout4"]
+                withered = orig_spr.copy()
+                tint = pygame.Surface(withered.get_size(), pygame.SRCALPHA)
+                tint.fill((160, 150, 40, 95))
+                withered.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                sh = withered.get_height()
+                withered = pygame.transform.scale(withered, (withered.get_width(), int(sh * 0.85)))
+                
+                sprite, offset = withered, (-24, -18 + int(sh * 0.15))
                 screen.blit(sprite, (x + offset[0], y + offset[1]))
+                
+                # 흙 아래 드러난 감자알들
                 pygame.draw.ellipse(screen, (78, 52, 32), (x - 15, y - 1, 14, 9))
                 pygame.draw.ellipse(screen, (150, 108, 66), (x - 14, y - 2, 12, 7))
                 pygame.draw.ellipse(screen, (78, 52, 32), (x + 1, y + 2, 12, 8))
                 pygame.draw.ellipse(screen, (150, 108, 66), (x + 2, y + 1, 10, 6))
                 return
             elif game_state.crop == "rice":
-                # 벼: sprout4를 그리고 황금색 벼 이삭들을 풍성하게 늘어뜨림
-                sprite, offset = sprites["sprout4"], (-24, -18)
+                # 벼: 황금빛 벼 이삭과 노랗게 익은 벼잎 연출
+                orig_spr = sprites["sprout4"]
+                golden = orig_spr.copy()
+                tint = pygame.Surface(golden.get_size(), pygame.SRCALPHA)
+                tint.fill((210, 185, 45, 120))
+                golden.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                
+                sprite, offset = golden, (-24, -18)
                 screen.blit(sprite, (x + offset[0], y + offset[1]))
+                
                 gold_dark = (190, 160, 40)
                 gold_light = (245, 220, 95)
                 pygame.draw.line(screen, gold_dark, (x, y - 5), (x - 14, y + 3), 2)

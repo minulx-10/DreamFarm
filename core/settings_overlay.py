@@ -143,18 +143,30 @@ class SettingsOverlay:
             bg = mix_color(bg, WHITE, 0.2)
         pygame.draw.rect(screen, bg, b, border_radius=7)
         pygame.draw.rect(screen, (229, 192, 124), b, 1, border_radius=7)
-        self._draw_speaker_icon(screen, b.x + 6, b.y + 6,
-                                muted=audio.is_muted() or not audio.is_enabled())
+        self._draw_gear_icon(screen, b.x + 6, b.y + 6, bg)
 
     @staticmethod
-    def _draw_speaker_icon(screen, x, y, muted):
-        col = (210, 216, 208) if not muted else (150, 138, 132)
-        pygame.draw.rect(screen, col, (x, y + 4, 5, 7))
-        pygame.draw.polygon(screen, col, [(x + 5, y + 4), (x + 11, y), (x + 11, y + 15), (x + 5, y + 11)])
-        if muted:
-            pygame.draw.line(screen, (214, 96, 84), (x + 12, y + 1), (x + 14, y + 14), 2)
-        else:
-            pygame.draw.arc(screen, col, (x + 10, y + 1, 7, 13), -0.9, 0.9, 2)
+    def _draw_gear_icon(screen, x, y, bg_color):
+        cx, cy = x + 8, y + 8
+        col = (210, 216, 208)
+        
+        # 8개의 톱니깃 그리기
+        import math
+        r_inner = 5
+        r_outer = 8
+        for i in range(8):
+            angle = i * (math.pi / 4)
+            cos_a = math.cos(angle)
+            sin_a = math.sin(angle)
+            tx1 = cx + int(r_inner * cos_a)
+            ty1 = cy + int(r_inner * sin_a)
+            tx2 = cx + int(r_outer * cos_a)
+            ty2 = cy + int(r_outer * sin_a)
+            pygame.draw.line(screen, col, (tx1, ty1), (tx2, ty2), 3)
+            
+        # 중앙 축 원판 및 안쪽 구멍 (뒷배경색)
+        pygame.draw.circle(screen, col, (cx, cy), 6)
+        pygame.draw.circle(screen, bg_color, (cx, cy), 2)
 
     def _draw_panel(self, screen):
         # 뒤를 살짝 어둡게

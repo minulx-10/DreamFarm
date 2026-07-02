@@ -31,16 +31,43 @@ class StoryChoiceScene:
         self.qte_choice = None
 
         data = game_state.choice_data or {}
-        self.title = data.get("title", "")
-        self.text = data.get("text", "")
-        self.choice_a = data.get("choice_a", ("", {}))
-        self.choice_b = data.get("choice_b", ("", {}))
+        
+        from core.crops import swap_crop_word, current_crop
+        crop_word = current_crop().get("food", "당근")
+        
+        self.title = swap_crop_word(data.get("title", ""), crop_word)
+        self.text = swap_crop_word(data.get("text", ""), crop_word)
+        
+        raw_a_label, a_effects = data.get("choice_a", ("", {}))
+        raw_b_label, b_effects = data.get("choice_b", ("", {}))
+        
+        self.choice_a = (swap_crop_word(raw_a_label, crop_word), self._cropify_effects(a_effects, crop_word))
+        self.choice_b = (swap_crop_word(raw_b_label, crop_word), self._cropify_effects(b_effects, crop_word))
+        
         self.text_to_print = self._prepare(self.text)
 
         self.btn_a = pygame.Rect(80, 390, 290, 65)
         self.btn_b = pygame.Rect(430, 390, 290, 65)
         self.hover_a = False
         self.hover_b = False
+
+    def _cropify_effects(self, effects, crop_word):
+        from core.crops import swap_crop_word
+        new_effects = {}
+        for k, v in effects.items():
+            if k in ["result_text", "impact_text"]:
+                new_effects[k] = swap_crop_word(v, crop_word)
+            elif k == "task":
+                new_task = {}
+                for tk, tv in v.items():
+                    if tk in ["prompt", "fail_text"]:
+                        new_task[tk] = swap_crop_word(tv, crop_word)
+                    else:
+                        new_task[tk] = tv
+                new_effects[k] = new_task
+            else:
+                new_effects[k] = v
+        return new_effects
 
     def _prepare(self, text):
         lines = []
