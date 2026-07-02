@@ -18,6 +18,8 @@ class NameInputScene:
         
         pygame.key.start_text_input()
         pygame.key.set_text_input_rect(pygame.Rect(250, 280, 300, 50))
+        # 백스페이스를 꾹 누르고 있을 때 연속 삭제가 지원되도록 키 반복 입력 활성화 (딜레이 450ms, 주기 50ms)
+        pygame.key.set_repeat(450, 50)
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -44,6 +46,7 @@ class NameInputScene:
                         audio.play("success")
                         game_state.player_name = self.input_text.strip()
                         game_state.current_scene = "intro"
+                        pygame.key.set_repeat(0) # 키 반복 입력 비활성화
                         pygame.key.stop_text_input()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
@@ -51,6 +54,7 @@ class NameInputScene:
                         audio.play("success")
                         game_state.player_name = self.input_text.strip()
                         game_state.current_scene = "intro"
+                        pygame.key.set_repeat(0) # 키 반복 입력 비활성화
                         pygame.key.stop_text_input()
                 elif event.key == pygame.K_BACKSPACE:
                     if len(self.ime_text) == 0:
