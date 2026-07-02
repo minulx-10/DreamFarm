@@ -36,16 +36,25 @@ def main():
     screen = None
     
     def update_display_mode():
-        nonlocal screen, current_nightmare
+        nonlocal screen, current_nightmare, is_fullscreen
         current_nightmare = game_state.nightmare
+        w = 960 if current_nightmare else 800
+        h = 720 if current_nightmare else 600
 
         if is_fullscreen:
             # (0,0) + FULLSCREEN → 모니터 native 해상도로 꽉 채운다.
             # 그리기는 800x600 가상 버퍼에 하고 실제 창 크기로 스케일하므로 어떤 해상도든 무방하다.
-            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.DOUBLEBUF)
+            try:
+                screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.DOUBLEBUF)
+            except Exception:
+                try:
+                    # native 실패 시, 가상 해상도 비율 그대로 전체화면 시도
+                    screen = pygame.display.set_mode((w, h), pygame.FULLSCREEN | pygame.DOUBLEBUF)
+                except Exception:
+                    # 전체화면 모두 실패 시 창모드로 복귀 (크래시 방지)
+                    screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
+                    is_fullscreen = False
         else:
-            w = 960 if current_nightmare else 800
-            h = 720 if current_nightmare else 600
             screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
         
     update_display_mode()
