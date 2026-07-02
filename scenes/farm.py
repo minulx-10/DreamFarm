@@ -1143,15 +1143,9 @@ class FarmScene:
         draw_light_panel(screen, panel)
         title_font = get_font(20)
         
-        # 기르는 작물 종류에 맞게 이름과 접미사(나무/논/밭)를 조합해 타이틀을 출력
+        # 기르는 작물 이름을 그대로 — 이름에 이미 '나무/벼' 등이 들어있어 접미사를 붙이면 중복됨
         crop_name = current_crop()["name"]
-        if game_state.crop == "apple":
-            suffix = "나무"
-        elif game_state.crop == "rice":
-            suffix = " 논"
-        else:
-            suffix = "밭"
-        title_text = f"밭 상태 ({crop_name}{suffix})"
+        title_text = f"밭 상태 ({crop_name})"
         
         title = title_font.render(title_text, True, TEXT_DARK)
         screen.blit(title, (450, 96))
@@ -1175,8 +1169,12 @@ class FarmScene:
         c1, c2 = 450, 600
         self.draw_compact_meter(screen, "수분", self.moisture, c1, 205, (80, 170, 240))
         self.draw_compact_meter(screen, "건강", self.health, c2, 205, (90, 185, 95))
-        self.draw_compact_meter(screen, "잡초", self.weeds, c1, 232, (150, 160, 60))
-        self.draw_compact_meter(screen, "해충", self.pests, c2, 232, (210, 110, 60))
+        # 나무류는 잡초 메커니즘이 없어 잡초 스탯을 숨긴다 (자리엔 해충을 왼쪽으로 당겨 배치)
+        if self.no_weeds:
+            self.draw_compact_meter(screen, "해충", self.pests, c1, 232, (210, 110, 60))
+        else:
+            self.draw_compact_meter(screen, "잡초", self.weeds, c1, 232, (150, 160, 60))
+            self.draw_compact_meter(screen, "해충", self.pests, c2, 232, (210, 110, 60))
         self.draw_compact_meter(screen, "배수", self.drainage, c1, 259, (90, 160, 185))
         self.draw_compact_meter(screen, "스트레스", self.stress, c2, 259, (210, 95, 95))
 

@@ -40,8 +40,9 @@ def main():
     def update_display_mode():
         nonlocal screen, current_nightmare, is_fullscreen, offset_x, offset_y, target_w, target_h
         current_nightmare = game_state.nightmare
-        w = 960 if current_nightmare else 800
-        h = 720 if current_nightmare else 600
+        # 창 크기는 항상 800x600. 악몽 모드에서 960x720으로 키우면 픽셀 폰트가 1.2배로
+        # 뭉개져 흐릿해졌다 → 크기는 그대로 두고 '검붉은 배경 테마'로만 악몽을 표현한다.
+        w, h = 800, 600
 
         if is_fullscreen:
             # (0,0) + FULLSCREEN → 모니터 native 해상도로 꽉 채운다.
@@ -246,7 +247,7 @@ def main():
         try:
             from core.assets import get_font
             font_ver = get_font(12)
-            ver_surf = font_ver.render("v1.0.4.6", True, (120, 120, 120))
+            ver_surf = font_ver.render("v1.0.4.7", True, (120, 120, 120))
             virtual_screen.blit(ver_surf, (8, 6))
         except Exception:
             pass

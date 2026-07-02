@@ -25,15 +25,19 @@ class CropSelectScene:
             "rice": pygame.Rect(580, 150, 160, 230)
         }
         
-        # 악몽 체크박스 Rect
-        self.nightmare_rect = pygame.Rect(280, 410, 240, 36)
+        # 악몽 체크박스 Rect (라벨이 길어 넉넉히, 화면 중앙 정렬)
+        self.nightmare_rect = pygame.Rect(200, 406, 400, 40)
         
         # 확인 버튼 Rect
         self.confirm_btn = pygame.Rect(300, 500, 200, 48)
-        
+
+        # 뒤로가기 버튼 (좌상단)
+        self.back_btn = pygame.Rect(24, 22, 104, 34)
+
         self.hovered_card = None
         self.hovered_nightmare = False
         self.hovered_confirm = False
+        self.hovered_back = False
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -47,9 +51,19 @@ class CropSelectScene:
                 
         self.hovered_nightmare = self.nightmare_rect.collidepoint(mouse_pos)
         self.hovered_confirm = self.confirm_btn.collidepoint(mouse_pos)
-        
+        self.hovered_back = self.back_btn.collidepoint(mouse_pos)
+
         for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                audio.play("click")
+                game_state.current_scene = "title"
+                return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 뒤로가기 → 타이틀
+                if self.hovered_back:
+                    audio.play("click")
+                    game_state.current_scene = "title"
+                    return
                 # 카드 클릭
                 if self.hovered_card:
                     audio.play("click")
@@ -123,14 +137,20 @@ class CropSelectScene:
             border_color = (200, 50, 50) if self.nightmare_mode else (130, 80, 80)
             
             draw_panel(screen, self.nightmare_rect, fill=box_color, border=border_color, radius=6, shadow=self.hovered_nightmare)
-            
-            # 체크 여부에 따른 표시
-            check_char = "✓" if self.nightmare_mode else " "
-            check_surf = self.font_name.render(check_char, True, (200, 30, 30))
-            screen.blit(check_surf, (self.nightmare_rect.x + 10, self.nightmare_rect.y + 5))
-            
-            label_surf = self.font_btn.render("[악)몽중농원] 활성화 (지옥 모드)", True, (139, 30, 30) if self.nightmare_mode else TEXT_DARK)
-            screen.blit(label_surf, (self.nightmare_rect.x + 36, self.nightmare_rect.y + 8))
+
+            # 체크 박스 + 라벨을 하나의 묶음으로 박스 안에서 가운데 정렬 (텍스트 잘림 방지)
+            r = self.nightmare_rect
+            label_font = get_font(16)
+            check_char = "✓" if self.nightmare_mode else "□"
+            check_surf = label_font.render(check_char, True, (200, 30, 30))
+            label_surf = label_font.render("[악)몽중농원] 활성화 (지옥 모드)",
+                                           True, (139, 30, 30) if self.nightmare_mode else TEXT_DARK)
+            gap = 8
+            total_w = check_surf.get_width() + gap + label_surf.get_width()
+            start_x = r.centerx - total_w // 2
+            cy = r.centery
+            screen.blit(check_surf, (start_x, cy - check_surf.get_height() // 2))
+            screen.blit(label_surf, (start_x + check_surf.get_width() + gap, cy - label_surf.get_height() // 2))
             
             # 설명구
             warn_text = "음식을 남기면 지옥에서 다 먹어야 합니다. 검붉은 밭에서 시작합니다."
@@ -143,3 +163,6 @@ class CropSelectScene:
 
         # 5. 확인 버튼
         draw_button(screen, self.confirm_btn, "선택 완료", self.font_btn, hovered=self.hovered_confirm)
+
+        # 6. 뒤로가기 버튼 (좌상단)
+        draw_button(screen, self.back_btn, "돌아가기", get_font(15), hovered=self.hovered_back)
