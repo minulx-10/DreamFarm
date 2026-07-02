@@ -503,6 +503,68 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
 
 
+def draw_crop_food(screen, cx, cy, crop_key, r=26):
+    """작물별 '먹는 것'을 (cx, cy) 중심에 그린다 — 엔딩·수확 연출에서 공용으로 사용.
+    당근은 기존 픽셀 스프라이트를, 나머지는 벡터 도형(사과·감자·쌀밥)을 그린다."""
+    if crop_key == "apple":
+        pygame.draw.circle(screen, (60, 16, 16), (cx, cy + 3), r)                 # 그림자
+        pygame.draw.circle(screen, (200, 48, 44), (cx, cy), r)                    # 몸통
+        pygame.draw.circle(screen, (160, 30, 30), (cx + r // 4, cy + r // 4), r - 3, 3)  # 아랫 음영
+        pygame.draw.circle(screen, (240, 120, 105), (cx - r // 3, cy - r // 3), max(3, r // 3))  # 하이라이트
+        pygame.draw.rect(screen, (96, 62, 36), (cx - 2, cy - r - 5, 4, 9), border_radius=2)  # 꼭지
+        pygame.draw.ellipse(screen, (86, 168, 84), (cx + 2, cy - r - 3, 13, 8))   # 잎
+        return
+    if crop_key == "potato":
+        pygame.draw.ellipse(screen, (78, 52, 32), (cx - r, cy - int(r * 0.7) + 3, 2 * r, int(1.4 * r)))  # 그림자
+        pygame.draw.ellipse(screen, (150, 108, 66), (cx - r, cy - int(r * 0.7), 2 * r, int(1.4 * r)))    # 몸통
+        pygame.draw.ellipse(screen, (182, 142, 92), (cx - int(r * 0.8), cy - int(r * 0.55), int(1.5 * r), int(1.0 * r)))  # 윗빛
+        for ex, ey in [(-r // 2, -3), (r // 3, r // 4), (0, r // 2), (r // 2, -r // 4)]:
+            pygame.draw.circle(screen, (96, 62, 38), (cx + ex, cy + ey), 2)       # 싹눈
+        return
+    if crop_key == "rice":
+        # 사기 그릇에 소복한 흰 쌀밥
+        pygame.draw.ellipse(screen, (240, 238, 232), (cx - r, cy - int(r * 0.75), 2 * r, int(1.1 * r)))  # 밥 봉우리
+        for gx, gy in [(-r // 2, -2), (0, -r // 4), (r // 2, 0), (-r // 4, r // 5), (r // 4, r // 6)]:
+            pygame.draw.ellipse(screen, (255, 255, 250), (cx + gx, cy + gy, 4, 3))  # 낟알 결
+        bowl = pygame.Rect(cx - r - 4, cy + int(r * 0.1), 2 * r + 8, int(r * 1.1))
+        pygame.draw.arc(screen, (208, 214, 224), bowl, 3.30, 6.12, 5)             # 그릇 벽
+        pygame.draw.arc(screen, (150, 176, 190), bowl, 3.30, 6.12, 2)
+        return
+    # carrot (기본): 픽셀 당근 스프라이트
+    spr = sprites.get("carrot")
+    if spr:
+        screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
+
+
+def draw_crop_seed(screen, cx, cy, crop_key):
+    """작물별 씨앗 모양을 (cx, cy) 중심에 그린다.
+    당근은 기존 픽셀 스프라이트를, 나머지는 벡터 도형을 그린다."""
+    if crop_key == "apple":
+        # 사과 씨앗: 작고 검붉은 물방울 씨앗 몇 알
+        for dx, dy in [(-5, 1), (5, -1), (0, 6)]:
+            pygame.draw.ellipse(screen, (92, 46, 28), (cx + dx - 2, cy + dy - 3, 5, 8))
+            pygame.draw.ellipse(screen, (150, 92, 56), (cx + dx - 1, cy + dy - 2, 2, 3))
+        return
+    if crop_key == "potato":
+        # 씨감자: 둥근 황갈색 덩이 + 싹눈
+        pygame.draw.ellipse(screen, (120, 84, 50), (cx - 10, cy - 6, 20, 15))
+        pygame.draw.ellipse(screen, (170, 130, 82), (cx - 8, cy - 5, 15, 11))
+        for ex, ey in [(-3, -1), (3, 2), (0, 4)]:
+            pygame.draw.circle(screen, (92, 62, 38), (cx + ex, cy + ey), 1)
+        return
+    if crop_key == "rice":
+        # 볍씨: 물 위에 흩뿌린 옅은 낟알
+        for dx, dy in [(-6, 1), (-1, 5), (4, -1), (7, 4), (1, -3)]:
+            pygame.draw.ellipse(screen, (200, 186, 120), (cx + dx - 1, cy + dy - 3, 4, 8))
+            pygame.draw.ellipse(screen, (240, 232, 190), (cx + dx, cy + dy - 2, 2, 4))
+        return
+    # carrot (기본): 픽셀 씨앗 스프라이트
+    spr = sprites.get("seed")
+    if spr:
+        screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
+
+
+
 def draw_weather_icon(screen, weather, x, y, size=20):
     import math
     cx, cy = x + size // 2, y + size // 2

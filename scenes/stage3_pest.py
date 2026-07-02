@@ -81,7 +81,7 @@ class Stage3Scene:
         for i in range(6):
             x = 150 + i * 100
             pygame.draw.rect(screen, DIRT_WET, (x-20, 260, 60, 40))
-            screen.blit(sprites['carrot'], (x-5, 200))
+            draw_crop_food(screen, x + 11, 224, game_state.crop, r=18)
 
         for bug in self.bugs: bug.draw(screen)
 

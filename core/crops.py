@@ -30,7 +30,8 @@ CROPS = {
         "desc": "더디지만 단단하다. 가지를 치고, 오래 기다려야 한다.",
         "food": "사과",
         "growth_goal": 26,
-        "labels": {"잡초 뽑기": "가지치기", "흙 북돋기": "거름 주기"},
+        "labels": {"흙 북돋기": "거름 주기"},
+        "no_weeds": True,   # 나무: 밭 잡초 메커니즘 없음 (구덩이 없는 흙바닥에 한 그루)
         "moist_lo": 26, "moist_hi": 68,
         "drain_mult": 0.8, "pressure_mult": 0.9,
         "water_mult": 1.0, "fragile": 0.75,

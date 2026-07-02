@@ -6,7 +6,7 @@ from core.game_state import (
     get_attitude_ending, save_progress, JOURNAL_RETROSPECTIVES,
     append_ending_journal,
 )
-from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites
+from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites, draw_crop_food
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
 from core import audio
 from core.crops import current_crop, swap_crop_word
@@ -318,7 +318,7 @@ class EndingScene:
         "wither": "끝내 밭을 지켜내지 못했지만, 그 숱한 새벽은 남았습니다.",
     }
 
-    # 게임이 끝난 화면에서 보이는 '종료하기' 버튼
+    # 게임이 끝난 화면에서 보이는 '메인으로' 버튼 (앱을 끄지 않고 타이틀로 돌아간다)
     EXIT_BUTTON = pygame.Rect(632, 550, 146, 40)
 
     def _exit_visible(self):
@@ -326,15 +326,20 @@ class EndingScene:
 
     def _draw_exit_button(self, screen):
         hovered = self.EXIT_BUTTON.collidepoint(pygame.mouse.get_pos())
-        draw_button(screen, self.EXIT_BUTTON, "종료하기", self.font_small, hovered=hovered)
+        draw_button(screen, self.EXIT_BUTTON, "메인으로", self.font_small, hovered=hovered)
+
+    def _to_title(self):
+        """엔딩을 마치고 타이틀 화면으로. 진행 상황은 저장하되 앱은 끄지 않는다."""
+        save_progress()
+        game_state.reset()
+        game_state.current_scene = "title"
 
     def handle_events(self, events):
         for event in events:
-            # 끝난 화면에서는 '종료하기' 버튼으로 창을 닫는다 (다른 클릭 처리보다 먼저)
+            # 끝난 화면에서는 '메인으로' 버튼으로 타이틀 화면에 돌아간다 (다른 클릭 처리보다 먼저)
             if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                     and self._exit_visible() and self.EXIT_BUTTON.collidepoint(event.pos)):
-                save_progress()
-                game_state.running = False
+                self._to_title()
                 return
 
             if event.type == pygame.KEYDOWN:
@@ -624,21 +629,20 @@ class EndingScene:
             pygame.draw.circle(sparkle, (255, 235, 140, alpha), (size, size), size)
             screen.blit(sparkle, (px - size, py - size))
 
-        # 4. Carrot sprite pulsing in center (Aligned properly inside the plate)
-        # 당근 스프라이트 하나뿐이라, 작물별 색조(tint)를 얹어 다른 작물처럼 보이게 한다.
-        carrot = sprites["carrot"]
+        # 4. 작물별 먹거리를 접시 위에 맥동시키며 그린다 (당근=스프라이트, 그 외=고유 도형)
         crop = current_crop()
-        if crop.get("tint"):
-            carrot = carrot.copy()
-            carrot.fill(crop["tint"], special_flags=pygame.BLEND_RGB_MULT)
-        scale = 1.0 + 0.06 * math.sin(self.carrot_pulse * 3)
-        cw = int(carrot.get_width() * scale)
-        ch = int(carrot.get_height() * scale)
-        scaled = pygame.transform.scale(carrot, (cw, ch))
-        screen.blit(scaled, (400 - cw // 2, 344 - ch))
+        pulse = 1.0 + 0.06 * math.sin(self.carrot_pulse * 3)
+        if game_state.crop == "carrot":
+            carrot = sprites["carrot"]
+            cw = int(carrot.get_width() * pulse)
+            ch = int(carrot.get_height() * pulse)
+            scaled = pygame.transform.scale(carrot, (cw, ch))
+            screen.blit(scaled, (400 - cw // 2, 344 - ch))
+        else:
+            draw_crop_food(screen, 400, 315, game_state.crop, r=int(30 * pulse))
 
-        # Prompt
-        prompt = self.font_small.render(f"{crop['food']}을(를) 클릭하세요", True, (255, 225, 130))
+        # Prompt (조사 자동 처리: 사과를 / 감자를 / 쌀밥을 / 당근을)
+        prompt = self.font_small.render(f"{append_josa(crop['food'], '을/를')} 클릭하세요", True, (255, 225, 130))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 430))
 
     def _draw_golden(self, screen):

@@ -4,6 +4,7 @@ from core.game_state import game_state
 from core.assets import *
 from core import audio
 from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel, mix_color
+from core.crops import current_crop, swap_crop_word
 
 class SortItem:
     def __init__(self, item_type, x, y):
@@ -16,12 +17,23 @@ class SortItem:
         self.dragging = False
         
         if item_type == 'seed':
-            self.name = "당근 씨앗"
-            self.desc = "밭으로 보내야 할 당근 씨앗입니다."
+            crop = game_state.crop
+            if crop == "apple":
+                self.name = "사과 씨앗"
+                self.desc = "밭으로 보내야 할 사과나무 씨앗입니다."
+            elif crop == "potato":
+                self.name = "씨감자"
+                self.desc = "밭으로 보내야 할 씨감자입니다."
+            elif crop == "rice":
+                self.name = "볍씨"
+                self.desc = "밭으로 보내야 할 볍씨 낟알입니다."
+            else:
+                self.name = "당근 씨앗"
+                self.desc = "밭으로 보내야 할 당근 씨앗입니다."
             self.is_good = True
         elif item_type == 'weed':
             self.name = "잡초"
-            self.desc = "당근의 영양분을 빼앗습니다. 치워야 합니다."
+            self.desc = swap_crop_word("당근의 영양분을 빼앗습니다. 치워야 합니다.", current_crop()["food"])
             self.is_good = False
         elif item_type == 'rock':
             self.name = "돌멩이"
@@ -33,7 +45,10 @@ class SortItem:
             self.is_good = False
 
     def draw(self, screen):
-        screen.blit(self.sprite, self.rect)
+        if self.item_type == 'seed':
+            draw_crop_seed(screen, self.rect.centerx, self.rect.centery, game_state.crop)
+        else:
+            screen.blit(self.sprite, self.rect)
         if self.dragging:
             pygame.draw.rect(screen, WHITE, self.rect, 2)
 
@@ -100,7 +115,7 @@ class Stage1Scene:
                     else:
                         game_state.score -= 80
                         audio.play("break")
-                        self.hovered_desc = "이건 밭에 두면 당근이 자라기 어렵습니다."
+                        self.hovered_desc = swap_crop_word("이건 밭에 두면 당근이 자라기 어렵습니다.", current_crop()["food"])
                     self.items.remove(self.dragged_item)
                 elif self.bin_trash.collidepoint(event.pos):
                     if not self.dragged_item.is_good:

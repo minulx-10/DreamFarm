@@ -1,9 +1,10 @@
 import pygame
 import math
 import random
-from core.game_state import game_state
+from core.game_state import game_state, append_josa
 from core.assets import *
 from core import audio
+from core.crops import current_crop
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
@@ -149,7 +150,7 @@ class Stage4Scene:
             # 부러짐 체크 (tension 과다)
             if self.tension >= 100.0:
                 self.pull_phase = "feedback"
-                self.feedback_text = "너무 세게... 부러졌다."
+                self.feedback_text = "너무 세게... 상했다."
                 self.feedback_timer = 2.0
                 audio.play("break")
                 self.results.append("broken")
@@ -227,18 +228,20 @@ class Stage4Scene:
         for p in self.dirt_particles:
             pygame.draw.rect(screen, p['color'], (int(p['x'] + sx), int(p['y']), p['size'], p['size']))
 
-        # 3. 당근 스프라이트 그리기
-        carrot = sprites["carrot"]
-        cw = carrot.get_width()
-        cy = self.carrot_y - 20
-
-        # 부러진 경우 윗부분만 표시
-        if self.pull_phase == "feedback" and "부러졌다" in self.feedback_text:
-            cropped = pygame.Surface((cw, 35), pygame.SRCALPHA)
-            cropped.blit(carrot, (0, 0))
-            screen.blit(cropped, (400 - cw // 2 + sx, cy))
+        # 3. 작물별 수확물 그리기 (당근=스프라이트, 그 외=고유 도형)
+        broken = self.pull_phase == "feedback" and "상했다" in self.feedback_text
+        if game_state.crop == "carrot":
+            carrot = sprites["carrot"]
+            cw = carrot.get_width()
+            cy = self.carrot_y - 20
+            if broken:
+                cropped = pygame.Surface((cw, 35), pygame.SRCALPHA)
+                cropped.blit(carrot, (0, 0))
+                screen.blit(cropped, (400 - cw // 2 + sx, cy))
+            else:
+                screen.blit(carrot, (400 - cw // 2 + sx, cy))
         else:
-            screen.blit(carrot, (400 - cw // 2 + sx, cy))
+            draw_crop_food(screen, 400 + sx, int(self.carrot_y + 6), game_state.crop, r=24)
 
         # 4. Tension 게이지 (pulling 중에만 표시)
         if self.pull_phase == "pulling" and not self.stage_clear:
@@ -295,9 +298,10 @@ class Stage4Scene:
             font_b = get_font(18)
             t2 = font_b.render("마우스 왼쪽 버튼을 연타해서", True, (200, 180, 140))
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
-            t3 = font_b.render("당근을 조금씩 뽑아 올리세요.", True, (200, 180, 140))
+            food_eul = append_josa(current_crop()["food"], "을/를")
+            t3 = font_b.render(f"{food_eul} 조금씩 거둬 올리세요.", True, (200, 180, 140))
             screen.blit(t3, (400 - t3.get_width() // 2, 290))
-            t4 = font_b.render("너무 빠르게 당기면 줄기가 꺾여 부러집니다.", True, (230, 110, 90))
+            t4 = font_b.render("너무 빠르게 하면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
             screen.blit(t4, (400 - t4.get_width() // 2, 330))
         elif self.stage_clear:
             font = get_font(28)
@@ -307,4 +311,5 @@ class Stage4Scene:
             screen.blit(t, (400 - t.get_width() // 2, 210))
             draw_bottom_bar(screen, "결과", f"수확 점수: {game_state.score}")
         else:
-            draw_bottom_bar(screen, "수확하기", "마우스를 연타해 당근을 뽑아 올리세요. 너무 빠르면 부러집니다.")
+            food_eul = append_josa(current_crop()["food"], "을/를")
+            draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 거둬 올리세요. 너무 빠르면 상합니다.")

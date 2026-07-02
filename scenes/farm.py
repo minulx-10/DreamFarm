@@ -12,7 +12,7 @@ from core.game_state import (
 from core.assets import *
 from core import audio
 from core import save_system
-from core.crops import farm_config
+from core.crops import farm_config, swap_crop_word
 from core.ui import (
     draw_light_panel, draw_panel, draw_wood_panel, draw_top_bar,
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
@@ -103,12 +103,14 @@ class FarmScene:
     def __init__(self):
         # 작물(+악몽 여부)에 따른 밭 성질 — 목표치, 버튼 이름, 마름/들끓음 속도
         self.crop_cfg = farm_config()
+        self.is_tree = self.crop_cfg.get("family") == "나무류"
+        self.no_weeds = self.crop_cfg.get("no_weeds", False)
         self.day = 1
         self.growth = 0
         self.growth_goal = self.crop_cfg["growth_goal"]
         self.moisture = 44
         self.health = 66
-        self.weeds = 25
+        self.weeds = 0 if self.no_weeds else 25
         self.pests = 14
         self.drainage = 55
         self.stress = 0
@@ -193,6 +195,10 @@ class FarmScene:
         """작물에 따라 같은 행동도 다른 이름으로 보인다 (벼: 물 대기, 사과나무: 가지치기)."""
         return self.crop_cfg["labels"].get(action, action)
 
+    def _cropify(self, text):
+        """밭 텍스트 속 '당근'을 지금 기르는 작물 이름으로 (조사까지) 바꾼다."""
+        return swap_crop_word(text, self.crop_cfg.get("food", "당근"))
+
     def rebuild_buttons(self):
         self.buttons = []
         start_x = 440
@@ -238,7 +244,7 @@ class FarmScene:
             add("물 주기", lo + 5 - self.moisture, 0)
         if self.moisture > hi or self.drainage < 35:
             add("배수로 정리", max(self.moisture - hi, 35 - self.drainage), 1)
-        if self.weeds > 20:
+        if not self.no_weeds and self.weeds > 20:
             weed_score = self.weeds - 20
             if self.weeds > 32:
                 weed_score += 12
@@ -262,6 +268,8 @@ class FarmScene:
 
         # '기다리기'는 행동 목록에서 분리 — 밭 화면의 전용 버튼으로만 한다
         fillers = ["물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
+        if self.no_weeds:
+            fillers.remove("잡초 뽑기")
         for action in fillers:
             if action not in choices:
                 choices.append(action)
@@ -662,7 +670,8 @@ class FarmScene:
     def apply_field_pressure(self, difficulty):
         self.day += 1
         self.moisture -= random.randint(4, 7 + difficulty)
-        self.weeds += random.randint(4, 7 + difficulty)
+        if not self.no_weeds:
+            self.weeds += random.randint(4, 7 + difficulty)
         self.pests += random.randint(2, 5 + difficulty)
 
         dmg = 0
@@ -861,8 +870,8 @@ class FarmScene:
         key, title, text = memory
         self.memories_seen.add(key)
         self.memory_cooldown = 4 if u < 25 else 6 if u < 50 else 8
-        game_state.memory_title = title
-        game_state.memory_text = text
+        game_state.memory_title = self._cropify(title)
+        game_state.memory_text = self._cropify(text)
         game_state.memory_next = "farm"
         game_state.current_scene = "memory"
 
@@ -1178,26 +1187,31 @@ class FarmScene:
     def _draw_seeds(self, screen, x, y):
         """작물별 씨앗 그래픽. 밭 이미지의 기본(주황) 씨앗을 흙 패치로 가린 뒤 그 위에 그린다."""
         screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
-        crop = game_state.crop
-        if crop == "apple":
-            # 사과 씨앗: 작고 검붉은 물방울 씨앗 몇 알
-            for dx, dy in [(-5, 1), (5, -1), (0, 6)]:
-                pygame.draw.ellipse(screen, (92, 46, 28), (x + dx - 2, y + dy - 3, 5, 8))
-                pygame.draw.ellipse(screen, (150, 92, 56), (x + dx - 1, y + dy - 2, 2, 3))
-        elif crop == "potato":
-            # 씨감자: 둥근 황갈색 덩이 + 싹눈
-            pygame.draw.ellipse(screen, (120, 84, 50), (x - 10, y - 6, 20, 15))
-            pygame.draw.ellipse(screen, (170, 130, 82), (x - 8, y - 5, 15, 11))
-            for ex, ey in [(-3, -1), (3, 2), (0, 4)]:
-                pygame.draw.circle(screen, (92, 62, 38), (x + ex, y + ey), 1)
-        elif crop == "rice":
-            # 볍씨: 물 위에 흩뿌린 옅은 낟알
-            for dx, dy in [(-6, 1), (-1, 5), (4, -1), (7, 4), (1, -3)]:
-                pygame.draw.ellipse(screen, (200, 186, 120), (x + dx - 1, y + dy - 3, 4, 8))
-                pygame.draw.ellipse(screen, (240, 232, 190), (x + dx, y + dy - 2, 2, 4))
-        else:
-            seed = sprites["seed"]
-            screen.blit(seed, (x - seed.get_width() // 2, y - seed.get_height() // 2))
+        draw_crop_seed(screen, x, y, game_state.crop)
+
+    def _draw_plain_soil(self, screen, plot_rect):
+        """나무류용 민 흙바닥 — 6구덩이 없이 한 덩이의 갈아 놓은 땅."""
+        sc = self.season_colors
+        inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
+        # 나무 테두리 틀
+        frame = inner.inflate(16, 16)
+        pygame.draw.rect(screen, (40, 30, 25), frame.move(0, 4), border_radius=18)
+        pygame.draw.rect(screen, (132, 83, 48), frame, border_radius=18)
+        pygame.draw.rect(screen, (185, 125, 80), frame, 3, border_radius=18)
+        # 흙 (수분에 따라 색조)
+        soil = (96, 62, 42) if self.moisture > 72 else (120, 82, 54) if self.moisture < 28 else sc["dirt"]
+        pygame.draw.rect(screen, sc["dirt_dark"], inner.move(0, 3), border_radius=14)
+        pygame.draw.rect(screen, soil, inner, border_radius=14)
+        # 갈아 놓은 이랑 결(가로 줄) 몇 개
+        for i in range(1, 5):
+            ly = inner.y + inner.h * i // 5
+            pygame.draw.line(screen, mix_color(soil, (0, 0, 0), 0.12),
+                             (inner.x + 10, ly), (inner.right - 10, ly), 2)
+        # 마른 땅이면 갈라짐 살짝
+        if self.moisture < 28:
+            cx, cy = inner.centerx, inner.centery
+            pygame.draw.line(screen, (82, 53, 35), (cx - 40, cy + 30), (cx - 20, cy + 40), 2)
+            pygame.draw.line(screen, (82, 53, 35), (cx + 24, cy - 34), (cx + 40, cy - 24), 2)
 
     def _draw_tree(self, screen, ratio):
         """나무류 작물: 한 그루의 나무가 성장 비율(ratio)에 따라 자란다.
@@ -1285,7 +1299,33 @@ class FarmScene:
         elif adj_stage < self.growth_goal:
             sprite, offset = sprites["sprout4"], (-24, -18)
         else:
-            sprite, offset = sprites["carrot"], (-24, -45)
+            if game_state.crop == "potato":
+                # 감자: sprout4 잎 아래에 흙을 헤치고 살짝 드러난 감자알들
+                sprite, offset = sprites["sprout4"], (-24, -18)
+                screen.blit(sprite, (x + offset[0], y + offset[1]))
+                pygame.draw.ellipse(screen, (78, 52, 32), (x - 15, y - 1, 14, 9))
+                pygame.draw.ellipse(screen, (150, 108, 66), (x - 14, y - 2, 12, 7))
+                pygame.draw.ellipse(screen, (78, 52, 32), (x + 1, y + 2, 12, 8))
+                pygame.draw.ellipse(screen, (150, 108, 66), (x + 2, y + 1, 10, 6))
+                return
+            elif game_state.crop == "rice":
+                # 벼: sprout4를 그리고 황금색 벼 이삭들을 풍성하게 늘어뜨림
+                sprite, offset = sprites["sprout4"], (-24, -18)
+                screen.blit(sprite, (x + offset[0], y + offset[1]))
+                gold_dark = (190, 160, 40)
+                gold_light = (245, 220, 95)
+                pygame.draw.line(screen, gold_dark, (x, y - 5), (x - 14, y + 3), 2)
+                for dx, dy in [(-8, -1), (-11, 1), (-14, 3)]:
+                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
+                pygame.draw.line(screen, gold_dark, (x, y - 8), (x + 14, y + 2), 2)
+                for dx, dy in [(8, -3), (11, -1), (14, 2)]:
+                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
+                pygame.draw.line(screen, gold_dark, (x + 2, y - 12), (x - 4, y - 2), 2)
+                for dx, dy in [(0, -9), (-2, -5), (-4, -2)]:
+                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
+                return
+            else:
+                sprite, offset = sprites["carrot"], (-24, -45)
         screen.blit(sprite, (x + offset[0], y + offset[1]))
 
     def draw_farm_plot(self, screen):
@@ -1293,9 +1333,12 @@ class FarmScene:
         
         # Draw base panel backplate
         draw_light_panel(screen, plot_rect)
-        
-        # 1. Render user's custom pixel field_bed image if available, else draw fallback
-        if "field_bed" in sprites:
+
+        # 1. Render field
+        if self.is_tree:
+            # 나무류는 6구덩이 밭 이미지 대신, 구덩이 없는 민 흙바닥에 한 그루만 심는다
+            self._draw_plain_soil(screen, plot_rect)
+        elif "field_bed" in sprites:
             screen.blit(sprites["field_bed"], (plot_rect.x, plot_rect.y))
         else:
             # Fallback 3D-ish drawing in case file fails to load
@@ -1317,14 +1360,14 @@ class FarmScene:
                 pygame.draw.rect(screen, base_color, patch_rect, border_radius=12)
                 pygame.draw.rect(screen, mix_color(base_color, (255, 235, 180), 0.16), patch_rect, 2, border_radius=12)
 
-        # 2. Draw moisture-specific visual clues over the patches
-        if self.moisture < 28:
+        # 2. Draw moisture-specific visual clues over the patches (구덩이 밭에서만)
+        if not self.is_tree and self.moisture < 28:
             # Draw tiny cracking lines in the soil patches
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x, y + 12
                 pygame.draw.line(screen, (82, 53, 35), (px - 22, py - 14), (px - 10, py - 8), 2)
                 pygame.draw.line(screen, (82, 53, 35), (px + 10, py + 14), (px + 22, py + 18), 2)
-        elif self.moisture > 72:
+        elif not self.is_tree and self.moisture > 72:
             # Draw wet puddle reflections under crops
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x - 18, y + 36
@@ -1332,7 +1375,7 @@ class FarmScene:
 
         # 3. Draw actual crop sprites
         growth_stage = max(0, min(self.growth, self.growth_goal))
-        if self.crop_cfg.get("family") == "나무류":
+        if self.is_tree:
             # 나무류(사과 등)는 밭 구덩이가 아니라 한 그루의 나무로 자란다
             self._draw_tree(screen, self.growth / max(1, self.growth_goal))
         else:
@@ -1342,7 +1385,7 @@ class FarmScene:
         # 4. Draw weeds & bugs on top of the scene
         # 손맛 인터랙션 중에는 배경 잡초/벌레를 숨긴다 — 뽑을/잡을 '대상'과 헷갈리지 않게.
         if self.interaction is None:
-            if self.weeds > 32:
+            if not self.no_weeds and self.weeds > 32:
                 weed_count = 2 if self.weeds < 55 else 4
                 weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]
                 for x, y in weed_spots[:weed_count]:
@@ -1438,7 +1481,7 @@ class FarmScene:
         if self.thought_text:
             tf = get_font(15)
             alpha = 1.0 if self.thought_timer > 1.0 else max(0.0, self.thought_timer)
-            line = wrap_text(self.thought_text, tf, 330, max_lines=1)[0]
+            line = wrap_text(self._cropify(self.thought_text), tf, 330, max_lines=1)[0]
             ts = tf.render(line, True, (245, 232, 198))
             pad = 12
             pill_w = ts.get_width() + pad * 2
@@ -1452,8 +1495,8 @@ class FarmScene:
             ts.set_alpha(int(255 * alpha))
             screen.blit(ts, (px + pad, py + 4))
 
-        # 하단바: 1줄 = 방금 일어난 일, 2줄 = 지금 밭의 증상
-        draw_bottom_bar(screen, "농장 일지", f"{self.message}\n{self.notice}")
+        # 하단바: 1줄 = 방금 일어난 일, 2줄 = 지금 밭의 증상 (작물명으로 치환)
+        draw_bottom_bar(screen, "농장 일지", self._cropify(f"{self.message}\n{self.notice}"))
 
         # 강제 기다리기 돌발 상황 배너 및 타이머 표시
         if self.forced_wait_active:
@@ -1485,6 +1528,8 @@ class FarmScene:
         screen.blit(overlay, (0, 0))
 
         title, body = self.TUTORIAL_PAGES[self.tutorial_step]
+        title = self._cropify(title)
+        body = self._cropify(body)
         card = pygame.Rect(150, 195, 500, 210)
         draw_light_panel(screen, card)
 
