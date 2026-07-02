@@ -59,6 +59,16 @@ def main():
         
     update_display_mode()
     pygame.display.set_caption("몽중농원")
+    
+    # 윈도우 창 아이콘 설정
+    try:
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "core", "logo.png")
+        if os.path.exists(icon_path):
+            icon_surf = pygame.image.load(icon_path)
+            pygame.display.set_icon(icon_surf)
+    except Exception as e:
+        pass
+        
     clock = pygame.time.Clock()
     
     from core.assets import init_sprites
