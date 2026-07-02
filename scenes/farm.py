@@ -14,7 +14,7 @@ from core import audio
 from core import save_system
 from core.crops import farm_config
 from core.ui import (
-    draw_light_panel, draw_wood_panel, draw_top_bar,
+    draw_light_panel, draw_panel, draw_wood_panel, draw_top_bar,
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
     wrap_text, mix_color,
 )
@@ -1163,13 +1163,40 @@ class FarmScene:
         # 밭 이미지(field_bed)의 6개 흙구덩이 중앙 픽셀 위치에 맞게 조율됨 (offset (44, 140) 기준)
         return [(126, 241), (223, 241), (322, 241), (126, 360), (223, 360), (322, 360)]
 
+    def _draw_seeds(self, screen, x, y):
+        """작물별 씨앗 그래픽. 밭 이미지의 기본(주황) 씨앗을 흙 패치로 가린 뒤 그 위에 그린다."""
+        screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
+        crop = game_state.crop
+        if crop == "apple":
+            # 사과 씨앗: 작고 검붉은 물방울 씨앗 몇 알
+            for dx, dy in [(-5, 1), (5, -1), (0, 6)]:
+                pygame.draw.ellipse(screen, (92, 46, 28), (x + dx - 2, y + dy - 3, 5, 8))
+                pygame.draw.ellipse(screen, (150, 92, 56), (x + dx - 1, y + dy - 2, 2, 3))
+        elif crop == "potato":
+            # 씨감자: 둥근 황갈색 덩이 + 싹눈
+            pygame.draw.ellipse(screen, (120, 84, 50), (x - 10, y - 6, 20, 15))
+            pygame.draw.ellipse(screen, (170, 130, 82), (x - 8, y - 5, 15, 11))
+            for ex, ey in [(-3, -1), (3, 2), (0, 4)]:
+                pygame.draw.circle(screen, (92, 62, 38), (x + ex, y + ey), 1)
+        elif crop == "rice":
+            # 볍씨: 물 위에 흩뿌린 옅은 낟알
+            for dx, dy in [(-6, 1), (-1, 5), (4, -1), (7, 4), (1, -3)]:
+                pygame.draw.ellipse(screen, (200, 186, 120), (x + dx - 1, y + dy - 3, 4, 8))
+                pygame.draw.ellipse(screen, (240, 232, 190), (x + dx, y + dy - 2, 2, 4))
+        else:
+            seed = sprites["seed"]
+            screen.blit(seed, (x - seed.get_width() // 2, y - seed.get_height() // 2))
+
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         # Individual growth variation per crop
         offset_val = self.crop_offsets[crop_idx] if crop_idx < len(self.crop_offsets) else 0
         adj_stage = max(0, growth_stage + offset_val)
 
-        # 밭 이미지 자체에 씨앗이 이미 그려져 있으므로, 싹(stage >= 5)이 나기 전에는 그리지 않고 대기
+        # 싹(stage >= 5)이 나기 전 — 씨앗 단계.
+        # 당근은 밭 이미지에 구워진 주황 씨앗을 그대로 쓰고, 다른 작물은 전용 씨앗으로 갈아 그린다.
         if adj_stage < 5:
+            if game_state.crop != "carrot":
+                self._draw_seeds(screen, x, y)
             return
 
         # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 패치 마스킹 렌더링
@@ -1358,7 +1385,7 @@ class FarmScene:
             
             # 상단 타이머 박스
             timer_box = pygame.Rect(220, 20, 360, 42)
-            draw_light_panel(screen, timer_box, fill=(255, 230, 230), border=(200, 50, 50))
+            draw_panel(screen, timer_box, fill=(255, 230, 230), border=(200, 50, 50))
             
             timer_font = get_font(16)
             timer_text = f"돌발 상황 해결 중! 남은 시간: {self.forced_wait_timer:.1f}초"
