@@ -12,7 +12,7 @@ from core.game_state import (
 from core.assets import *
 from core import audio
 from core import save_system
-from core.crops import farm_config, swap_crop_word
+from core.crops import farm_config, swap_crop_word, current_crop
 from core.ui import (
     draw_light_panel, draw_panel, draw_wood_panel, draw_top_bar,
     draw_bottom_bar, draw_understanding_badge, draw_button, draw_meter_bar,
