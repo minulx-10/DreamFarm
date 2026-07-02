@@ -1213,6 +1213,37 @@ class FarmScene:
             pygame.draw.line(screen, (82, 53, 35), (cx - 40, cy + 30), (cx - 20, cy + 40), 2)
             pygame.draw.line(screen, (82, 53, 35), (cx + 24, cy - 34), (cx + 40, cy - 24), 2)
 
+    def _draw_paddy_field(self, screen, plot_rect):
+        """벼용 물이 자작한 논 (관개농업 연출) — 6구덩이 대신 물이 채워진 논바닥과 물결."""
+        sc = self.season_colors
+        inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
+        
+        # 논둑 (dyke/frame)
+        frame = inner.inflate(16, 16)
+        pygame.draw.rect(screen, (35, 30, 25), frame.move(0, 4), border_radius=18) # 그림자
+        pygame.draw.rect(screen, (100, 75, 55), frame, border_radius=18)          # 논둑 몸통 (흙둑)
+        pygame.draw.rect(screen, (75, 55, 40), frame, 3, border_radius=18)         # 논둑 어두운 선
+        
+        # 논 물바닥 (진흙 기저)
+        pygame.draw.rect(screen, (55, 42, 32), inner, border_radius=14)
+        
+        # 자작하게 고인 물 (수분에 따라 물의 밝기와 비침이 달라짐)
+        water_alpha = min(220, max(80, int(self.moisture * 2.2)))
+        water_surf = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
+        water_surf.fill((65, 115, 145, water_alpha))
+        screen.blit(water_surf, (inner.x, inner.y))
+        
+        # 물 반사광/하이라이트 (가로로 긴 맑은 물결선들)
+        for i in range(1, 4):
+            ly = inner.y + inner.h * i // 4
+            pygame.draw.ellipse(screen, (160, 205, 235, 100), (inner.x + 20, ly - 4, inner.w - 40, 8), 1)
+            
+        # 6개의 모내기 자리 주변에 자작한 물결(동심원 잔물결) 그리기
+        for cx, cy in self.crop_positions():
+            rx, ry = cx, cy + 8
+            pygame.draw.ellipse(screen, (120, 180, 210, 140), (rx - 16, ry - 5, 32, 10), 1)
+            pygame.draw.ellipse(screen, (120, 180, 210, 80), (rx - 26, ry - 8, 52, 16), 1)
+
     def _draw_tree(self, screen, ratio):
         """나무류 작물: 한 그루의 나무가 성장 비율(ratio)에 따라 자란다.
         어린 묘목 → 굵어지는 줄기와 우거지는 잎 → 수확기엔 열매가 맺힌다."""
@@ -1338,6 +1369,9 @@ class FarmScene:
         if self.is_tree:
             # 나무류는 6구덩이 밭 이미지 대신, 구덩이 없는 민 흙바닥에 한 그루만 심는다
             self._draw_plain_soil(screen, plot_rect)
+        elif game_state.crop == "rice":
+            # 벼는 관개농업(논)을 시각적으로 묘사한다
+            self._draw_paddy_field(screen, plot_rect)
         elif "field_bed" in sprites:
             screen.blit(sprites["field_bed"], (plot_rect.x, plot_rect.y))
         else:
@@ -1361,13 +1395,13 @@ class FarmScene:
                 pygame.draw.rect(screen, mix_color(base_color, (255, 235, 180), 0.16), patch_rect, 2, border_radius=12)
 
         # 2. Draw moisture-specific visual clues over the patches (구덩이 밭에서만)
-        if not self.is_tree and self.moisture < 28:
+        if not self.is_tree and game_state.crop != "rice" and self.moisture < 28:
             # Draw tiny cracking lines in the soil patches
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x, y + 12
                 pygame.draw.line(screen, (82, 53, 35), (px - 22, py - 14), (px - 10, py - 8), 2)
                 pygame.draw.line(screen, (82, 53, 35), (px + 10, py + 14), (px + 22, py + 18), 2)
-        elif not self.is_tree and self.moisture > 72:
+        elif not self.is_tree and game_state.crop != "rice" and self.moisture > 72:
             # Draw wet puddle reflections under crops
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x - 18, y + 36

@@ -82,23 +82,82 @@ def swap_crop_word(text, word):
     """본문 속 '당근'을 지금 작물 이름으로 바꾸되, 뒤따르는 조사도 맞춘다."""
     if word == "당근":
         return text
+
+    # 작물별 사전 치환 (논/밭 명칭 및 식재료별 디테일 처리)
+    if word == "쌀밥":
+        # 밭 -> 논
+        text = text.replace("당근밭", "논")
+        text = text.replace("당근 밭", "논")
+        text = text.replace("밭의 상태", "논의 상태")
+        text = text.replace("밭 상태", "논 상태")
+        text = text.replace("밭일", "논일")
+        text = text.replace("낯선 밭", "낯선 논")
+        text = text.replace("평온한 밭", "평온한 논")
+        text = text.replace("지켜내지 못한 밭", "지켜내지 못한 논")
+        text = text.replace("밭을 지켜내지", "논을 지켜내지")
+        text = text.replace("밭이 평온하다", "논이 평온하다")
+        
+        # 특정 식사/대사 맥락 치환
+        text = text.replace("당근 반찬", "쌀밥")
+        text = text.replace("당근을 베어 문", "쌀밥을 입에 넣은")
+        text = text.replace("당근을 베어문", "쌀밥을 입에 넣은")
+        text = text.replace("당근을 집어 먹는다", "쌀밥을 떠 먹는다")
+        text = text.replace("당근을 가만히 바라보다", "밥그릇을 가만히 바라보다")
+        text = text.replace("당근 한 뿌리", "벼 한 포기")
+        text = text.replace("당근 한 조각", "쌀밥 한 숟갈")
+        text = text.replace("젓가락", "숟가락")
+        text = text.replace("흙 묻은 당근", "햅쌀 봉지")
+        text = text.replace("당근 잎", "벼 잎")
+        text = text.replace("당근 씨앗", "볍씨")
+        
+        # 식탁 맥락과 재배 맥락에 따라 치환할 작물명 결정 (쌀밥 vs 벼)
+        is_meal = False
+        for keyword in ["남기지 마라", "몸에 좋으니까", "먹어라", "맛", "식탁", "그릇"]:
+            if keyword in text:
+                is_meal = True
+                break
+        word_to_use = "쌀밥" if is_meal else "벼"
+    elif word == "사과":
+        text = text.replace("당근밭", "사과밭")
+        text = text.replace("당근 밭", "사과밭")
+        text = text.replace("당근 반찬", "사과 반찬")
+        text = text.replace("당근 한 뿌리", "사과 한 알")
+        text = text.replace("당근 한 조각", "사과 한 조각")
+        text = text.replace("흙 묻은 당근", "갓 딴 사과")
+        text = text.replace("당근 잎", "사과 잎")
+        text = text.replace("당근 씨앗", "사과 씨앗")
+        word_to_use = word
+    elif word == "감자":
+        text = text.replace("당근밭", "감자밭")
+        text = text.replace("당근 밭", "감자밭")
+        text = text.replace("당근 반찬", "감자 반찬")
+        text = text.replace("당근 한 뿌리", "감자 한 알")
+        text = text.replace("당근 한 조각", "감자 한 조각")
+        text = text.replace("흙 묻은 당근", "흙 묻은 감자")
+        text = text.replace("당근 잎", "감자 잎")
+        text = text.replace("당근 씨앗", "씨감자")
+        word_to_use = word
+    else:
+        word_to_use = word
+
     out = []
     i = 0
     while i < len(text):
         if text.startswith("당근", i):
-            out.append(word)
+            out.append(word_to_use)
             i += 2
             if i < len(text):
                 nxt = text[i]
                 for with_b, without_b in _JOSA_PAIRS:
                     if nxt in (with_b, without_b):
-                        out.append(with_b if _has_batchim(word) else without_b)
+                        out.append(with_b if _has_batchim(word_to_use) else without_b)
                         i += 1
                         break
         else:
             out.append(text[i])
             i += 1
     return "".join(out)
+
 
 
 # ── 악)몽중농원 — 진엔딩 해금 모드 ──

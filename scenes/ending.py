@@ -576,18 +576,47 @@ class EndingScene:
             # 2. 그릇 (입체 백자)
             self._draw_plate(screen, 400, 345, tc)
 
-            # 3. 그릇에 담긴 당근 반찬 조각들 (안면 가운데)
+            # 3. 그릇에 담긴 반찬/음식 조각들 (안면 가운데)
             if tc > 120:
-                chunks = [
-                    ([(376, 348), (392, 342), (396, 352), (380, 356)], (245, 125, 30), (205, 85, 15)),
-                    ([(396, 341), (414, 337), (418, 347), (400, 351)], (255, 140, 40), (215, 95, 20)),
-                    ([(416, 350), (432, 344), (438, 354), (422, 358)], (235, 115, 25), (195, 75, 10)),
-                ]
-                for pts, fill, edge in chunks:
-                    pygame.draw.polygon(screen, (min(tc, fill[0]), min(tc, fill[1]), min(tc, fill[2])), pts)
-                    pygame.draw.polygon(screen, (min(tc, edge[0]), min(tc, edge[1]), min(tc, edge[2])), pts, 1)
-                pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (388, 346), 1)
-                pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (408, 342), 1)
+                crop_key = game_state.crop
+                if crop_key == "apple":
+                    # 사과: 붉은 사과 껍질이 살짝 보이는 초승달 모양 슬라이스들
+                    # 사과 조각 1
+                    pts1 = [(378, 348), (395, 340), (410, 348), (392, 355)]
+                    pygame.draw.polygon(screen, (min(tc, 245), min(tc, 235), min(tc, 215)), pts1)
+                    pygame.draw.arc(screen, (min(tc, 190), min(tc, 30), min(tc, 30)), (376, 338, 36, 18), 3.14, 6.28, 2)
+                    # 사과 조각 2
+                    pts2 = [(398, 342), (415, 334), (430, 342), (412, 349)]
+                    pygame.draw.polygon(screen, (min(tc, 245), min(tc, 235), min(tc, 215)), pts2)
+                    pygame.draw.arc(screen, (min(tc, 190), min(tc, 30), min(tc, 30)), (396, 332, 36, 18), 3.14, 6.28, 2)
+                elif crop_key == "potato":
+                    # 감자: 둥글고 파근파근한 찐감자 덩어리들 (연노랑/베이지)
+                    chunks = [
+                        ([(376, 349), (390, 342), (398, 350), (384, 356)], (230, 205, 150), (160, 120, 80)),
+                        ([(394, 344), (412, 338), (418, 346), (402, 351)], (235, 212, 160), (165, 125, 85)),
+                        ([(414, 351), (428, 345), (434, 353), (420, 358)], (225, 200, 145), (155, 115, 75)),
+                    ]
+                    for pts, fill, edge in chunks:
+                        pygame.draw.polygon(screen, (min(tc, fill[0]), min(tc, fill[1]), min(tc, fill[2])), pts)
+                        pygame.draw.polygon(screen, (min(tc, edge[0]), min(tc, edge[1]), min(tc, edge[2])), pts, 1)
+                elif crop_key == "rice":
+                    # 쌀밥: 그릇 위에 봉긋하게 솟아오른 소복한 흰 쌀밥 heap
+                    pygame.draw.ellipse(screen, (min(tc, 248), min(tc, 246), min(tc, 240)), (360, 322, 80, 32))
+                    pygame.draw.ellipse(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (370, 314, 60, 28))
+                    for gx, gy in [(375, 330), (390, 322), (410, 325), (425, 332), (395, 334)]:
+                        pygame.draw.ellipse(screen, (min(tc, 240), min(tc, 238), min(tc, 230)), (gx, gy, 4, 3))
+                else:
+                    # 당근 반찬
+                    chunks = [
+                        ([(376, 348), (392, 342), (396, 352), (380, 356)], (245, 125, 30), (205, 85, 15)),
+                        ([(396, 341), (414, 337), (418, 347), (400, 351)], (255, 140, 40), (215, 95, 20)),
+                        ([(416, 350), (432, 344), (438, 354), (422, 358)], (235, 115, 25), (195, 75, 10)),
+                    ]
+                    for pts, fill, edge in chunks:
+                        pygame.draw.polygon(screen, (min(tc, fill[0]), min(tc, fill[1]), min(tc, fill[2])), pts)
+                        pygame.draw.polygon(screen, (min(tc, edge[0]), min(tc, edge[1]), min(tc, edge[2])), pts, 1)
+                    pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (388, 346), 1)
+                    pygame.draw.circle(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (408, 342), 1)
 
             # 4. 젓가락
             if tc > 150:
