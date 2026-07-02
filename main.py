@@ -222,7 +222,7 @@ def main():
         quit_overlay.draw(virtual_screen)
 
         # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사
-        pygame.transform.scale(virtual_screen, (actual_w, actual_h), screen)
+        pygame.transform.scale(virtual_screen, screen.get_size(), screen)
 
         pygame.display.flip()
 
