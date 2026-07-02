@@ -128,6 +128,17 @@ def has_save():
     return _read_json(SLOT_PATH) is not None
 
 
+def delete_save():
+    """세이브 슬롯 파일을 삭제한다."""
+    try:
+        if os.path.exists(SLOT_PATH):
+            os.remove(SLOT_PATH)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 # ────────────────────────────── 회차 기록(메타) ──────────────────────────────
 
 def load_meta():

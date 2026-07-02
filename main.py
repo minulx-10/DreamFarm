@@ -246,7 +246,7 @@ def main():
         try:
             from core.assets import get_font
             font_ver = get_font(12)
-            ver_surf = font_ver.render("v1.0.4.5", True, (120, 120, 120))
+            ver_surf = font_ver.render("v1.0.4.6", True, (120, 120, 120))
             virtual_screen.blit(ver_surf, (8, 6))
         except Exception:
             pass
