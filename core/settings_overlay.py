@@ -112,6 +112,18 @@ class SettingsOverlay:
             audio.play("click")
             game_state.current_scene = "title"
             self.open = False
+        elif self._confirm_action == "save_game":
+            if farm_scene is not None and save_system.save_game(farm_scene):
+                audio.play("success")
+                self.show_message = "게임이 저장되었습니다."
+            else:
+                audio.play("break")
+                self.show_message = "저장에 실패했습니다."
+            self.message_timer = 2.0
+        elif self._confirm_action == "load_game":
+            audio.play("success")
+            game_state.request_load = True
+            self.open = False
         self._confirm_action = None
 
     def _on_press(self, pos, farm_scene=None):
@@ -129,24 +141,17 @@ class SettingsOverlay:
             save_system.set_setting("autosave", not current_autosave)
             audio.play("click")
         elif self._save_btn.collidepoint(pos):
+            # 실수로 덮어쓰지 않도록 저장 전 확인 절차를 한 번 거친다.
             if game_state.current_scene == "farm" and farm_scene is not None:
-                success = save_system.save_game(farm_scene)
-                if success:
-                    audio.play("success")
-                    self.show_message = "게임이 저장되었습니다."
-                else:
-                    audio.play("break")
-                    self.show_message = "저장에 실패했습니다."
-                self.message_timer = 2.0
+                self._confirm_action = "save_game"
             else:
                 audio.play("break")
                 self.show_message = "인게임 내에서만 저장 가능합니다."
                 self.message_timer = 2.0
         elif self._load_btn.collidepoint(pos):
+            # 현재 진행이 날아가므로 불러오기 전 확인 절차를 거친다.
             if save_system.has_save():
-                audio.play("success")
-                game_state.request_load = True
-                self.open = False
+                self._confirm_action = "load_game"
             else:
                 audio.play("break")
                 self.show_message = "저장된 게임이 없습니다."
@@ -304,21 +309,26 @@ class SettingsOverlay:
         veil.fill((0, 0, 0, 140))
         screen.blit(veil, (self.panel.x, self.panel.y))
 
-        modal = pygame.Rect(self.panel.centerx - 120, self.panel.y + 280, 240, 120)
+        # 모달 폭을 넓혀 문구가 상자 밖으로 삐져나오지 않게 한다 (좌우 여백 확보).
+        modal = pygame.Rect(0, 0, 324, 124)
+        modal.center = (self.panel.centerx, self.panel.y + 340)
         draw_panel(screen, modal, radius=10)
 
-        if self._confirm_action == "delete_save":
-            msg = "세이브를 삭제하시겠습니까?"
-        elif self._confirm_action == "go_main":
-            msg = "메인 화면으로 돌아가시겠습니까?"
-        else:
-            msg = "진행하시겠습니까?"
+        info = {
+            "delete_save": ("세이브를 삭제하시겠습니까?", "이 기록은 되돌릴 수 없습니다."),
+            "go_main": ("메인 화면으로 돌아가시겠습니까?", "저장하지 않은 진행은 사라집니다."),
+            "save_game": ("현재 상태를 저장하시겠습니까?",
+                          "기존 저장을 덮어씁니다." if save_system.has_save() else "새 저장을 만듭니다."),
+            "load_game": ("저장된 게임을 불러오시겠습니까?", "저장하지 않은 진행은 사라집니다."),
+        }
+        msg, sub = info.get(self._confirm_action, ("진행하시겠습니까?", ""))
 
-        msg_surf = get_font(16).render(msg, True, TEXT_DARK)
-        screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 24))
+        msg_surf = get_font(15).render(msg, True, TEXT_DARK)
+        screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 22))
 
-        sub_surf = get_font(12).render("저장하지 않은 진행은 사라집니다.", True, TEXT_MUTED)
-        screen.blit(sub_surf, (modal.centerx - sub_surf.get_width() // 2, modal.y + 52))
+        if sub:
+            sub_surf = get_font(12).render(sub, True, TEXT_MUTED)
+            screen.blit(sub_surf, (modal.centerx - sub_surf.get_width() // 2, modal.y + 48))
 
         self._draw_text_button(screen, self._confirm_yes, "예", active=False)
         self._draw_text_button(screen, self._confirm_no, "아니오", active=False)

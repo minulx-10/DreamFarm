@@ -135,7 +135,13 @@ _BACKDROP_STARS = [
 
 
 def draw_story_backdrop(screen, mood="night"):
-    if mood == "warm":
+    if mood == "nightmare":
+        # 악)몽중농원 — 검붉은 하늘과 핏빛 달
+        stops = [(0.0, (8, 2, 4)), (0.42, (52, 8, 10)), (1.0, (120, 18, 18))]
+        hill_far, hill_near = (46, 10, 10), (28, 5, 5)
+        ground = (34, 8, 8)
+        moon_glow = (200, 40, 36)
+    elif mood == "warm":
         stops = [(0.0, (58, 82, 96)), (0.5, (132, 98, 90)), (1.0, (188, 130, 84))]
         hill_far, hill_near = (70, 92, 84), (50, 74, 60)
         ground = (92, 68, 52)

@@ -29,7 +29,17 @@ from scenes.father_day import FatherDayScene
 
 def main():
     pygame.init()
-    
+
+    # 윈도우 작업표시줄 아이콘 대응 —
+    # 파이썬/pygame 창은 기본적으로 작업표시줄에서 python.exe 아이콘으로 뜬다.
+    # 프로세스에 고유한 AppUserModelID를 지정하면 윈도우가 이 창을 독립 앱으로 보고
+    # set_icon()으로 넣은 아이콘을 작업표시줄에도 그대로 쓴다.
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mongjung.nongwon.game")
+    except Exception:
+        pass
+
     # 디스플레이 초기화 변수
     is_fullscreen = False
     current_nightmare = False
@@ -81,7 +91,21 @@ def main():
         from core.assets import resource_path
         icon_path = resource_path("logo.png")
         if os.path.exists(icon_path):
-            icon_surf = pygame.image.load(icon_path)
+            raw_icon = pygame.image.load(icon_path).convert_alpha()
+            # 원본 logo.png는 원형 그림 둘레에 투명 여백이 넓어, 작업표시줄에 넣으면
+            # 다른 앱 아이콘보다 작아 보인다. 실제 그림의 경계만 잘라 정사각 캔버스에
+            # 꽉 채워 넣으면 작업표시줄 칸을 다른 아이콘만큼 채운다.
+            bb = raw_icon.get_bounding_rect(min_alpha=8)
+            if bb.width > 0 and bb.height > 0:
+                cropped = raw_icon.subsurface(bb).copy()
+                side = max(bb.width, bb.height)
+                canvas = pygame.Surface((side, side), pygame.SRCALPHA)
+                canvas.blit(cropped, ((side - bb.width) // 2, (side - bb.height) // 2))
+            else:
+                canvas = raw_icon
+            # 작업표시줄/제목표시줄은 아이콘을 32~48px로 줄여 쓴다. OS의 거친 축소를
+            # 피하려고 미리 256px로 다듬어 넘긴다.
+            icon_surf = pygame.transform.smoothscale(canvas, (256, 256))
             pygame.display.set_icon(icon_surf)
     except Exception as e:
         pass
@@ -138,8 +162,8 @@ def main():
     }
     
     FRESH_ON_ENTER = {
-        "title", "crop_select", "gallery", "intro", "memory", "epiphany", 
-        "story_choice", "father_day", "stage1", "stage2", "stage3", 
+        "title", "crop_select", "gallery", "name_input", "intro", "memory", "epiphany",
+        "story_choice", "father_day", "stage1", "stage2", "stage3",
         "stage4", "star_connect", "ending",
     }
 
@@ -240,6 +264,8 @@ def main():
 
         current_scene_obj.update(dt)
         settings_overlay.update(dt)
+        from core import achievements
+        achievements.update(dt)
 
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
@@ -256,6 +282,7 @@ def main():
 
         settings_overlay.draw(virtual_screen)
         quit_overlay.draw(virtual_screen)
+        achievements.draw(virtual_screen)   # 업적 토스트는 항상 맨 위에
 
         # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사 (종횡비 유지 검은 띠 적용)
         scaled_screen = pygame.transform.scale(virtual_screen, (target_w, target_h))

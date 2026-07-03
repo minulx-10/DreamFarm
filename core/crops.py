@@ -29,7 +29,7 @@ CROPS = {
         "family": "나무류",
         "desc": "더디지만 단단하다. 가지를 치고, 오래 기다려야 한다.",
         "food": "사과",
-        "growth_goal": 26,
+        "growth_goal": 34,
         "labels": {"흙 북돋기": "거름 주기"},
         "no_weeds": True,   # 나무: 밭 잡초 메커니즘 없음 (구덩이 없는 흙바닥에 한 그루)
         "moist_lo": 26, "moist_hi": 68,
@@ -54,7 +54,7 @@ CROPS = {
         "family": "벼",
         "desc": "물 위에서 자라는 한 해의 주식. 물꼬 관리가 전부다.",
         "food": "쌀밥",
-        "growth_goal": 22,
+        "growth_goal": 26,
         "labels": {"물 주기": "물 대기", "배수로 정리": "물꼬 트기"},
         "moist_lo": 50, "moist_hi": 86,
         "drain_mult": 1.5, "pressure_mult": 1.0,
@@ -126,6 +126,7 @@ def swap_crop_word(text, word):
         text = text.replace("흙 묻은 당근", "갓 딴 사과")
         text = text.replace("당근 잎", "사과 잎")
         text = text.replace("당근 씨앗", "사과 씨앗")
+        text = text.replace("젓가락", "포크")   # 사과는 젓가락이 아니라 포크로 먹는다
         word_to_use = word
     elif word == "감자":
         text = text.replace("당근밭", "감자밭")

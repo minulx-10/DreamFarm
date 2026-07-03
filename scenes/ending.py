@@ -28,6 +28,8 @@ class EndingScene:
         # 갤러리에서 특정 엔딩을 감상하려고 들어온 경우, 그 엔딩을 강제한다.
         forced = game_state.forced_ending
         game_state.forced_ending = None
+        # 갤러리 감상 모드 — 이 경우 엔딩이 끝나도 새 게임을 시작하지 않고 갤러리로 돌아간다.
+        self.from_gallery = bool(forced)
         if forced:
             self.crop_failed = (forced == "wither")
             self.ending_data = self.get_ending(forced)
@@ -105,6 +107,11 @@ class EndingScene:
         # Record ending in meta save data
         from core import save_system
         save_system.record_ending(ending_type)
+
+        # 실제 플레이로 도달한 엔딩에서만 업적을 해제한다 (갤러리 감상은 제외).
+        if not getattr(self, "from_gallery", False):
+            from core import achievements
+            achievements.on_ending(ending_type)
 
         endings = {
             "true": {
@@ -269,6 +276,11 @@ class EndingScene:
             self.phase_timer = 0
 
     def retry(self):
+        # 갤러리에서 감상 중이었다면 새 게임을 시작하지 않고 갤러리로 돌아간다.
+        if self.from_gallery:
+            game_state.forced_ending = None
+            game_state.current_scene = "gallery"
+            return
         # #14 Save progress before retry
         save_progress()
         game_state.reset()
@@ -326,10 +338,15 @@ class EndingScene:
 
     def _draw_exit_button(self, screen):
         hovered = self.EXIT_BUTTON.collidepoint(pygame.mouse.get_pos())
-        draw_button(screen, self.EXIT_BUTTON, "메인으로", self.font_small, hovered=hovered)
+        label = "갤러리로" if self.from_gallery else "메인으로"
+        draw_button(screen, self.EXIT_BUTTON, label, self.font_small, hovered=hovered)
 
     def _to_title(self):
-        """엔딩을 마치고 타이틀 화면으로. 진행 상황은 저장하되 앱은 끄지 않는다."""
+        """엔딩을 마치고 타이틀(또는 갤러리 감상 중이면 갤러리)로 돌아간다."""
+        if self.from_gallery:
+            game_state.forced_ending = None
+            game_state.current_scene = "gallery"
+            return
         save_progress()
         game_state.reset()
         game_state.current_scene = "title"
@@ -881,8 +898,16 @@ class EndingScene:
             y += 8 if is_section else 4
 
         if self.phase_timer > 1.0:
-            prompt = self.font_small.render("넘기려면 클릭 또는 스페이스바", True, (150, 145, 125))
-            screen.blit(prompt, (400 - prompt.get_width() // 2, 560))
+            # 흐르는 크레딧 글자와 겹치지 않도록 오른쪽 아래 구석에 어두운 알약을 깔고 얹는다.
+            prompt = self.font_small.render("클릭·스페이스바 ▸ 넘기기", True, (222, 216, 196))
+            pad = 9
+            box = pygame.Rect(0, 0, prompt.get_width() + pad * 2, prompt.get_height() + pad * 2)
+            box.bottomright = (786, 588)
+            bg = pygame.Surface((box.w, box.h), pygame.SRCALPHA)
+            bg.fill((10, 10, 15, 205))
+            pygame.draw.rect(bg, (60, 58, 50, 220), bg.get_rect(), 1, border_radius=8)
+            screen.blit(bg, box.topleft)
+            screen.blit(prompt, (box.x + pad, box.y + pad))
 
     def _draw_journal(self, screen):
         draw_story_backdrop(screen, "night")

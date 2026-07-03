@@ -1,0 +1,141 @@
+"""업적(도전과제) — 마인크래프트 도전과제 느낌의 잠금 해제식 업적.
+
+save 메타(save_system)에 해제 목록을 남기고, 해제되는 순간 화면 맨 위에
+토스트로 슬쩍 알린다. 메인 루프가 매 프레임 update()/draw()를 불러 준다.
+"""
+
+import pygame
+
+from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
+from core import audio, save_system
+
+
+# 등급별 메달 색 (common → legend)
+TIER_COLORS = {
+    "common": (176, 168, 150),
+    "rare": (108, 170, 214),
+    "epic": (222, 158, 92),
+    "legend": (224, 118, 128),
+}
+
+ACHIEVEMENTS = [
+    {"id": "first_harvest", "title": "첫 결실", "desc": "작물을 처음으로 끝까지 길러 거두었다.", "tier": "common"},
+    {"id": "grow_carrot", "title": "흙을 아는 손", "desc": "당근을 수확했다.", "tier": "common"},
+    {"id": "grow_potato", "title": "메마른 해의 버팀목", "desc": "감자를 캐냈다.", "tier": "common"},
+    {"id": "grow_rice", "title": "물꼬를 쥔 농부", "desc": "벼를 길러 쌀을 얻었다.", "tier": "rare"},
+    {"id": "grow_apple", "title": "오래 기다린 자", "desc": "사과나무를 끝까지 길러 열매를 땄다.", "tier": "rare"},
+    {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "epic"},
+    {"id": "perfect_harvest", "title": "완벽주의자", "desc": "한 번의 실수도 없이 완벽하게만 수확했다.", "tier": "rare"},
+    {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "epic"},
+    {"id": "nightmare_clear", "title": "악몽에서 깨어나", "desc": "악)몽중농원을 끝까지 버텨 수확했다.", "tier": "legend"},
+]
+
+_BY_ID = {a["id"]: a for a in ACHIEVEMENTS}
+
+# 화면에 띄울 토스트 대기열 (각 항목: {"a": 업적, "t": 경과시간})
+_toasts = []
+_TOAST_DUR = 4.2
+
+
+def unlock(aid):
+    """업적을 처음 해제할 때만 기록하고 토스트를 띄운다."""
+    ach = _BY_ID.get(aid)
+    if not ach:
+        return
+    if save_system.is_achievement_unlocked(aid):
+        return
+    save_system.record_achievement(aid)
+    _toasts.append({"a": ach, "t": 0.0})
+    try:
+        audio.play("epiphany")
+    except Exception:
+        pass
+
+
+# ------------------------------------------------------------------ 트리거
+_CROP_ACH = {"carrot": "grow_carrot", "apple": "grow_apple",
+             "potato": "grow_potato", "rice": "grow_rice"}
+
+
+def on_harvest(crop, perfects, attempts):
+    """작물 수확을 마쳤을 때 (수확 성공 시에만) 호출."""
+    from core.game_state import game_state
+    unlock("first_harvest")
+    unlock(_CROP_ACH.get(crop, ""))
+    clears = save_system.crop_clears()
+    if all(clears.get(c, 0) > 0 for c in ("carrot", "apple", "potato", "rice")):
+        unlock("all_crops")
+    if perfects > 0 and attempts <= perfects:
+        unlock("perfect_harvest")
+    if getattr(game_state, "nightmare", False):
+        unlock("nightmare_clear")
+
+
+def on_ending(ending_type):
+    """엔딩에 도달했을 때 (갤러리 감상이 아닌 실제 플레이에서만) 호출."""
+    if ending_type == "true":
+        unlock("true_ending")
+
+
+# ------------------------------------------------------------------ 토스트
+def update(dt):
+    for t in _toasts:
+        t["t"] += dt
+    while _toasts and _toasts[0]["t"] > _TOAST_DUR:
+        _toasts.pop(0)
+
+
+def _draw_medal(screen, cx, cy, tier, r=17):
+    col = TIER_COLORS.get(tier, (176, 168, 150))
+    pygame.draw.circle(screen, (30, 26, 22), (cx, cy + 1), r + 1)
+    pygame.draw.circle(screen, col, (cx, cy), r)
+    pygame.draw.circle(screen, WHITE, (cx, cy), r, 2)
+    # 가운데 작은 별
+    import math
+    pts = []
+    for i in range(10):
+        ang = -math.pi / 2 + i * math.pi / 5
+        rr = r * 0.55 if i % 2 == 0 else r * 0.24
+        pts.append((cx + rr * math.cos(ang), cy + rr * math.sin(ang)))
+    pygame.draw.polygon(screen, (255, 244, 214), pts)
+
+
+def draw(screen):
+    """맨 위에서 살짝 내려왔다 올라가는 업적 토스트 (한 번에 하나)."""
+    if not _toasts:
+        return
+    t = _toasts[0]
+    a = t["a"]
+    elapsed = t["t"]
+
+    W, H = 344, 60
+    x = (800 - W) // 2
+    rest_y = 12
+    if elapsed < 0.35:
+        k = elapsed / 0.35
+        y = -H + (rest_y + H) * (1 - (1 - k) * (1 - k))   # ease-out
+    elif elapsed > _TOAST_DUR - 0.4:
+        k = max(0.0, (_TOAST_DUR - elapsed) / 0.4)
+        y = -H + (rest_y + H) * k
+    else:
+        y = rest_y
+
+    y = int(y)
+    panel = pygame.Surface((W, H), pygame.SRCALPHA)
+    pygame.draw.rect(panel, (40, 34, 28, 236), (0, 0, W, H), border_radius=10)
+    tier_col = TIER_COLORS.get(a.get("tier"), (176, 168, 150))
+    pygame.draw.rect(panel, (*tier_col, 255), (0, 0, W, H), 2, border_radius=10)
+    screen.blit(panel, (x, y))
+
+    _draw_medal(screen, x + 32, y + H // 2, a.get("tier"))
+
+    head = get_font(12).render("업적 달성!", True, (240, 206, 120))
+    screen.blit(head, (x + 60, y + 9))
+    title = get_font(17).render(a["title"], True, WHITE)
+    screen.blit(title, (x + 60, y + 27))
+
+
+def all_with_state():
+    """갤러리 표시용 — (업적, 해제여부) 목록."""
+    unlocked = set(save_system.achievements_unlocked())
+    return [(a, a["id"] in unlocked) for a in ACHIEVEMENTS]

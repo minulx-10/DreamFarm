@@ -108,7 +108,8 @@ class FarmScene:
         self.day = 1
         self.growth = 0
         self.growth_goal = self.crop_cfg["growth_goal"]
-        self.moisture = 44
+        # 벼(논)는 처음부터 물을 가득 대어 심는다 — 실제 무논처럼 물이 찰랑이는 상태로 시작.
+        self.moisture = 80 if game_state.crop == "rice" else 44
         self.health = 66
         self.weeds = 0 if self.no_weeds else 25
         self.pests = 14
@@ -1235,93 +1236,146 @@ class FarmScene:
         pygame.draw.rect(screen, (100, 75, 55), frame, border_radius=18)          # 논둑 몸통 (흙둑)
         pygame.draw.rect(screen, (75, 55, 40), frame, 3, border_radius=18)         # 논둑 어두운 선
         
-        # 논 물바닥 (진흙 기저 - 침울한 회색에서 밝고 비옥한 황토빛 진흙색으로 개선)
-        pygame.draw.rect(screen, (92, 72, 52), inner, border_radius=14)
-        
-        # 자작하게 고인 물 (수분에 따라 물의 밝기와 비침이 달라짐 - 맑은 하늘빛 투사)
-        water_alpha = min(160, max(50, int(self.moisture * 1.5)))
-        water_surf = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
-        water_surf.fill((70, 155, 200, water_alpha))
-        
-        # 수면 위 햇살 반사광 (중앙부에 부드러운 하이라이트 추가)
-        for r in range(140, 0, -10):
-            alpha = int(24 * (1.0 - r / 140.0) * (water_alpha / 160.0))
-            pygame.draw.ellipse(water_surf, (255, 255, 255, alpha), (inner.w // 2 - r, inner.h // 2 - int(r * 0.4), r * 2, int(r * 0.8)))
-            
-        screen.blit(water_surf, (inner.x, inner.y))
-        
-        # 물 반사광/하이라이트 (가로로 긴 맑은 물결선들 - 색상 한층 더 밝게 보정)
-        for i in range(1, 4):
-            ly = inner.y + inner.h * i // 4
-            pygame.draw.ellipse(screen, (200, 235, 255, 140), (inner.x + 20, ly - 4, inner.w - 40, 8), 1)
-            
-        # 6개의 모내기 자리 주변에 자작한 물결(동심원 잔물결) 그리기
-        for cx, cy in self.crop_positions():
-            rx, ry = cx, cy + 8
-            pygame.draw.ellipse(screen, (190, 230, 255, 200), (rx - 16, ry - 5, 32, 10), 1)
-            pygame.draw.ellipse(screen, (190, 230, 255, 120), (rx - 26, ry - 8, 52, 16), 1)
+        # 수분량(moisture)에 따라 논의 물이 실시간으로 차고 빠진다.
+        wet = max(0.0, min(1.0, (self.moisture - 12) / 74.0))
+
+        # 진흙 바닥 — 물이 많을수록 짙게 젖고, 마르면 밝은 황토빛으로 드러난다.
+        mud = mix_color((158, 118, 78), (74, 58, 42), wet)
+        pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.25), inner.move(0, 3), border_radius=14)
+        pygame.draw.rect(screen, mud, inner, border_radius=14)
+
+        # 마른 논이면 갈라진 흙 (물이 적을수록 뚜렷하게)
+        if wet < 0.34:
+            crack = mix_color(mud, (0, 0, 0), 0.35)
+            cx0, cy0 = inner.centerx, inner.centery
+            segs = [(-70, -30, -40, -8), (-40, -8, -52, 20), (20, -34, 44, -18),
+                    (30, 10, 60, 22), (-10, 24, 12, 40), (48, -6, 70, 8)]
+            for x1, y1, x2, y2 in segs:
+                pygame.draw.line(screen, crack, (cx0 + x1, cy0 + y1), (cx0 + x2, cy0 + y2), 2)
+
+        # 고인 물 — 물이 많을수록 넓고 짙게 (가운데부터 차오른다)
+        if wet > 0.04:
+            water = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
+            alpha = int(46 + 150 * wet)
+            ew = int(inner.w * (0.42 + 0.58 * wet))
+            eh = int(inner.h * (0.42 + 0.58 * wet))
+            ex, ey = (inner.w - ew) // 2, (inner.h - eh) // 2
+            pygame.draw.ellipse(water, (66, 150, 198, alpha), (ex, ey, ew, eh))
+            # 수면 햇살 반사 (물이 많을수록 밝게)
+            for r in range(min(ew, eh) // 2, 0, -10):
+                a = int(22 * (1.0 - r / max(1, min(ew, eh) // 2)) * wet)
+                pygame.draw.ellipse(water, (255, 255, 255, a),
+                                    (inner.w // 2 - r, inner.h // 2 - int(r * 0.4), r * 2, int(r * 0.8)))
+            screen.blit(water, (inner.x, inner.y))
+            # 잔물결 라인 (물에 잠긴 범위 안에서만)
+            for i in range(1, 4):
+                ly = inner.y + inner.h * i // 4
+                if abs(ly - inner.centery) < eh // 2 - 4:
+                    pygame.draw.ellipse(screen, (200, 235, 255, int(140 * wet)),
+                                        (inner.centerx - ew // 2 + 14, ly - 4, ew - 28, 8), 1)
+
+        # 모내기 자리 잔물결 — 물이 그 자리를 덮고 있을 때만
+        if wet > 0.2:
+            for cx, cy in self.crop_positions():
+                pygame.draw.ellipse(screen, (190, 230, 255, int(200 * wet)), (cx - 16, cy + 3, 32, 10), 1)
 
     def _draw_tree(self, screen, ratio):
-        """나무류 작물: 한 그루의 나무가 성장 비율(ratio)에 따라 자란다.
-        어린 묘목 → 굵어지는 줄기와 우거지는 잎 → 수확기엔 열매가 맺힌다."""
-        import math
+        """나무류 작물 — 픽셀 아트 한 그루가 현실 나무처럼 자란다.
+        묘목 → 줄기가 오르고 '맨 가지가 먼저' 뻗은 뒤 → 그 가지에 잎이 돋고 → 수확기엔 열매."""
         ratio = max(0.0, min(1.2, ratio))
-        base_x, base_y = 225, 360          # 밭 한가운데 땅에 심긴 밑동
-        trunk_h = int(24 + 96 * min(1.0, ratio))
-        trunk_w = int(8 + 16 * min(1.0, ratio))
-        canopy_r = int(16 + 62 * min(1.0, ratio))
-        top_y = base_y - trunk_h
+        g = min(1.0, ratio)
+        PX = 6
+        base_x, base_y = 225, 362
+
+        bark_d, bark, bark_l = (74, 48, 28), (110, 72, 42), (150, 104, 62)
+        leaf_d, leaf_m, leaf_l = (46, 110, 60), (72, 150, 80), (120, 196, 112)
+        if game_state.nightmare:
+            bark_d, bark, bark_l = (48, 24, 22), (86, 44, 36), (120, 66, 52)
+            leaf_d, leaf_m, leaf_l = (72, 20, 20), (112, 30, 28), (156, 52, 42)
+        fruit_c = self.crop_cfg.get("tint") or (200, 60, 50)
+
+        def cell(cx, cy, color):
+            # cx: 줄기 중심 기준 가로 칸, cy: 땅(0)에서 위로 올라가는 세로 칸
+            pygame.draw.rect(screen, color, (base_x + cx * PX - PX // 2, base_y - cy * PX - PX, PX, PX))
 
         # 밑동 그림자
-        shadow = pygame.Surface((canopy_r * 2 + 20, 24), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 60), shadow.get_rect())
-        screen.blit(shadow, (base_x - canopy_r - 10, base_y - 6))
+        shadow = pygame.Surface((150, 22), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 55), shadow.get_rect())
+        screen.blit(shadow, (base_x - 75, base_y - 8))
 
-        # 줄기 (밑이 굵고 위가 가는 사다리꼴)
-        trunk_pts = [
-            (base_x - trunk_w // 2, base_y),
-            (base_x + trunk_w // 2, base_y),
-            (base_x + max(2, trunk_w // 4), top_y + canopy_r // 2),
-            (base_x - max(2, trunk_w // 4), top_y + canopy_r // 2),
-        ]
-        pygame.draw.polygon(screen, (110, 74, 44), trunk_pts)
-        pygame.draw.polygon(screen, (150, 104, 62), trunk_pts, 2)
+        trunk_h = 4 + int(13 * g)
 
-        if ratio < 0.12:
-            # 갓 심은 묘목: 줄기 끝에 작은 잎 두 장
-            pygame.draw.circle(screen, (86, 160, 78), (base_x - 5, top_y + 6), 6)
-            pygame.draw.circle(screen, (86, 160, 78), (base_x + 5, top_y + 6), 6)
+        # 갓 돋은 묘목 — 짧은 줄기 + 떡잎 두 장
+        if g < 0.10:
+            th = max(2, int(4 + 6 * (g / 0.10)))
+            for cy in range(th):
+                cell(0, cy, bark)
+            cell(-1, th, leaf_m); cell(1, th, leaf_m); cell(0, th, leaf_l)
             return
 
-        # 잎 덮개 (여러 원을 겹쳐 뭉게뭉게)
-        cx, cy = base_x, top_y
-        dark = (46, 112, 60)
-        mid = (66, 150, 78)
-        light = (108, 190, 104)
-        blobs = [
-            (cx, cy, canopy_r), (cx - canopy_r // 2, cy + canopy_r // 4, int(canopy_r * 0.7)),
-            (cx + canopy_r // 2, cy + canopy_r // 4, int(canopy_r * 0.7)),
-            (cx, cy - canopy_r // 3, int(canopy_r * 0.72)),
-        ]
-        for bx, by, r in blobs:
-            pygame.draw.circle(screen, dark, (bx, by + 3), r)
-        for bx, by, r in blobs:
-            pygame.draw.circle(screen, mid, (bx, by), r)
-        pygame.draw.circle(screen, light, (cx - canopy_r // 3, cy - canopy_r // 3), max(4, canopy_r // 3))
+        # 줄기 (아래가 굵고 위가 가늘게)
+        for cy in range(trunk_h):
+            hw = 1 if (cy / trunk_h) < 0.45 else 0
+            for cx in range(-hw, hw + 1):
+                cell(cx, cy, bark_l if cx < 0 else (bark if cx == 0 else bark_d))
+        cell(-2, 0, bark_d); cell(2, 0, bark_d)   # 뿌리 flare
 
-        # 수확기: 잎 사이로 붉은 열매(사과 등) — 작물 색조 사용
-        if ratio >= 0.7:
-            fruit = self.crop_cfg.get("tint") or (200, 60, 50)
+        def leaf_blob(cx0, cy0, rad, grow):
+            if grow <= 0:
+                return
+            r = rad * grow
+            rq = r * r + r
+            ri = int(r) + 1
+            for dx in range(-ri, ri + 1):
+                for dy in range(-ri, ri + 1):
+                    if dx * dx + dy * dy <= rq:
+                        s = dx + dy
+                        cell(cx0 + dx, cy0 + dy, leaf_l if s <= -1 else (leaf_d if s >= 2 else leaf_m))
+
+        def fruit(cx, cy):
+            px = base_x + cx * PX - PX // 2
+            py = base_y - cy * PX - PX
+            pygame.draw.rect(screen, fruit_c, (px, py, PX, PX))
+            pygame.draw.rect(screen, (255, 236, 218), (px + 1, py + 1, 2, 2))
+
+        # 가지: (줄기높이비율, 방향, 길이칸, 가지출현 g, 잎출현 g) — 잎은 가지보다 늦게 돋는다
+        branches = [
+            (0.52, -1, 3, 0.14, 0.34),
+            (0.60,  1, 3, 0.18, 0.40),
+            (0.74, -1, 4, 0.28, 0.50),
+            (0.82,  1, 4, 0.32, 0.54),
+        ]
+        tips = []
+        for frac, d, length, br_g, lf_g in branches:
+            if g < br_g:
+                continue
+            node = int(trunk_h * frac)
+            grow = min(1.0, (g - br_g) / 0.16)
+            steps = max(1, int(length * grow))
+            tx, ty = 0, node
+            for s in range(1, steps + 1):
+                tx = d * s
+                ty = node + int(s * 0.6)
+                cell(tx, ty, bark if s % 2 else bark_l)
+            lg = min(1.0, (g - lf_g) / 0.22)
+            if lg > 0:
+                leaf_blob(tx, ty + 1, 2.2, lg)
+                tips.append((tx, ty + 1))
+
+        # 꼭대기 우듬지 잎
+        if g >= 0.40:
+            leaf_blob(0, trunk_h + 1, 3.0, min(1.0, (g - 0.40) / 0.30))
+            tips.append((0, trunk_h + 1))
+
+        # 수확기 열매 (고정 시드로 매 프레임 같은 자리)
+        if g >= 0.82 and tips:
             import random as _r
-            rng = _r.Random(7)   # 매 프레임 같은 자리에 맺히도록 고정 시드
-            n = 4 if ratio < 1.0 else 7
-            for _ in range(n):
-                ang = rng.uniform(0, 6.28)
-                dist = rng.uniform(0.2, 0.9) * canopy_r
-                fx = int(cx + dist * math.cos(ang))
-                fy = int(cy + dist * math.sin(ang) * 0.85)
-                pygame.draw.circle(screen, fruit, (fx, fy), 5)
-                pygame.draw.circle(screen, (255, 240, 220), (fx - 1, fy - 1), 1)
+            rng = _r.Random(9)
+            n = 3 if g < 1.0 else 6
+            spots = tips[:]
+            rng.shuffle(spots)
+            for fx, fy in spots[:n]:
+                fruit(fx + rng.randint(-1, 1), fy + rng.randint(-1, 1))
 
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         # Individual growth variation per crop

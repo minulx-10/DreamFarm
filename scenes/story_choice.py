@@ -31,6 +31,7 @@ class StoryChoiceScene:
         self.qte_progress = 0.0
         self.qte_targets = []
         self.qte_choice = None
+        self.qte_theme = None
 
         data = game_state.choice_data or {}
         
@@ -88,6 +89,7 @@ class StoryChoiceScene:
         self.qte_choice = choice
         self.qte_progress = 0.0          # hold/rub 진행도 (0~1, 현재 표적 기준)
         self.qte_targets = []
+        self.qte_theme = task_data.get("theme")
 
         count = task_data.get("count", 4)
         if self.qte_kind == "trail":
@@ -95,6 +97,12 @@ class StoryChoiceScene:
             for i in range(count):
                 tx = 180 + (i * (440 // max(1, count - 1)) if count > 1 else 220)
                 ty = 300 + (34 if i % 2 else -34)
+                self.qte_targets.append({"pos": (tx, ty), "done": False})
+        elif self.qte_theme == "fence":
+            # 울타리 틈은 한 줄로 늘어선 울타리 위에 뚫려 있어야 한다 — 가로 울타리 선을 따라 배치
+            for i in range(count):
+                tx = 190 + int((i + 0.5) * (420 / count))
+                ty = 302 + random.randint(-5, 5)
                 self.qte_targets.append({"pos": (tx, ty), "done": False})
         else:
             # 서로 겹치지 않게 랜덤 배치 (tap/hold/rub 공용)
@@ -334,6 +342,10 @@ class StoryChoiceScene:
                 cx, cy = t["pos"]
                 is_next = (t is active)
                 last = (i == len(self.qte_targets) - 1)
+                if last:
+                    # 목적지는 잎이 아니라 꽃밭의 꽃 한 송이로 그린다
+                    self._draw_flower(screen, cx, cy, t["done"], is_next, pulse)
+                    continue
                 if t["done"]:
                     col = (120, 150, 100)
                 elif is_next:
@@ -344,7 +356,7 @@ class StoryChoiceScene:
                 # 잎 모양
                 pygame.draw.ellipse(screen, col, (cx - 13, cy - 9, 26, 18))
                 pygame.draw.line(screen, (40, 90, 50), (cx - 10, cy), (cx + 10, cy), 1)
-                num = get_font(13).render(str(i + 1) if not last else "꽃", True, (30, 60, 35))
+                num = get_font(13).render(str(i + 1), True, (30, 60, 35))
                 screen.blit(num, (cx - num.get_width() // 2, cy - num.get_height() // 2))
             # 벌: 다음 잎(또는 마지막 완료 잎) 위에 앉아 있다
             bee_t = active or self.qte_targets[-1]
@@ -357,21 +369,25 @@ class StoryChoiceScene:
             pygame.draw.ellipse(screen, (220, 235, 255), (bx + 2, by - 7, 7, 5))
 
         elif self.qte_kind == "hold":
-            for t in self.qte_targets:
-                cx, cy = t["pos"]
-                if t["done"]:
-                    pygame.draw.circle(screen, (120, 150, 95), (cx, cy), 16)
-                    continue
-                # 막아야 할 틈/구멍
-                pygame.draw.circle(screen, (48, 34, 24), (cx, cy), 17)
-                if t is active:
-                    # 누르는 동안 차는 게이지 링
-                    pygame.draw.circle(screen, (210, 180, 90), (cx, cy), int(20 + 4 * pulse), 2)
-                    if self.qte_progress > 0:
-                        ang = -math.pi / 2
-                        end = ang + self.qte_progress * 2 * math.pi
-                        rect = pygame.Rect(cx - 15, cy - 15, 30, 30)
-                        pygame.draw.arc(screen, (95, 200, 120), rect, ang, end, 5)
+            if self.qte_theme == "fence":
+                self._draw_fence_qte(screen, active, pulse)
+            else:
+                # 물길/이랑 등 — 막아야 할 틈/구멍 (테마에 따라 색만 달리)
+                hole_c = (44, 78, 104) if self.qte_theme == "water" else (48, 34, 24)
+                for t in self.qte_targets:
+                    cx, cy = t["pos"]
+                    if t["done"]:
+                        fill = (110, 150, 180) if self.qte_theme == "water" else (120, 95, 70)
+                        pygame.draw.circle(screen, fill, (cx, cy), 16)
+                        continue
+                    pygame.draw.circle(screen, hole_c, (cx, cy), 17)
+                    if t is active:
+                        pygame.draw.circle(screen, (210, 180, 90), (cx, cy), int(20 + 4 * pulse), 2)
+                        if self.qte_progress > 0:
+                            ang = -math.pi / 2
+                            end = ang + self.qte_progress * 2 * math.pi
+                            rect = pygame.Rect(cx - 15, cy - 15, 30, 30)
+                            pygame.draw.arc(screen, (95, 200, 120), rect, ang, end, 5)
             hint = t_font.render("표적 위에서 마우스를 꾹 누르세요", True, TEXT_MUTED)
             screen.blit(hint, (400 - hint.get_width() // 2, 430))
 
@@ -392,6 +408,106 @@ class StoryChoiceScene:
                         pygame.draw.rect(screen, (180, 186, 192), (cx - 14, cy + 20, w, 4), border_radius=2)
             hint = t_font.render("표적 위에서 마우스를 좌우로 문지르세요", True, TEXT_MUTED)
             screen.blit(hint, (400 - hint.get_width() // 2, 430))
+
+    def _draw_flower(self, screen, cx, cy, done, active, pulse):
+        """길 잃은 벌의 목적지 — 꽃밭의 꽃 한 송이."""
+        if active:
+            pygame.draw.circle(screen, (250, 180, 205), (cx, cy), int(23 + 6 * pulse), 2)
+        # 잎줄기
+        pygame.draw.line(screen, (70, 130, 80), (cx, cy + 6), (cx, cy + 18), 3)
+        petal = (222, 150, 182) if done else (240, 162, 194)
+        petal_hi = (252, 200, 220)
+        for k in range(6):
+            ang = k * math.pi / 3
+            px = cx + int(math.cos(ang) * 11)
+            py = cy + int(math.sin(ang) * 11)
+            pygame.draw.circle(screen, petal, (px, py), 7)
+        for k in range(6):
+            ang = k * math.pi / 3
+            px = cx + int(math.cos(ang) * 11)
+            py = cy + int(math.sin(ang) * 11)
+            pygame.draw.circle(screen, petal_hi, (px - 2, py - 2), 3)
+        pygame.draw.circle(screen, (246, 206, 92), (cx, cy), 6)
+        pygame.draw.circle(screen, (208, 158, 58), (cx, cy), 6, 1)
+
+    def _draw_fence_qte(self, screen, active, pulse):
+        """새벽의 고라니 — 실제 울타리가 한 줄로 서 있고, 부러진 틈이 표적이 된다."""
+        span_l, span_r = 150, 650
+        y_top, y_bot = 292, 314
+        rail_c, rail_d = (156, 114, 70), (112, 80, 48)
+        post_c, post_d = (128, 90, 54), (88, 60, 36)
+
+        undone = [t for t in self.qte_targets if not t["done"]]
+        gaps = [(t["pos"][0] - 26, t["pos"][0] + 26) for t in undone]
+
+        def in_gap(x):
+            return any(a <= x <= b for a, b in gaps)
+
+        # 활성 틈 뒤에서 노리는 고라니
+        if active is not None and not active["done"]:
+            dx, dy = active["pos"]
+            self._draw_deer(screen, dx, y_top - 30)
+
+        # 가로 살(rail) — 틈 구간은 건너뛰고 이어 그린다
+        for yy in (y_top, y_bot):
+            x = span_l
+            while x < span_r:
+                if in_gap(x):
+                    x += 3
+                    continue
+                seg_end = x
+                while seg_end < span_r and not in_gap(seg_end):
+                    seg_end += 3
+                pygame.draw.rect(screen, rail_c, (x, yy, seg_end - x, 8))
+                pygame.draw.rect(screen, rail_d, (x, yy + 6, seg_end - x, 2))
+                x = seg_end
+
+        # 기둥(post)
+        for px in range(span_l, span_r + 1, 100):
+            pygame.draw.rect(screen, post_c, (px - 6, y_top - 18, 12, 62))
+            pygame.draw.rect(screen, post_d, (px + 2, y_top - 18, 4, 62))
+            pygame.draw.polygon(screen, post_c, [(px - 6, y_top - 18), (px, y_top - 26), (px + 6, y_top - 18)])
+
+        # 표적별: 부러진 틈 또는 메운 자리
+        for t in self.qte_targets:
+            cx, cy = t["pos"]
+            if t["done"]:
+                self._draw_fence_patch(screen, cx, y_top, y_bot, 1.0)
+                continue
+            # 부러진 살 끝 (뾰족하게)
+            for yy in (y_top, y_bot):
+                pygame.draw.polygon(screen, rail_d, [(cx - 26, yy), (cx - 19, yy + 4), (cx - 26, yy + 8)])
+                pygame.draw.polygon(screen, rail_d, [(cx + 26, yy), (cx + 19, yy + 4), (cx + 26, yy + 8)])
+            if t is active:
+                pygame.draw.circle(screen, (210, 180, 90), (cx, cy), int(23 + 4 * pulse), 2)
+                if self.qte_progress > 0:
+                    self._draw_fence_patch(screen, cx, y_top, y_bot, self.qte_progress)
+
+    def _draw_fence_patch(self, screen, cx, y_top, y_bot, frac):
+        """부러진 틈을 나뭇가지로 가로질러 메운다 (frac 만큼 자라난다)."""
+        br, brd, leaf = (120, 82, 48), (86, 56, 32), (96, 152, 72)
+        span = 24
+        x0, y0 = cx - span, y_top - 4
+        x1, y1 = cx + span, y_bot + 6
+        ex, ey = x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac
+        pygame.draw.line(screen, brd, (x0, y0), (ex, ey), 6)
+        pygame.draw.line(screen, br, (x0, y0), (ex, ey), 4)
+        if frac >= 0.999:
+            pygame.draw.line(screen, brd, (x1, y0), (x0, y1), 5)
+            pygame.draw.line(screen, br, (x1, y0), (x0, y1), 3)
+            pygame.draw.circle(screen, leaf, (cx - 5, y_top - 1), 4)
+            pygame.draw.circle(screen, leaf, (cx + 7, y_bot + 1), 3)
+
+    def _draw_deer(self, screen, cx, cy):
+        """울타리 너머로 고개를 들이민 고라니."""
+        body, dark, nose = (126, 100, 74), (94, 72, 52), (58, 46, 38)
+        pygame.draw.ellipse(screen, body, (cx - 15, cy - 4, 8, 15))   # 왼귀
+        pygame.draw.ellipse(screen, body, (cx + 7, cy - 4, 8, 15))    # 오른귀
+        pygame.draw.ellipse(screen, body, (cx - 13, cy, 26, 30))      # 얼굴
+        pygame.draw.ellipse(screen, dark, (cx - 8, cy + 16, 16, 14))  # 주둥이
+        pygame.draw.circle(screen, nose, (cx, cy + 26), 3)
+        pygame.draw.circle(screen, (28, 22, 18), (cx - 6, cy + 10), 2)
+        pygame.draw.circle(screen, (28, 22, 18), (cx + 6, cy + 10), 2)
 
     def _draw_btn(self, screen, rect, label, hovered):
         draw_button(screen, rect, label, self.font_small, hovered=hovered)

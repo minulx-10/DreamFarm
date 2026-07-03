@@ -16,25 +16,26 @@ class GalleryScene:
         
         self.active_tab = "endings" # "endings" | "stories"
         
-        # 탭 Rects
-        self.tab1_rect = pygame.Rect(230, 105, 160, 36)
-        self.tab2_rect = pygame.Rect(410, 105, 160, 36)
+        # 탭 Rects (엔딩 / 이야기 / 업적)
+        self.tab1_rect = pygame.Rect(158, 105, 158, 34)
+        self.tab2_rect = pygame.Rect(322, 105, 158, 34)
+        self.tab3_rect = pygame.Rect(486, 105, 158, 34)
         self.back_rect = pygame.Rect(30, 24, 100, 32)
         
-        # 엔딩 슬롯 Rects
+        # 엔딩 슬롯 Rects (제목 2줄 + 설명 3줄 + 버튼이 겹치지 않도록 높이 확보)
         self.ending_slots = {
-            "true": pygame.Rect(90, 170, 290, 150),
-            "normal": pygame.Rect(420, 170, 290, 150),
-            "bad": pygame.Rect(90, 340, 290, 150),
-            "wither": pygame.Rect(420, 340, 290, 150)
+            "true": pygame.Rect(90, 168, 290, 160),
+            "normal": pygame.Rect(420, 168, 290, 160),
+            "bad": pygame.Rect(90, 338, 290, 160),
+            "wither": pygame.Rect(420, 338, 290, 160)
         }
-        
-        # 리플레이 버튼 Rects (엔딩 카드 안쪽 상대 좌표 기반 계산)
+
+        # 리플레이 버튼 Rects — 각 카드 아래쪽에 고정
         self.replay_btns = {
-            "true": pygame.Rect(230, 275, 140, 32),
-            "normal": pygame.Rect(560, 275, 140, 32),
-            "bad": pygame.Rect(230, 445, 140, 32),
-            "wither": pygame.Rect(560, 445, 140, 32)
+            "true": pygame.Rect(230, 288, 140, 32),
+            "normal": pygame.Rect(560, 288, 140, 32),
+            "bad": pygame.Rect(230, 458, 140, 32),
+            "wither": pygame.Rect(560, 458, 140, 32)
         }
         
         # 리스트 컬럼 영역
@@ -54,6 +55,7 @@ class GalleryScene:
         self.hovered_back = False
         self.hovered_tab1 = False
         self.hovered_tab2 = False
+        self.hovered_tab3 = False
         self.hovered_modal_close = False
         
         # 리스트 아이템 마우스 오버용 위치 매핑 리스트
@@ -77,7 +79,8 @@ class GalleryScene:
         self.hovered_back = self.back_rect.collidepoint(mouse_pos)
         self.hovered_tab1 = self.tab1_rect.collidepoint(mouse_pos)
         self.hovered_tab2 = self.tab2_rect.collidepoint(mouse_pos)
-        
+        self.hovered_tab3 = self.tab3_rect.collidepoint(mouse_pos)
+
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 뒤로가기
@@ -92,6 +95,9 @@ class GalleryScene:
                 elif self.hovered_tab2:
                     audio.play("click")
                     self.active_tab = "stories"
+                elif self.hovered_tab3:
+                    audio.play("click")
+                    self.active_tab = "achievements"
                 
                 # 콘텐츠별 클릭
                 if self.active_tab == "endings":
@@ -142,14 +148,18 @@ class GalleryScene:
         draw_button(screen, self.back_rect, "돌아가기", self.font_small, hovered=self.hovered_back)
         
         # 3. 탭 바 그리기
-        draw_button(screen, self.tab1_rect, "엔딩 갤러리", self.font_btn, 
+        draw_button(screen, self.tab1_rect, "엔딩", self.font_btn,
                     hovered=self.hovered_tab1, selected=(self.active_tab == "endings"))
-        draw_button(screen, self.tab2_rect, "이야기 및 기억", self.font_btn, 
+        draw_button(screen, self.tab2_rect, "이야기·기억", self.font_btn,
                     hovered=self.hovered_tab2, selected=(self.active_tab == "stories"))
-        
+        draw_button(screen, self.tab3_rect, "업적", self.font_btn,
+                    hovered=self.hovered_tab3, selected=(self.active_tab == "achievements"))
+
         # 4. 콘텐츠 그리기
         if self.active_tab == "endings":
             self._draw_endings_tab(screen)
+        elif self.active_tab == "achievements":
+            self._draw_achievements_tab(screen)
         else:
             self._draw_stories_tab(screen)
             
@@ -173,6 +183,7 @@ class GalleryScene:
             if unlocked:
                 # 해금된 카드 그리기
                 draw_light_panel(screen, rect)
+                btn_rect = self.replay_btns[key]
                 # 제목이 카드 밖으로 튀어나오지 않게 폭에 맞춰 줄바꿈
                 y = rect.y + 14
                 for tline in wrap_text(meta["title"], self.font_card_title, rect.w - 36, max_lines=2):
@@ -180,15 +191,15 @@ class GalleryScene:
                     screen.blit(title_surf, (rect.x + 18, y))
                     y += self.font_card_title.get_height() + 2
 
-                # 설명줄
+                # 설명줄 — 리플레이 버튼 위 공간까지만 그려 버튼과 겹치지 않게 한다
                 y += 4
-                for line in wrap_text(meta["desc"], self.font_small, rect.w - 36, max_lines=3):
+                avail_lines = max(1, min(3, (btn_rect.y - 8 - y) // 18))
+                for line in wrap_text(meta["desc"], self.font_small, rect.w - 36, max_lines=avail_lines):
                     line_surf = self.font_small.render(line, True, TEXT_DARK)
                     screen.blit(line_surf, (rect.x + 18, y))
                     y += 18
-                
+
                 # 리플레이 버튼
-                btn_rect = self.replay_btns[key]
                 hovered = btn_rect.collidepoint(pygame.mouse.get_pos())
                 draw_button(screen, btn_rect, "엔딩 다시보기", self.font_small, hovered=hovered)
             else:
@@ -202,6 +213,52 @@ class GalleryScene:
                 
                 lock_desc = self.font_body.render("아직 해금되지 않은 결말입니다.", True, (130, 125, 115))
                 screen.blit(lock_desc, (rect.x + 18, rect.y + 60))
+
+    def _draw_achievements_tab(self, screen):
+        from core import achievements
+        items = achievements.all_with_state()
+        got = sum(1 for _, unlocked in items if unlocked)
+
+        area = pygame.Rect(80, 160, 640, 372)
+        draw_light_panel(screen, area)
+        header = self.font_section.render(f"업적  {got} / {len(items)}", True, TEXT_DARK)
+        screen.blit(header, (area.x + 20, area.y + 12))
+        pygame.draw.line(screen, (200, 180, 150), (area.x + 20, area.y + 44),
+                         (area.right - 20, area.y + 44), 1)
+
+        # 2열 그리드
+        col_w = (area.w - 50) // 2
+        cell_h = 56
+        ox, oy = area.x + 18, area.y + 56
+        for i, (ach, unlocked) in enumerate(items):
+            col = i % 2
+            row = i // 2
+            cx = ox + col * (col_w + 14)
+            cy = oy + row * (cell_h + 5)
+            cell = pygame.Rect(cx, cy, col_w, cell_h)
+
+            base = (250, 240, 214) if unlocked else (222, 216, 206)
+            edge = mix_color(achievements.TIER_COLORS.get(ach["tier"], (180, 170, 150)),
+                             (0, 0, 0), 0.15) if unlocked else (188, 182, 172)
+            draw_panel(screen, cell, fill=base, border=edge, radius=8, shadow=False)
+
+            mcx, mcy = cell.x + 26, cell.centery
+            if unlocked:
+                achievements._draw_medal(screen, mcx, mcy, ach["tier"], r=15)
+                title = self.font_body.render(ach["title"], True, TEXT_DARK)
+                screen.blit(title, (cell.x + 52, cell.y + 9))
+                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 66, max_lines=2)):
+                    ds = self.font_small.render(line, True, TEXT_MUTED)
+                    screen.blit(ds, (cell.x + 52, cell.y + 30 + j * 15))
+            else:
+                pygame.draw.circle(screen, (170, 164, 154), (mcx, mcy), 15)
+                pygame.draw.circle(screen, (140, 134, 124), (mcx, mcy), 15, 2)
+                q = self.font_body.render("?", True, (120, 114, 104))
+                screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
+                title = self.font_body.render("???", True, (140, 134, 124))
+                screen.blit(title, (cell.x + 52, cell.y + 9))
+                ds = self.font_small.render("아직 잠겨 있는 업적", True, (150, 144, 134))
+                screen.blit(ds, (cell.x + 52, cell.y + 32))
 
     def _draw_stories_tab(self, screen):
         # 텃밭 사건 목록

@@ -52,11 +52,15 @@ class Stage4Scene:
         elif self.is_potato:
             self.potato_x = self.center_x
             self.potato_start_x = self.center_x
-            self.potato_target_x = self.center_x + 130.0  # 옆으로 드래그해 캐냄 (130px 끌어당기기)
+            # 감자는 한 번 밀어서 캐는 게 아니라, 좌우로 번갈아 흔들어 흙에서 풀어내야 뽑힌다.
             self.dragging = False
             self.drag_start_x = self.center_x
             self.drag_current_x = self.center_x
             self.last_drag_x = self.center_x
+            self.potato_loosen = 0.0   # 흔들어 풀린 정도 (100이면 쏙 뽑힌다)
+            self.shake_dir = 0         # 마지막 흔든 방향 (+1 오른쪽 / -1 왼쪽)
+            self.swing = 0.0           # 현재 방향으로 흔든 누적 거리
+            self.shake_count = 0
         elif self.is_rice:
             self.rice_phase = "thresh"  # thresh (탈곡) -> hull (도정)
             self.thresh_progress = 0.0
@@ -172,6 +176,9 @@ class Stage4Scene:
                             self.drag_current_x = event.pos[0]
                             self.last_drag_x = event.pos[0]
                             self.tension = 0.0
+                            self.potato_loosen = 0.0
+                            self.shake_dir = 0
+                            self.swing = 0.0
                             audio.play("pop")
                 elif event.type == pygame.MOUSEMOTION:
                     if self.pull_phase == "pulling" and self.dragging:
@@ -241,6 +248,11 @@ class Stage4Scene:
                 perfects = self.results.count("perfect")
                 bonus = 5 + perfects * 8
                 game_state.understanding += bonus
+                # 작물을 끝까지 길러 수확했다 — 작물별 클리어 횟수를 누적하고 업적을 확인한다.
+                from core import save_system
+                save_system.record_crop_clear(game_state.crop)
+                from core import achievements
+                achievements.on_harvest(game_state.crop, perfects, self.attempts)
                 game_state.transition_text = (
                     "수확 완료!\n\n"
                     f"완벽한 수확: {perfects}회\n"
@@ -300,33 +312,44 @@ class Stage4Scene:
                         self.dragging = False
             elif self.is_potato:
                 if self.dragging:
-                    # 마우스 속도 측정으로 과도한 드래그 감지
-                    speed = abs(self.drag_current_x - self.last_drag_x) / max(0.001, dt)
-                    if speed > 600.0:  # 600 px/sec 임계값
-                        self.tension = min(100.0, self.tension + 18.0 * dt * (speed / 600.0))
+                    dx = self.drag_current_x - self.last_drag_x
+
+                    # 좌우로 번갈아 흔들어야 풀린다 — 방향이 바뀔 때마다 '한 번 흔든' 것으로 친다.
+                    self.swing += dx
+                    if dx != 0:
+                        new_dir = 1 if dx > 0 else -1
+                        if new_dir != self.shake_dir and abs(self.swing) > 26.0:
+                            self.shake_dir = new_dir
+                            self.swing = 0.0
+                            self.shake_count += 1
+                            self.potato_loosen = min(100.0, self.potato_loosen + 20.0)
+                            audio.play("pop")
+                            for _ in range(random.randint(2, 4)):
+                                self.dirt_particles.append({
+                                    'x': random.uniform(self.potato_x - 26, self.potato_x + 26),
+                                    'y': random.uniform(345, 372),
+                                    'vx': random.uniform(-70, 70),
+                                    'vy': random.uniform(-70, -20),
+                                    'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                                    'size': random.randint(2, 5),
+                                    'life': random.uniform(0.3, 0.6)
+                                })
+
+                    # 너무 격하게 홱홱 채면 감자가 상한다
+                    speed = abs(dx) / max(0.001, dt)
+                    if speed > 1500.0:
+                        self.tension = min(100.0, self.tension + 22.0 * dt * (speed / 1500.0))
                     else:
-                        self.tension = max(0.0, self.tension - 40.0 * dt)
+                        self.tension = max(0.0, self.tension - 45.0 * dt)
 
-                    # 흙 파티클 생성
-                    if abs(self.drag_current_x - self.last_drag_x) > 2.0:
-                        for _ in range(random.randint(0, 1)):
-                            self.dirt_particles.append({
-                                'x': random.uniform(self.potato_x - 30, self.potato_x + 30),
-                                'y': random.uniform(340, 370),
-                                'vx': random.uniform(-45, 45),
-                                'vy': random.uniform(-60, -15),
-                                'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
-                                'size': random.randint(2, 5),
-                                'life': random.uniform(0.3, 0.6)
-                            })
-
-                    self.potato_x = max(self.center_x - 145.0, min(self.center_x + 145.0, self.center_x + (self.drag_current_x - self.drag_start_x)))
+                    # 손짓 따라 감자가 좌우로 살짝 흔들린다 (뽑히진 않고 흔들리기만)
+                    wiggle = (self.drag_current_x - self.drag_start_x) * 0.35
+                    self.potato_x = max(self.center_x - 34.0, min(self.center_x + 34.0, self.center_x + wiggle))
                     self.last_drag_x = self.drag_current_x
 
-                    # 부러짐 체크 (tension 과다)
                     if self.tension >= 100.0:
                         self.pull_phase = "feedback"
-                        self.feedback_text = "너무 세게... 상했다."
+                        self.feedback_text = "너무 거칠게... 상했다."
                         self.feedback_timer = 2.0
                         audio.play("break")
                         self.results.append("broken")
@@ -334,8 +357,7 @@ class Stage4Scene:
                         self.attempts += 1
                         game_state.score -= 50
                         self.dragging = False
-                    # 성공 체크 (130px 이상 좌/우 드래그)
-                    elif abs(self.potato_x - self.center_x) >= 130.0:
+                    elif self.potato_loosen >= 100.0:
                         self.pull_phase = "feedback"
                         self.feedback_text = "쏙! 완벽하게 캐냈다."
                         self.feedback_timer = 2.0
@@ -345,13 +367,15 @@ class Stage4Scene:
                         game_state.score += 300
                         self.dragging = False
                 else:
-                    # 드래그를 안 하고 있으면 제자리로 복귀
+                    # 손을 놓으면 흔든 정도가 서서히 풀리고 제자리로
                     self.tension = max(0.0, self.tension - 60.0 * dt)
+                    self.potato_loosen = max(0.0, self.potato_loosen - 28.0 * dt)
                     if self.potato_x < self.center_x:
                         self.potato_x = min(self.center_x, self.potato_x + self.slide_speed * 4.0 * dt)
                     elif self.potato_x > self.center_x:
                         self.potato_x = max(self.center_x, self.potato_x - self.slide_speed * 4.0 * dt)
-                    if self.potato_x == self.center_x:
+                    if abs(self.potato_x - self.center_x) < 0.5:
+                        self.potato_x = self.center_x
                         self.pull_phase = "ready"
             else:
                 # tension 자연 감소
@@ -651,11 +675,21 @@ class Stage4Scene:
                 gauge_color = mix_color((80, 175, 110), (220, 60, 45), self.tension / 100.0)
                 pygame.draw.rect(screen, gauge_color, (gx + 2, gy + 2, fill_w, gh - 4), border_radius=3)
 
+            # 감자: 흔들어 풀린 정도 게이지 (다 차면 쏙 뽑힌다)
+            if self.is_potato:
+                lx, ly, lw, lh = 250, 428, 300, 13
+                pygame.draw.rect(screen, (40, 35, 30), (lx, ly, lw, lh), border_radius=4)
+                lfill = int((lw - 4) * (self.potato_loosen / 100.0))
+                if lfill > 0:
+                    pygame.draw.rect(screen, (210, 180, 90), (lx + 2, ly + 2, lfill, lh - 4), border_radius=3)
+                cap = get_font(12).render("풀림", True, (236, 224, 200))
+                screen.blit(cap, (lx - cap.get_width() - 8, ly - 1))
+
             # 경고 텍스트 — 어두운 흙 위에서도 읽히도록 알약 배경 + 밝은 색
             font_t = get_font(14)
             warn = self.tension > 50.0
             if self.is_potato:
-                txt = "너무 빨라요! 천천히 드래그하세요." if warn else "적당한 속도로 좌우로 드래그하세요."
+                txt = "너무 거칠어요! 살살 흔드세요." if warn else "좌우로 번갈아 흔들어 캐내세요!"
             elif self.is_rice:
                 txt = "너무 빨라요! 천천히 흔드세요." if warn else "마우스를 드래그해 좌우로 흔들어 터세요."
             else:
@@ -734,5 +768,9 @@ class Stage4Scene:
             food_eul = append_josa(current_crop()["food"], "을/를")
             if self.is_apple:
                 draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 당겨 따내세요. 너무 빠르면 상합니다.")
+            elif self.is_potato:
+                draw_bottom_bar(screen, "수확하기", f"감자를 잡고 좌우로 번갈아 흔들어 캐내세요. 너무 거칠면 상합니다.")
+            elif self.is_rice:
+                draw_bottom_bar(screen, "수확하기", f"좌우로 흔들어 이삭을 털고, 비벼서 껍질을 벗기세요.")
             else:
                 draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 거둬 올리세요. 너무 빠르면 상합니다.")

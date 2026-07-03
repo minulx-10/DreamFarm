@@ -11,15 +11,38 @@ class NameInputScene:
         self.font_btn = get_font(20)
         self.input_text = ""
         self.ime_text = ""
-        
+
         # '시작하기' 입력 완료 버튼 Rect
         self.start_btn = pygame.Rect(310, 355, 180, 44)
         self.hovered = False
-        
+        # 뒤로가기 버튼 (좌상단) — 작물 선택으로 돌아간다
+        self.back_btn = pygame.Rect(24, 22, 104, 34)
+        self.hovered_back = False
+        # 빈 이름으로 진행하려 할 때 잠깐 뜨는 경고
+        self.warn_timer = 0.0
+
         pygame.key.start_text_input()
         pygame.key.set_text_input_rect(pygame.Rect(250, 280, 300, 50))
         # 백스페이스를 꾹 누르고 있을 때 연속 삭제가 지원되도록 키 반복 입력 활성화 (딜레이 450ms, 주기 50ms)
         pygame.key.set_repeat(450, 50)
+
+    def _try_start(self):
+        """이름이 채워져 있으면 진행하고, 비어 있으면 경고를 띄운다."""
+        if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
+            audio.play("success")
+            game_state.player_name = self.input_text.strip()
+            game_state.current_scene = "intro"
+            pygame.key.set_repeat(0)         # 키 반복 입력 비활성화
+            pygame.key.stop_text_input()
+        else:
+            audio.play("break")
+            self.warn_timer = 2.2            # "이름을 입력해 주세요" 경고 표시
+
+    def _go_back(self):
+        audio.play("click")
+        pygame.key.set_repeat(0)
+        pygame.key.stop_text_input()
+        game_state.current_scene = "crop_select"
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -28,6 +51,7 @@ class NameInputScene:
             self.hovered = new_hover
             if self.hovered:
                 audio.play("hover")
+        self.hovered_back = self.back_btn.collidepoint(mouse_pos)
 
         for event in events:
             if event.type == pygame.TEXTEDITING:
@@ -39,23 +63,17 @@ class NameInputScene:
                 if len(self.input_text) + len(event.text) <= 8:
                     self.input_text += event.text
                     audio.type_tick(event.text)
+                    self.warn_timer = 0.0
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # 마우스로 시작하기 버튼 클릭 시
-                if self.start_btn.collidepoint(event.pos):
-                    if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
-                        audio.play("success")
-                        game_state.player_name = self.input_text.strip()
-                        game_state.current_scene = "intro"
-                        pygame.key.set_repeat(0) # 키 반복 입력 비활성화
-                        pygame.key.stop_text_input()
+                if self.back_btn.collidepoint(event.pos):
+                    self._go_back()
+                elif self.start_btn.collidepoint(event.pos):
+                    self._try_start()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
-                        audio.play("success")
-                        game_state.player_name = self.input_text.strip()
-                        game_state.current_scene = "intro"
-                        pygame.key.set_repeat(0) # 키 반복 입력 비활성화
-                        pygame.key.stop_text_input()
+                    self._try_start()
+                elif event.key == pygame.K_ESCAPE:
+                    self._go_back()
                 elif event.key == pygame.K_BACKSPACE:
                     if len(self.ime_text) == 0:
                         if len(self.input_text) > 0:
@@ -63,10 +81,14 @@ class NameInputScene:
                             audio.play("click")
 
     def update(self, dt):
-        pass
+        if self.warn_timer > 0:
+            self.warn_timer -= dt
 
     def draw(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
+
+        # 뒤로가기 버튼
+        draw_button(screen, self.back_btn, "돌아가기", self.font_btn, hovered=self.hovered_back)
 
         card = pygame.Rect(160, 140, 480, 310)
         draw_light_panel(screen, card)
@@ -95,8 +117,12 @@ class NameInputScene:
         # 시작하기 완료 버튼 그리기
         draw_button(screen, self.start_btn, "시작하기", self.font_btn, hovered=self.hovered)
 
-        desc = self.font_small.render("Enter 키로도 입력 완료 가능", True, TEXT_MUTED)
-        screen.blit(desc, (400 - desc.get_width()//2, 412))
+        if self.warn_timer > 0:
+            warn = self.font_small.render("이름을 입력해 주세요!", True, (206, 70, 60))
+            screen.blit(warn, (400 - warn.get_width()//2, 412))
+        else:
+            desc = self.font_small.render("Enter 키로도 입력 완료 가능", True, TEXT_MUTED)
+            screen.blit(desc, (400 - desc.get_width()//2, 412))
 
         shine = self.font_small.render("몽중농원", True, WHITE)
         screen.blit(shine, (400 - shine.get_width() // 2, 85))

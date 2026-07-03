@@ -180,16 +180,33 @@ class WeedPull:
 
     def __init__(self, farm):
         from core.game_state import game_state
+        import math
         self.farm = farm
-        n = min(6, max(3, farm.weeds // 11)) + random.randint(0, 1)   # 변형: 개수
+        self.is_apple = (game_state.crop == "apple")
+        # 사과나무 가지치기는 나무에서 뻗어 나온 곁가지를 잡아 밖으로 끌어낸다.
+        # 가지들이 실제 나무 우듬지에서 뻗어 나오도록 밑동(anchor) 기준 방사형으로 배치한다.
+        self.tree_anchor = (225, 316)
         self.items = []
-        for _ in range(n):
-            self.items.append({
-                "x": random.randint(PLOT.x + 40, PLOT.right - 56),
-                "y": random.randint(PLOT.y + 60, PLOT.bottom - 64),
-                "ox": 0.0, "oy": 0.0, "pulled": False,
-                "strength": random.randint(24, 42),   # 변형: 뿌리 깊이(필요 드래그)
-            })
+        if self.is_apple:
+            n = random.randint(4, 5)
+            for i in range(n):
+                ang = math.radians(202 + 136 * (i / max(1, n - 1)) + random.uniform(-8, 8))
+                rad = random.randint(42, 74)
+                self.items.append({
+                    "x": int(225 + rad * math.cos(ang)),
+                    "y": int(300 + rad * math.sin(ang)),
+                    "ox": 0.0, "oy": 0.0, "pulled": False,
+                    "strength": random.randint(26, 44),
+                })
+        else:
+            n = min(6, max(3, farm.weeds // 11)) + random.randint(0, 1)   # 변형: 개수
+            for _ in range(n):
+                self.items.append({
+                    "x": random.randint(PLOT.x + 40, PLOT.right - 56),
+                    "y": random.randint(PLOT.y + 60, PLOT.bottom - 64),
+                    "ox": 0.0, "oy": 0.0, "pulled": False,
+                    "strength": random.randint(24, 42),   # 변형: 뿌리 깊이(필요 드래그)
+                })
         self.total = len(self.items)
         self.grabbed = None
         self.timer = 6.5
@@ -270,20 +287,31 @@ class WeedPull:
                 continue
             ox, oy = int(w["ox"]), int(w["oy"])
             gx2, gy2 = w["x"] + ox, w["y"] + oy
-            # 대상 표시
-            glow = pygame.Surface((46, 24), pygame.SRCALPHA)
-            pygame.draw.ellipse(glow, (255, 236, 165, 80) if not is_apple else (230, 255, 200, 80), (0, 0, 46, 24))
-            pygame.draw.ellipse(glow, (255, 250, 210, 120) if not is_apple else (240, 255, 210, 120), (9, 6, 28, 12))
-            screen.blit(glow, (gx2 - 23, gy2 + 6))
-            # 줄기 표시
-            if self.grabbed is w and (ox or oy):
-                pygame.draw.line(screen, (96, 132, 70) if not is_apple else (120, 90, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
-            
+
             if is_apple:
-                pygame.draw.line(screen, (101, 67, 33), (gx2 - 12, gy2 + 8), (gx2 + 12, gy2 - 8), 4) # 나무줄기
-                pygame.draw.circle(screen, (76, 139, 58), (gx2 - 4, gy2 - 2), 6) # 나뭇잎 1
-                pygame.draw.circle(screen, (96, 169, 78), (gx2 + 6, gy2 - 6), 5) # 나뭇잎 2
+                # 나무 밑동(anchor)에서 가지가 뻗어 나온 것처럼 굵은 곁가지를 그린다.
+                ax, ay = self.tree_anchor
+                pygame.draw.line(screen, (78, 52, 30), (ax, ay), (gx2, gy2), 7)
+                pygame.draw.line(screen, (120, 82, 46), (ax, ay), (gx2, gy2), 4)
+                # 잔가지
+                pygame.draw.line(screen, (110, 76, 44), (gx2, gy2), (gx2 - 8, gy2 - 10), 3)
+                pygame.draw.line(screen, (110, 76, 44), (gx2, gy2), (gx2 + 9, gy2 - 6), 3)
+                # 곁가지 잎 (쳐내야 할 웃자란 잎)
+                pygame.draw.circle(screen, (60, 120, 58), (gx2 - 6, gy2 - 12), 7)
+                pygame.draw.circle(screen, (86, 162, 78), (gx2 + 9, gy2 - 9), 6)
+                pygame.draw.circle(screen, (108, 190, 96), (gx2 + 2, gy2 - 15), 5)
+                # 잡는 곳 표시
+                glow = pygame.Surface((30, 30), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (240, 255, 210, 90), (15, 15), 14)
+                screen.blit(glow, (gx2 - 15, gy2 - 15))
             else:
+                # 대상 표시
+                glow = pygame.Surface((46, 24), pygame.SRCALPHA)
+                pygame.draw.ellipse(glow, (255, 236, 165, 80), (0, 0, 46, 24))
+                pygame.draw.ellipse(glow, (255, 250, 210, 120), (9, 6, 28, 12))
+                screen.blit(glow, (gx2 - 23, gy2 + 6))
+                if self.grabbed is w and (ox or oy):
+                    pygame.draw.line(screen, (96, 132, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
                 screen.blit(wsp, (gx2 - wsp.get_width() // 2, gy2 - wsp.get_height() // 2))
                 
         for p in self.puffs:

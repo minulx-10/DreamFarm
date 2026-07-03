@@ -94,10 +94,26 @@ class CropSelectScene:
         screen.blit(desc_top, (400 - desc_top.get_width() // 2, 105))
         
         # 3. 작물 카드 그리기
+        clears = save_system.crop_clears()
         for key, rect in self.cards.items():
             info = CROPS[key]
             is_selected = (self.selected_crop == key)
             is_hovered = (self.hovered_card == key)
+
+            # 각 작물 카드 위에 클리어(수확 성공) 횟수 배지
+            cnt = clears.get(key, 0)
+            badge_font = get_font(12)
+            if cnt > 0:
+                btxt = badge_font.render(f"클리어 {cnt}회", True, (74, 52, 34))
+                bg = (232, 205, 130)
+                bw, bh = btxt.get_width() + 16, btxt.get_height() + 6
+            else:
+                btxt = badge_font.render("미클리어", True, (150, 145, 135))
+                bg = (222, 216, 206)
+                bw, bh = btxt.get_width() + 16, btxt.get_height() + 6
+            badge = pygame.Rect(rect.centerx - bw // 2, rect.y - bh - 6, bw, bh)
+            draw_panel(screen, badge, fill=bg, border=mix_color(bg, (0, 0, 0), 0.25), radius=8, shadow=False)
+            screen.blit(btxt, (badge.centerx - btxt.get_width() // 2, badge.centery - btxt.get_height() // 2))
             
             # 카드 배경 & 테두리 색상 분기
             if is_selected:

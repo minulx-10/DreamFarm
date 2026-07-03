@@ -185,6 +185,38 @@ def endings_seen():
     return load_meta().get("endings_seen", [])
 
 
+def record_crop_clear(crop):
+    """작물을 끝까지 길러 수확한 횟수를 작물별로 누적한다 (수확 성공 시에만 호출)."""
+    meta = load_meta()
+    clears = meta.get("crop_clears", {})
+    clears[crop] = clears.get(crop, 0) + 1
+    meta["crop_clears"] = clears
+    _write_json(META_PATH, meta)
+
+
+def crop_clears():
+    """작물별 클리어(수확 성공) 횟수 사전."""
+    return load_meta().get("crop_clears", {})
+
+
+def record_achievement(aid):
+    """해제된 업적 id를 메타에 남긴다 (중복은 무시)."""
+    meta = load_meta()
+    got = meta.get("achievements", [])
+    if aid not in got:
+        got.append(aid)
+    meta["achievements"] = got
+    _write_json(META_PATH, meta)
+
+
+def achievements_unlocked():
+    return load_meta().get("achievements", [])
+
+
+def is_achievement_unlocked(aid):
+    return aid in load_meta().get("achievements", [])
+
+
 def crops_unlocked():
     """아무 엔딩이든 한 번 보면 다른 작물이 열린다."""
     return bool(endings_seen())
