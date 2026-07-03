@@ -391,9 +391,35 @@ def _bgm_ending_sad():
     return _mix(pad * 0.55, mel * 0.5)
 
 
+def _bgm_event():
+    """돌발상황 — 긴장감 있는 빠른 단조 루프 (두근대는 저음 펄스 + 불안한 아르페지오)."""
+    Am = [110.00, 130.81, 164.81]   # Am
+    Dm = [146.83, 174.61, 220.00]   # Dm
+    E  = [164.81, 207.65, 246.94]   # E (장3도로 살짝 불안하게)
+    pad = _pad_progression([Am, Dm, Am, E], 1.8, xfade=0.22)
+
+    # 두근대는 저음 펄스 (심장박동 같은 8분음표)
+    pulse = np.zeros(len(pad))
+    beat = 0.5
+    one = _tone(82.41, 0.2, harmonics=(1.0, 0.5)) * _adsr(0.2, a=0.002, d=0.05, s=0.2, r=0.09)
+    b = 0
+    while True:
+        s = int(b * beat * SAMPLE_RATE)
+        if s >= len(pulse):
+            break
+        seg = one[:len(pulse) - s]
+        pulse[s:s + len(seg)] += seg
+        b += 1
+
+    # 불안하게 맴도는 아르페지오
+    arp = _melody([(440.0, 1), (523.25, 1), (659.25, 1), (587.33, 1)] * 8, 0.225)
+    return _mix(pad * 0.5, pulse * 0.5, arp * 0.3)
+
+
 _BGM_BUILDERS = {
     "farm": _bgm_farm,
     "night": _bgm_night,
+    "event": _bgm_event,              # 돌발상황(밭 정리·선택형 이벤트)
     "ending": _bgm_ending,            # 중립(솜씨·노멀)
     "ending_warm": _bgm_ending_warm,  # 따뜻함(진·해피·성장)
     "ending_sad": _bgm_ending_sad,    # 슬픔(조급·배드·시듦)

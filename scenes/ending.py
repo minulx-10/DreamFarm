@@ -70,6 +70,7 @@ class EndingScene:
                 "alpha_phase": random.uniform(0, 6.28)
             })
         self.credits_y = 620
+        self.credit_hold = 0.0   # 크레딧에서 스페이스바를 꾹 누른 시간(게이지)
 
         # 엔딩 타입에 따라 BGM 분기
         self._select_ending_bgm()
@@ -397,10 +398,11 @@ class EndingScene:
                         # 솟아오르던 결과 글자를 한 번에 제자리에 앉힌다 (다음 프레임에 안내가 뜸)
                         self.result_y = 260
             elif self.phase == "credits":
-                if click and self.phase_timer > 1.0:
-                    self._finish_after_credits()
+                # 넘기기는 update()에서 스페이스바 '꾹 누름' 게이지로 처리 (실수 방지)
+                pass
             elif self.phase == "journal":
-                # 휠(또는 휠 버튼)로 스크롤 — 나가기는 좌클릭/스페이스만
+                # 휠(또는 휠 버튼)로만 스크롤. 나가기는 '메인으로' 버튼(또는 R:다시하기)으로만.
+                # 스페이스바/좌클릭으로 실수로 새 게임이 시작되지 않게 한다.
                 if event.type == pygame.MOUSEWHEEL:
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll - event.y * 30))
@@ -408,10 +410,6 @@ class EndingScene:
                     delta = -30 if event.button == 4 else 30
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll + delta))
-                elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or (
-                        event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
-                    save_progress()
-                    self.retry()
 
     def update(self, dt):
         self.carrot_pulse += dt
@@ -464,6 +462,14 @@ class EndingScene:
         elif self.phase == "credits":
             self.phase_timer += dt
             self.credits_y -= 26 * dt
+            # 스페이스바를 꾹 누르고 있으면 게이지가 차고, 다 차면 다음으로 넘어간다.
+            held = pygame.key.get_pressed()[pygame.K_SPACE] or pygame.mouse.get_pressed()[0]
+            if held and self.phase_timer > 0.6:
+                self.credit_hold = min(1.0, self.credit_hold + dt / 1.2)
+                if self.credit_hold >= 1.0:
+                    self._finish_after_credits()
+            else:
+                self.credit_hold = max(0.0, self.credit_hold - dt * 1.6)
             import random
             for star in self.credits_stars:
                 star["y"] += star["speed"] * dt
@@ -897,17 +903,24 @@ class EndingScene:
                 y += font.get_height() + 6
             y += 8 if is_section else 4
 
-        if self.phase_timer > 1.0:
-            # 흐르는 크레딧 글자와 겹치지 않도록 오른쪽 아래 구석에 어두운 알약을 깔고 얹는다.
-            prompt = self.font_small.render("클릭·스페이스바 ▸ 넘기기", True, (222, 216, 196))
+        if self.phase_timer > 0.6:
+            # 오른쪽 아래 구석: 스페이스바를 꾹 누르는 동안 차오르는 넘기기 게이지.
+            prompt = self.font_small.render("스페이스바 꾹 눌러 넘기기", True, (222, 216, 196))
             pad = 9
-            box = pygame.Rect(0, 0, prompt.get_width() + pad * 2, prompt.get_height() + pad * 2)
+            gauge_h = 6
+            box = pygame.Rect(0, 0, prompt.get_width() + pad * 2, prompt.get_height() + pad * 2 + gauge_h + 4)
             box.bottomright = (786, 588)
             bg = pygame.Surface((box.w, box.h), pygame.SRCALPHA)
             bg.fill((10, 10, 15, 205))
             pygame.draw.rect(bg, (60, 58, 50, 220), bg.get_rect(), 1, border_radius=8)
             screen.blit(bg, box.topleft)
             screen.blit(prompt, (box.x + pad, box.y + pad))
+            # 게이지
+            gx, gy = box.x + pad, box.y + pad + prompt.get_height() + 3
+            gw = box.w - pad * 2
+            pygame.draw.rect(screen, (48, 46, 40), (gx, gy, gw, gauge_h), border_radius=3)
+            if self.credit_hold > 0:
+                pygame.draw.rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), border_radius=3)
 
     def _draw_journal(self, screen):
         draw_story_backdrop(screen, "night")
@@ -949,8 +962,8 @@ class EndingScene:
             sh = retro_font.render("휠로 스크롤", True, (172, 152, 112))
             screen.blit(sh, (672 - sh.get_width(), 110))
 
-        prompt = self.font_small.render("스페이스바 또는 클릭 ▸ 처음 화면으로", True, (214, 204, 178))
-        screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
+        prompt = self.font_small.render("오른쪽 아래 버튼으로 나가기  ·  R: 다시하기", True, (214, 204, 178))
+        screen.blit(prompt, (360 - prompt.get_width() // 2, 554))
         if self.gallery_unlocked():
             g = get_font(14).render("1~7: 다른 엔딩 다시 보기", True, (150, 143, 122))
             screen.blit(g, (400 - g.get_width() // 2, 578))

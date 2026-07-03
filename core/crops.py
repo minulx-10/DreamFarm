@@ -120,7 +120,7 @@ def swap_crop_word(text, word):
     elif word == "사과":
         text = text.replace("당근밭", "사과밭")
         text = text.replace("당근 밭", "사과밭")
-        text = text.replace("당근 반찬", "사과 반찬")
+        text = text.replace("당근 반찬", "사과 한 조각")   # 사과는 '반찬'이 아니라 그냥 과일 한 조각
         text = text.replace("당근 한 뿌리", "사과 한 알")
         text = text.replace("당근 한 조각", "사과 한 조각")
         text = text.replace("흙 묻은 당근", "갓 딴 사과")

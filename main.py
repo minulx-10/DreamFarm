@@ -134,8 +134,8 @@ def main():
     BGM_BY_SCENE = {
         "title": "night", "crop_select": "night", "gallery": "night", 
         "name_input": "night", "intro": "night",
-        "memory": None, "story_choice": None, "father_day": None,
-        "farm": "farm", "stage1": "farm", "stage2": "farm",
+        "memory": None, "story_choice": "event", "father_day": None,
+        "farm": "farm", "stage1": "event", "stage2": "farm",
         "stage3": "farm", "stage4": "farm", "star_connect": None,
         "ending": None,
         "transition": None, "epiphany": None,

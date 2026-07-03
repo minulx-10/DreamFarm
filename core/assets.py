@@ -157,12 +157,12 @@ iii
 .i.
 ''', 2)
     sprites['mini_potato'] = create_sprite_from_string('''
-.g.
-.X.
-BYB
-BYB
-bBb
-.b.
+.XXXX.
+XBYYBX
+XYYbYX
+XYbYYX
+XBYYBX
+.XbbX.
 ''', 2)
     sprites['mini_rice'] = create_sprite_from_string('''
 .Y.
@@ -251,15 +251,17 @@ XHOOOOOoX
 ...XoqX..
 ....XX...
 ''', 5)
+    # 굼벵이 — 통통하게 도르르 말린 애벌레 (갈색 머리 + 마디진 크림빛 몸통)
     sprites['bug'] = create_sprite_from_string('''
-.X....X.
-..XkkX..
-.XkKKkX.
-XkKiiKkX
-XkKKKKkX
-.XkKKkX.
-X.XkkX.X
-.XX..XX.
+..XXXX...
+.XkkbSX..
+XkiksSsX.
+XkbSsSsSX
+XSsSsSsSX
+XSsSsSsSX
+.XSssSsX.
+..XSSsX..
+...XXX...
 ''', 5)
     dad_path = resource_path("dad.png")
     loaded_dad = False
@@ -547,13 +549,24 @@ def draw_crop_food(screen, cx, cy, crop_key, r=26):
             pygame.draw.circle(screen, (96, 62, 38), (cx + ex, cy + ey), 2)       # 싹눈
         return
     if crop_key == "rice":
-        # 사기 그릇에 소복한 흰 쌀밥
-        pygame.draw.ellipse(screen, (240, 238, 232), (cx - r, cy - int(r * 0.75), 2 * r, int(1.1 * r)))  # 밥 봉우리
-        for gx, gy in [(-r // 2, -2), (0, -r // 4), (r // 2, 0), (-r // 4, r // 5), (r // 4, r // 6)]:
-            pygame.draw.ellipse(screen, (255, 255, 250), (cx + gx, cy + gy, 4, 3))  # 낟알 결
-        bowl = pygame.Rect(cx - r - 4, cy + int(r * 0.1), 2 * r + 8, int(r * 1.1))
-        pygame.draw.arc(screen, (208, 214, 224), bowl, 3.30, 6.12, 5)             # 그릇 벽
-        pygame.draw.arc(screen, (150, 176, 190), bowl, 3.30, 6.12, 2)
+        # 밥공기 — 흰 사기그릇에 소복이 담긴 쌀밥 (찻잔처럼 보이지 않게 넓고 낮은 공기 모양)
+        tw, bw = int(r * 2.2), int(r * 1.2)
+        ty, by = cy + int(r * 0.12), cy + int(r * 0.98)
+        shadow = pygame.Surface((tw + 12, 14), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 70), shadow.get_rect())
+        screen.blit(shadow, (cx - (tw + 12) // 2, by - 7))
+        # 그릇 몸통 (아래로 좁아지는 사기 공기)
+        body = [(cx - tw // 2, ty), (cx + tw // 2, ty), (cx + bw // 2, by), (cx - bw // 2, by)]
+        pygame.draw.polygon(screen, (240, 242, 247), body)
+        pygame.draw.polygon(screen, (196, 204, 215), body, 2)
+        pygame.draw.line(screen, (96, 140, 192), (cx - tw // 2 + 5, ty + 10), (cx + tw // 2 - 5, ty + 10), 3)  # 청화 띠
+        # 소복한 쌀밥 봉우리
+        pygame.draw.ellipse(screen, (249, 249, 245), (cx - int(r * 1.0), ty - int(r * 0.72), int(r * 2.0), int(r * 1.05)))
+        pygame.draw.ellipse(screen, (255, 255, 255), (cx - int(r * 0.62), ty - int(r * 0.66), int(r * 0.8), int(r * 0.42)))  # 하이라이트
+        for gx, gy in [(-int(r * 0.5), -int(r * 0.26)), (0, -int(r * 0.34)), (int(r * 0.5), -int(r * 0.18)),
+                       (-int(r * 0.24), -int(r * 0.04)), (int(r * 0.28), -int(r * 0.1))]:
+            pygame.draw.ellipse(screen, (232, 232, 226), (cx + gx, ty - int(r * 0.18) + gy, 4, 3))  # 낟알 결
+        pygame.draw.ellipse(screen, (214, 220, 230), (cx - tw // 2, ty - 5, tw, 12), 2)  # 그릇 앞 테두리
         return
     # carrot (기본): 픽셀 당근 스프라이트
     spr = sprites.get("carrot")

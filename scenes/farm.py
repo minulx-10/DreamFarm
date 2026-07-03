@@ -268,9 +268,13 @@ class FarmScene:
                 choices.append(action)
 
         # '기다리기'는 행동 목록에서 분리 — 밭 화면의 전용 버튼으로만 한다
-        fillers = ["물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
-        if self.no_weeds:
-            fillers.remove("잡초 뽑기")
+        if self.is_tree:
+            # 나무: 잡초/배수로 개념이 옅다. '거름 주기(흙 북돋기)'를 앞에 둬 항상 보이게 한다.
+            fillers = ["흙 북돋기", "물 주기", "해충 살피기"]
+        else:
+            fillers = ["물 주기", "잡초 뽑기", "해충 살피기", "배수로 정리", "흙 북돋기"]
+            if self.no_weeds:
+                fillers.remove("잡초 뽑기")
         for action in fillers:
             if action not in choices:
                 choices.append(action)
@@ -1205,14 +1209,20 @@ class FarmScene:
         """나무류용 민 흙바닥 — 6구덩이 없이 한 덩이의 갈아 놓은 땅."""
         sc = self.season_colors
         inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
-        # 나무 테두리 틀
+        # 나무 테두리 틀 (악몽에서는 검붉게)
+        nm = game_state.nightmare
         frame = inner.inflate(16, 16)
-        pygame.draw.rect(screen, (40, 30, 25), frame.move(0, 4), border_radius=18)
-        pygame.draw.rect(screen, (132, 83, 48), frame, border_radius=18)
-        pygame.draw.rect(screen, (185, 125, 80), frame, 3, border_radius=18)
-        # 흙 (수분에 따라 색조)
-        soil = (96, 62, 42) if self.moisture > 72 else (120, 82, 54) if self.moisture < 28 else sc["dirt"]
-        pygame.draw.rect(screen, sc["dirt_dark"], inner.move(0, 3), border_radius=14)
+        pygame.draw.rect(screen, (40, 30, 25) if not nm else (28, 8, 8), frame.move(0, 4), border_radius=18)
+        pygame.draw.rect(screen, (132, 83, 48) if not nm else (96, 32, 30), frame, border_radius=18)
+        pygame.draw.rect(screen, (185, 125, 80) if not nm else (150, 45, 42), frame, 3, border_radius=18)
+        # 흙 (수분에 따라 색조 / 악몽은 검붉은 흙)
+        if nm:
+            soil = (78, 20, 18) if self.moisture > 72 else (116, 40, 34) if self.moisture < 28 else (96, 30, 28)
+            soil_dark = (48, 12, 12)
+        else:
+            soil = (96, 62, 42) if self.moisture > 72 else (120, 82, 54) if self.moisture < 28 else sc["dirt"]
+            soil_dark = sc["dirt_dark"]
+        pygame.draw.rect(screen, soil_dark, inner.move(0, 3), border_radius=14)
         pygame.draw.rect(screen, soil, inner, border_radius=14)
         # 갈아 놓은 이랑 결(가로 줄) 몇 개
         for i in range(1, 5):
@@ -1230,54 +1240,51 @@ class FarmScene:
         sc = self.season_colors
         inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
         
+        # 악)몽중농원에서는 논둑·진흙·물까지 전부 검붉게 물든다.
+        nm = game_state.nightmare
+        if nm:
+            frame_body, frame_dark = (90, 30, 28), (60, 16, 16)
+            mud_dry, mud_wet = (120, 40, 34), (58, 16, 16)
+            water_col = (150, 30, 30)
+        else:
+            frame_body, frame_dark = (100, 75, 55), (75, 55, 40)
+            mud_dry, mud_wet = (158, 118, 78), (74, 58, 42)
+            water_col = (66, 150, 198)
+
         # 논둑 (dyke/frame)
         frame = inner.inflate(16, 16)
         pygame.draw.rect(screen, (35, 30, 25), frame.move(0, 4), border_radius=18) # 그림자
-        pygame.draw.rect(screen, (100, 75, 55), frame, border_radius=18)          # 논둑 몸통 (흙둑)
-        pygame.draw.rect(screen, (75, 55, 40), frame, 3, border_radius=18)         # 논둑 어두운 선
-        
-        # 수분량(moisture)에 따라 논의 물이 실시간으로 차고 빠진다.
+        pygame.draw.rect(screen, frame_body, frame, border_radius=18)              # 논둑 몸통 (흙둑)
+        pygame.draw.rect(screen, frame_dark, frame, 3, border_radius=18)           # 논둑 어두운 선
+
+        # 무논 — 논은 밭 전체가 물에 잠겨 있다. 수분량은 물의 깊이·맑기로만 드러난다.
         wet = max(0.0, min(1.0, (self.moisture - 12) / 74.0))
 
-        # 진흙 바닥 — 물이 많을수록 짙게 젖고, 마르면 밝은 황토빛으로 드러난다.
-        mud = mix_color((158, 118, 78), (74, 58, 42), wet)
+        # 진흙 바닥 (물 아래로 비쳐 보임)
+        mud = mix_color(mud_dry, mud_wet, wet)
         pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.25), inner.move(0, 3), border_radius=14)
         pygame.draw.rect(screen, mud, inner, border_radius=14)
 
-        # 마른 논이면 갈라진 흙 (물이 적을수록 뚜렷하게)
-        if wet < 0.34:
-            crack = mix_color(mud, (0, 0, 0), 0.35)
-            cx0, cy0 = inner.centerx, inner.centery
-            segs = [(-70, -30, -40, -8), (-40, -8, -52, 20), (20, -34, 44, -18),
-                    (30, 10, 60, 22), (-10, 24, 12, 40), (48, -6, 70, 8)]
-            for x1, y1, x2, y2 in segs:
-                pygame.draw.line(screen, crack, (cx0 + x1, cy0 + y1), (cx0 + x2, cy0 + y2), 2)
+        # 밭 전체를 덮는 물 — 물이 많을수록 짙고 파랗게, 적으면 얕고 흐리게 (그래도 전면이 물)
+        water = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
+        alpha = int(96 + 132 * wet)
+        pygame.draw.rect(water, (*water_col, alpha), (0, 0, inner.w, inner.h), border_radius=14)
+        screen.blit(water, (inner.x, inner.y))
 
-        # 고인 물 — 물이 많을수록 넓고 짙게 (가운데부터 차오른다)
-        if wet > 0.04:
-            water = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
-            alpha = int(46 + 150 * wet)
-            ew = int(inner.w * (0.42 + 0.58 * wet))
-            eh = int(inner.h * (0.42 + 0.58 * wet))
-            ex, ey = (inner.w - ew) // 2, (inner.h - eh) // 2
-            pygame.draw.ellipse(water, (66, 150, 198, alpha), (ex, ey, ew, eh))
-            # 수면 햇살 반사 (물이 많을수록 밝게)
-            for r in range(min(ew, eh) // 2, 0, -10):
-                a = int(22 * (1.0 - r / max(1, min(ew, eh) // 2)) * wet)
-                pygame.draw.ellipse(water, (255, 255, 255, a),
-                                    (inner.w // 2 - r, inner.h // 2 - int(r * 0.4), r * 2, int(r * 0.8)))
-            screen.blit(water, (inner.x, inner.y))
-            # 잔물결 라인 (물에 잠긴 범위 안에서만)
-            for i in range(1, 4):
-                ly = inner.y + inner.h * i // 4
-                if abs(ly - inner.centery) < eh // 2 - 4:
-                    pygame.draw.ellipse(screen, (200, 235, 255, int(140 * wet)),
-                                        (inner.centerx - ew // 2 + 14, ly - 4, ew - 28, 8), 1)
+        # 수면 반사선 — 논 전체에 가로로 은은하게
+        hl = (214, 240, 255) if not nm else (236, 150, 140)
+        for i in range(1, 5):
+            ly = inner.y + inner.h * i // 5
+            pygame.draw.ellipse(screen, hl, (inner.x + 16, ly - 3, inner.w - 32, 7), 1)
 
-        # 모내기 자리 잔물결 — 물이 그 자리를 덮고 있을 때만
-        if wet > 0.2:
-            for cx, cy in self.crop_positions():
-                pygame.draw.ellipse(screen, (190, 230, 255, int(200 * wet)), (cx - 16, cy + 3, 32, 10), 1)
+        # 물이 심하게 마른 가뭄 때만 드문드문 진흙 섬이 드러난다
+        if wet < 0.18:
+            for cx, cy in self.crop_positions()[:3]:
+                pygame.draw.ellipse(screen, mud, (cx - 20, cy - 6, 40, 16))
+
+        # 모내기 자리마다 동심원 잔물결
+        for cx, cy in self.crop_positions():
+            pygame.draw.ellipse(screen, (*hl, 220), (cx - 16, cy + 3, 32, 10), 1)
 
     def _draw_tree(self, screen, ratio):
         """나무류 작물 — 픽셀 아트 한 그루가 현실 나무처럼 자란다.
@@ -1362,9 +1369,11 @@ class FarmScene:
                 leaf_blob(tx, ty + 1, 2.2, lg)
                 tips.append((tx, ty + 1))
 
-        # 꼭대기 우듬지 잎
-        if g >= 0.40:
-            leaf_blob(0, trunk_h + 1, 3.0, min(1.0, (g - 0.40) / 0.30))
+        # 꼭대기 눈(순) → 우듬지: 어린 단계에도 끝에 작은 잎이 있어 '죽순'처럼 헐벗어 보이지 않게
+        # 하고, 자라며 그대로 우거진 우듬지로 이어진다.
+        apex = min(1.0, (g - 0.10) / 0.34)
+        if apex > 0:
+            leaf_blob(0, trunk_h + 1, 0.9 + 2.3 * apex, 1.0)
             tips.append((0, trunk_h + 1))
 
         # 수확기 열매 (고정 시드로 매 프레임 같은 자리)
@@ -1385,12 +1394,41 @@ class FarmScene:
         # 싹(stage >= 5)이 나기 전 — 씨앗 단계.
         # 당근은 밭 이미지에 구워진 주황 씨앗을 그대로 쓰고, 다른 작물은 전용 씨앗으로 갈아 그린다.
         if adj_stage < 5:
+            if game_state.crop == "rice":
+                # 벼는 모내기 — 씨를 뿌리는 게 아니라 어린 모를 손으로 심는다. 처음부터 모가 서 있다.
+                screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
+                pygame.draw.line(screen, (86, 165, 96), (x, y + 8), (x - 3, y + 1), 2)
+                pygame.draw.line(screen, (98, 182, 106), (x, y + 8), (x, y - 4), 2)
+                pygame.draw.line(screen, (86, 165, 96), (x, y + 8), (x + 3, y + 1), 2)
+                return
             if game_state.crop != "carrot":
                 self._draw_seeds(screen, x, y)
             return
 
         # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 패치 마스킹 렌더링
         screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
+
+        if game_state.crop == "potato" and adj_stage < self.growth_goal:
+            # 감자 포기 — 뾰족한 싹이 아니라 둥근 잎이 덤불진 포기. 자라면 흰 감자꽃이 핀다.
+            if adj_stage < 10:
+                leaves = [(-6, 3, 5), (5, 2, 5), (0, -3, 6)]
+                flower = False
+            elif adj_stage < 16:
+                leaves = [(-9, 4, 6), (8, 3, 6), (-3, -3, 7), (6, -5, 6), (0, -10, 6)]
+                flower = False
+            else:
+                leaves = [(-12, 5, 7), (11, 4, 7), (-5, -1, 8), (7, -4, 8), (-2, -11, 7), (5, -12, 6)]
+                flower = True
+            pygame.draw.line(screen, (70, 120, 60), (x, y + 10), (x, y - 6), 2)
+            for lx, ly, lr in leaves:
+                pygame.draw.circle(screen, (48, 108, 54), (x + lx, y + ly + 1), lr)          # 그늘
+                pygame.draw.circle(screen, (80, 152, 78), (x + lx, y + ly), lr)              # 잎
+                pygame.draw.circle(screen, (122, 192, 110), (x + lx - 2, y + ly - 2), max(2, lr // 2))  # 하이라이트
+            if flower:
+                for fx, fy in [(-8, -6), (7, -8)]:
+                    pygame.draw.circle(screen, (240, 238, 248), (x + fx, y + fy), 3)          # 흰 감자꽃
+                    pygame.draw.circle(screen, (234, 202, 92), (x + fx, y + fy), 1)           # 노란 꽃술
+            return
 
         if game_state.crop == "rice" and adj_stage < self.growth_goal:
             # 벼의 성장기: 일반 잎사귀 스프라이트 대신 뾰족하고 길게 서 자라는 벼 잎사귀 다발을 그린다

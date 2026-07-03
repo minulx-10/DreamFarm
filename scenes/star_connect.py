@@ -105,7 +105,7 @@ class StarConnectScene:
 
     # --------------------------------------------------------------- 그리기
     def draw(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
 
         # 이미 이은 선 (별과 별 사이) — 은은한 금빛 + 글로우
         for i in range(1, self.idx):

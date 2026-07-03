@@ -263,7 +263,7 @@ def draw_understanding_badge(screen, x, y, w):
     font = get_font(15)
     label_font = get_font(13)
 
-    label = label_font.render("마음", True, TEXT_MUTED)
+    label = label_font.render("이해도", True, TEXT_MUTED)
     screen.blit(label, (x, y - 1))
 
     # 라벨 실제 폭 뒤로 달·단계명을 배치해 서로 겹치지 않게 한다
