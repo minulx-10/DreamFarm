@@ -1265,26 +1265,41 @@ class FarmScene:
         pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.25), inner.move(0, 3), border_radius=14)
         pygame.draw.rect(screen, mud, inner, border_radius=14)
 
-        # 밭 전체를 덮는 물 — 물이 많을수록 짙고 파랗게, 적으면 얕고 흐리게 (그래도 전면이 물)
+        # 밭 전체를 덮는 물 — 깊은 물 위에 밝은 수면막을 겹쳐 평평한 단색 슬래브 대신 깊이감을 준다.
+        base_col = (36, 100, 152) if not nm else (110, 24, 24)
+        film_col = (96, 178, 214) if not nm else (172, 52, 44)
         water = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
-        alpha = int(96 + 132 * wet)
-        pygame.draw.rect(water, (*water_col, alpha), (0, 0, inner.w, inner.h), border_radius=14)
+        pygame.draw.rect(water, (*base_col, int(120 + 110 * wet)), (0, 0, inner.w, inner.h), border_radius=14)
+        film = pygame.Surface((inner.w, int(inner.h * 0.5)), pygame.SRCALPHA)
+        pygame.draw.rect(film, (*film_col, int(34 + 54 * wet)), film.get_rect(),
+                         border_top_left_radius=14, border_top_right_radius=14)
+        water.blit(film, (0, 0))
         screen.blit(water, (inner.x, inner.y))
 
-        # 수면 반사선 — 논 전체에 가로로 은은하게
+        # 수면 반사선 — 좌우로 엇갈리고 길이도 달리해 물결처럼 (전면에 은은하게)
         hl = (214, 240, 255) if not nm else (236, 150, 140)
         for i in range(1, 5):
             ly = inner.y + inner.h * i // 5
-            pygame.draw.ellipse(screen, hl, (inner.x + 16, ly - 3, inner.w - 32, 7), 1)
+            indent = 18 + (20 if i % 2 else 0)
+            ln = max(30, inner.w - 2 * indent - i * 4)
+            pygame.draw.ellipse(screen, hl, (inner.x + indent, ly - 3, ln, 7), 1)
+        # 반짝이 물비늘 (고정 시드로 매 프레임 같은 자리)
+        import random as _r
+        _rng = _r.Random(11)
+        for _ in range(6):
+            sx = inner.x + _rng.randint(20, inner.w - 20)
+            sy = inner.y + _rng.randint(18, inner.h - 18)
+            pygame.draw.circle(screen, hl, (sx, sy), 1)
 
         # 물이 심하게 마른 가뭄 때만 드문드문 진흙 섬이 드러난다
         if wet < 0.18:
             for cx, cy in self.crop_positions()[:3]:
                 pygame.draw.ellipse(screen, mud, (cx - 20, cy - 6, 40, 16))
 
-        # 모내기 자리마다 동심원 잔물결
+        # 모내기 자리마다 2겹 동심원 잔물결
         for cx, cy in self.crop_positions():
-            pygame.draw.ellipse(screen, (*hl, 220), (cx - 16, cy + 3, 32, 10), 1)
+            pygame.draw.ellipse(screen, hl, (cx - 16, cy + 3, 32, 10), 1)
+            pygame.draw.ellipse(screen, hl, (cx - 9, cy + 5, 18, 6), 1)
 
     def _draw_tree(self, screen, ratio):
         """나무류 작물 — 픽셀 아트 한 그루가 현실 나무처럼 자란다.
@@ -1386,6 +1401,41 @@ class FarmScene:
             for fx, fy in spots[:n]:
                 fruit(fx + rng.randint(-1, 1), fy + rng.randint(-1, 1))
 
+    def _rice_water_base(self, screen, x, y):
+        """물에 잠긴 벼 포기 밑동 — 흙 패치 대신 어두운 물그림자 + 잔물결(무논에 뿌리내린 느낌)."""
+        sh = pygame.Surface((36, 13), pygame.SRCALPHA)
+        base_shadow = (24, 12, 12, 120) if game_state.nightmare else (26, 66, 92, 115)
+        pygame.draw.ellipse(sh, base_shadow, sh.get_rect())
+        screen.blit(sh, (x - 18, y + 4))
+        ring = (150, 60, 60) if game_state.nightmare else (150, 210, 235)
+        pygame.draw.ellipse(screen, ring, (x - 12, y + 6, 24, 6), 1)
+
+    def _rice_blade(self, screen, bx, by, dx, dy, dark, mid, light):
+        """밑동(bx,by)에서 (dx,dy)만큼 뻗는, 살짝 휜 벼 잎사귀 — 밑이 굵고 끝이 가늘게."""
+        import math
+        L = math.hypot(dx, dy) or 1.0
+        px, py = -dy / L, dx / L
+        mx = int(bx + dx * 0.55 + px * 2.4)
+        my = int(by + dy * 0.55 + py * 2.4)
+        tx, ty = bx + dx, by + dy
+        if game_state.nightmare:
+            dark, mid, light = (70, 20, 20), (110, 34, 30), (150, 60, 46)
+        pygame.draw.line(screen, dark, (bx, by), (mx, my), 3)
+        pygame.draw.line(screen, mid, (mx, my), (tx, ty), 2)
+        pygame.draw.line(screen, light, (bx, by - 1), (mx, my - 1), 1)
+
+    def _rice_ear(self, screen, bx, by, side):
+        """무게로 고개 숙인 벼 이삭 한 가닥 (곡선 대 + 알알이 익은 낟알)."""
+        gold_d = (150, 60, 46) if game_state.nightmare else (196, 164, 52)
+        gold_l = (196, 90, 70) if game_state.nightmare else (246, 224, 120)
+        midx, midy = bx + side * 7, by + 3
+        tipx, tipy = bx + side * 11, by + 15   # 아래로 처짐
+        pygame.draw.line(screen, gold_d, (bx, by), (midx, midy), 2)
+        pygame.draw.line(screen, gold_d, (midx, midy), (tipx, tipy), 2)
+        grains = [(bx, by), (midx, midy), ((midx + tipx) // 2, (midy + tipy) // 2), (tipx, tipy)]
+        for i, (gx, gy) in enumerate(grains):
+            pygame.draw.circle(screen, gold_l if i % 2 == 0 else gold_d, (gx, gy), 2)
+
     def draw_crop(self, screen, x, y, growth_stage, crop_idx=0):
         # Individual growth variation per crop
         offset_val = self.crop_offsets[crop_idx] if crop_idx < len(self.crop_offsets) else 0
@@ -1395,18 +1445,20 @@ class FarmScene:
         # 당근은 밭 이미지에 구워진 주황 씨앗을 그대로 쓰고, 다른 작물은 전용 씨앗으로 갈아 그린다.
         if adj_stage < 5:
             if game_state.crop == "rice":
-                # 벼는 모내기 — 씨를 뿌리는 게 아니라 어린 모를 손으로 심는다. 처음부터 모가 서 있다.
-                screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
-                pygame.draw.line(screen, (86, 165, 96), (x, y + 8), (x - 3, y + 1), 2)
-                pygame.draw.line(screen, (98, 182, 106), (x, y + 8), (x, y - 4), 2)
-                pygame.draw.line(screen, (86, 165, 96), (x, y + 8), (x + 3, y + 1), 2)
+                # 벼는 모내기 — 씨를 뿌리는 게 아니라 어린 모를 손으로 심는다. 물에 잠긴 채 처음부터 모가 서 있다.
+                self._rice_water_base(screen, x, y)
+                gd, gm, gl = (40, 120, 58), (78, 168, 92), (150, 220, 120)
+                for dx, dy in [(-3, -9), (0, -13), (3, -9)]:
+                    self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
                 return
             if game_state.crop != "carrot":
                 self._draw_seeds(screen, x, y)
             return
 
-        # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 패치 마스킹 렌더링
-        screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
+        # 싹이 돋아나면 밭 이미지의 주황색 씨앗 픽셀을 가리기 위해 흙 패치 마스킹 렌더링.
+        # 벼는 무논(물 위)이라 흙 패치가 오히려 어색하므로 그리지 않는다.
+        if game_state.crop != "rice":
+            screen.blit(sprites["dirt_patch"], (x - 13, y - 12))
 
         if game_state.crop == "potato" and adj_stage < self.growth_goal:
             # 감자 포기 — 뾰족한 싹이 아니라 둥근 잎이 덤불진 포기. 자라면 흰 감자꽃이 핀다.
@@ -1431,23 +1483,17 @@ class FarmScene:
             return
 
         if game_state.crop == "rice" and adj_stage < self.growth_goal:
-            # 벼의 성장기: 일반 잎사귀 스프라이트 대신 뾰족하고 길게 서 자라는 벼 잎사귀 다발을 그린다
+            # 벼 성장기: 물에 뿌리내린 포기에서 살짝 휜 벼 잎사귀 다발이 자라 오른다
+            self._rice_water_base(screen, x, y)
+            gd, gm, gl = (40, 120, 58), (78, 168, 92), (150, 220, 120)
             if adj_stage < 10:
-                pygame.draw.line(screen, (80, 160, 90), (x, y + 8), (x - 4, y - 1), 2)
-                pygame.draw.line(screen, (90, 175, 100), (x, y + 8), (x, y - 6), 2)
-                pygame.draw.line(screen, (80, 160, 90), (x, y + 8), (x + 4, y - 1), 2)
+                blades = [(-5, -12), (0, -17), (5, -12)]
             elif adj_stage < 16:
-                pygame.draw.line(screen, (70, 145, 80), (x, y + 8), (x - 7, y - 8), 2)
-                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x - 2, y - 14), 2)
-                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x + 2, y - 14), 2)
-                pygame.draw.line(screen, (70, 145, 80), (x, y + 8), (x + 7, y - 8), 2)
+                blades = [(-8, -14), (-3, -21), (3, -21), (8, -14)]
             else:
-                pygame.draw.line(screen, (60, 135, 70), (x, y + 8), (x - 12, y - 16), 2)
-                pygame.draw.line(screen, (75, 150, 85), (x, y + 8), (x - 5, y - 24), 2)
-                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x - 1, y - 28), 2)
-                pygame.draw.line(screen, (85, 165, 95), (x, y + 8), (x + 2, y - 28), 2)
-                pygame.draw.line(screen, (75, 150, 85), (x, y + 8), (x + 6, y - 24), 2)
-                pygame.draw.line(screen, (60, 135, 70), (x, y + 8), (x + 12, y - 16), 2)
+                blades = [(-12, -16), (-6, -25), (-1, -31), (2, -31), (7, -25), (12, -16)]
+            for dx, dy in blades:
+                self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
             return
 
         if adj_stage < 10:
@@ -1479,27 +1525,15 @@ class FarmScene:
                 pygame.draw.ellipse(screen, (150, 108, 66), (x + 2, y + 1, 10, 6))
                 return
             elif game_state.crop == "rice":
-                # 벼: 황금빛 벼 이삭과 노랗게 익은 벼잎 연출
-                orig_spr = sprites["sprout4"]
-                golden = orig_spr.copy()
-                tint = pygame.Surface(golden.get_size(), pygame.SRCALPHA)
-                tint.fill((210, 185, 45, 120))
-                golden.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                
-                sprite, offset = golden, (-24, -18)
-                screen.blit(sprite, (x + offset[0], y + offset[1]))
-                
-                gold_dark = (190, 160, 40)
-                gold_light = (245, 220, 95)
-                pygame.draw.line(screen, gold_dark, (x, y - 5), (x - 14, y + 3), 2)
-                for dx, dy in [(-8, -1), (-11, 1), (-14, 3)]:
-                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
-                pygame.draw.line(screen, gold_dark, (x, y - 8), (x + 14, y + 2), 2)
-                for dx, dy in [(8, -3), (11, -1), (14, 2)]:
-                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
-                pygame.draw.line(screen, gold_dark, (x + 2, y - 12), (x - 4, y - 2), 2)
-                for dx, dy in [(0, -9), (-2, -5), (-4, -2)]:
-                    pygame.draw.circle(screen, gold_light, (x + dx, y + dy), 2)
+                # 벼: 노랗게 익어 아래로 휜 벼잎 + 고개 숙인 황금빛 이삭
+                self._rice_water_base(screen, x, y)
+                gd, gm, gl = (150, 120, 36), (196, 166, 60), (236, 214, 120)
+                for dx, dy in [(-11, -13), (-5, -19), (5, -19), (11, -13)]:
+                    self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
+                # 무게로 고개 숙인 이삭 세 가닥
+                self._rice_ear(screen, x - 8, y - 15, -1)
+                self._rice_ear(screen, x + 8, y - 17, 1)
+                self._rice_ear(screen, x, y - 20, 0)
                 return
             else:
                 sprite, offset = sprites["carrot"], (-24, -45)

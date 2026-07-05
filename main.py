@@ -260,7 +260,14 @@ def main():
                 for event in mapped_events:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                         audio.toggle_mute()
-                current_scene_obj.handle_events(mapped_events)
+                # ESC로 설정 오버레이 열기 — 여기까지 왔다는 건 설정이 닫혀 있다는 뜻(열려 있으면
+                # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면은 예외.
+                esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
+                                  for e in mapped_events)
+                if esc_pressed and current_key not in ("crop_select", "name_input"):
+                    settings_overlay.open = True
+                else:
+                    current_scene_obj.handle_events(mapped_events)
 
         current_scene_obj.update(dt)
         settings_overlay.update(dt)

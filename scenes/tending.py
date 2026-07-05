@@ -36,6 +36,7 @@ class WaterPour:
         self.feedback_color = (255, 255, 255)
         self.drops = []
         self.pour_played = False
+        self.pour_anim = 0.0   # 0=쉼(입구 위), 1=붓는 중(입구가 아래로 기울어짐)
         self.fill_rate = 55.0 * random.uniform(0.9, 1.14)   # 변형: 물줄기 세기
 
         # 작물별 프롬프트 정의
@@ -67,11 +68,16 @@ class WaterPour:
             if self.settle <= 0:
                 self.done = True
             return
+        # 붓기 시작/멈춤을 부드럽게 — 물뿌리개 입구가 스르륵 기울어지도록
+        target = 1.0 if self.pouring else 0.0
+        self.pour_anim += (target - self.pour_anim) * min(1.0, dt * 10.0)
         if self.pouring:
             self.level += self.fill_rate * dt
             if game_state.crop != "rice":
-                sx = PLOT.x + 150 + 70
-                self.drops.append([sx, 210.0, 40.0 + random.uniform(-12, 12), 120.0])
+                # 물방울은 내려간 입구 끝 물줄기 아래에서 떨어진다 (draw의 spout_y+물줄기 길이와 맞춤)
+                sx = PLOT.x + 150 + int(60 - 18 * self.pour_anim)
+                sy = 190 + int(34 * self.pour_anim) + 52
+                self.drops.append([sx + random.uniform(-3, 3), sy, 24.0 + random.uniform(-12, 12), 130.0])
             if self.level >= self.GAUGE_MAX:
                 self.pouring = False
                 self._resolve()
@@ -95,36 +101,41 @@ class WaterPour:
         from core.game_state import game_state
         _veil(screen)
         
+        p = self.pour_anim
         if game_state.crop == "rice":
             # 목재 물꼬 틀 그리기
             gate_rect = pygame.Rect(PLOT.x + 130, 140, 40, 60)
             pygame.draw.rect(screen, (80, 50, 30), gate_rect)
             pygame.draw.rect(screen, (122, 86, 53), gate_rect.inflate(-4, -4))
-            
-            # 들어 올려지는 나무 판자
-            offset_y = -22 if self.pouring else 0
-            panel_rect = pygame.Rect(PLOT.x + 136, 150 + offset_y, 28, 40)
+
+            # 나무 판자가 스르륵 들려 올라가며(입구가 열리며) 문턱으로 물이 쏟아진다
+            lift = int(26 * p)
+            panel_rect = pygame.Rect(PLOT.x + 136, 150 - lift, 28, 40)
             pygame.draw.rect(screen, (60, 35, 20), panel_rect)
             pygame.draw.rect(screen, (87, 51, 25), panel_rect.inflate(-4, -4))
-            
-            # 쏟아지는 물줄기
-            if self.pouring:
-                pygame.draw.rect(screen, (100, 170, 240), (PLOT.x + 140, 190, 20, 50))
-                pygame.draw.rect(screen, (222, 242, 252), (PLOT.x + 145, 190, 10, 50))
-        else:
-            can = sprites["watering_can"]
-            tilt = 28 + (22 if self.pouring else 0)
-            rot = pygame.transform.rotate(can, tilt)
-            screen.blit(rot, (PLOT.x + 150 - rot.get_width() // 2, 150))
 
-            spout_x = PLOT.x + 150 + 64
-            if self.pouring:
-                # 물줄기 — 반투명 리본 여러 겹 + 밝은 심줄
-                ribbon = pygame.Surface((48, 56), pygame.SRCALPHA)
-                for ox, a, wd in ((-2, 70, 6), (1, 120, 4), (4, 80, 5)):
-                    pygame.draw.line(ribbon, (150, 205, 235, a), (8 + ox, 0), (26 + ox, 46), wd)
-                pygame.draw.line(ribbon, (222, 242, 252, 210), (8, 0), (26, 44), 2)
-                screen.blit(ribbon, (spout_x - 8, 196))
+            if p > 0.05:
+                open_y = 194                    # 판이 들려 드러난 아래쪽 문턱(입구)
+                slen = int(30 + 26 * p)
+                pygame.draw.ellipse(screen, (150, 205, 235), (PLOT.x + 138, open_y - 3, 24, 7))
+                pygame.draw.rect(screen, (100, 170, 240), (PLOT.x + 140, open_y, 20, slen))
+                pygame.draw.rect(screen, (222, 242, 252), (PLOT.x + 145, open_y, 10, slen))
+        else:
+            # 물뿌리개가 붓는 동안 입구(스파웃)를 아래로 기울여 내린다.
+            can = sprites["watering_can"]
+            tilt = 34 - 44 * p                       # 쉼: 34(입구 위로) → 붓기: -10(입구 아래로 꺾임)
+            rot = pygame.transform.rotate(can, tilt)
+            screen.blit(rot, (PLOT.x + 150 - rot.get_width() // 2, 150 + int(10 * p)))  # 붓을수록 살짝 내려감
+            # 입구는 붓을수록 오른쪽 위 → 아래로 내려온다. 물줄기 시작점을 그에 맞춰 내린다.
+            spout_x = PLOT.x + 150 + int(60 - 18 * p)
+            spout_y = 190 + int(34 * p)
+            if p > 0.05:
+                slen = int(40 + 20 * p)
+                ribbon = pygame.Surface((30, slen + 6), pygame.SRCALPHA)
+                for ox, a, wd in ((-3, int(70 * p) + 20, 6), (0, int(120 * p) + 30, 4), (3, int(80 * p) + 20, 5)):
+                    pygame.draw.line(ribbon, (150, 205, 235, a), (13 + ox, 0), (11 + ox, slen), wd)
+                pygame.draw.line(ribbon, (222, 242, 252, 210), (13, 0), (11, slen - 2), 2)
+                screen.blit(ribbon, (spout_x - 13, spout_y))
         if game_state.crop != "rice":
             for d in self.drops:
                 glow = pygame.Surface((10, 10), pygame.SRCALPHA)

@@ -142,6 +142,7 @@ class Stage4Scene:
                         grain_rect = pygame.Rect(320, 230, 160, 100)
                         if grain_rect.collidepoint(event.pos):
                             self.dragging = True
+                            self.pull_phase = "pulling"   # 도정 완료 판정이 thresh에서 넘어온 상태에 의존하지 않게 명시
                             self.drag_start_x = event.pos[0]
                     elif event.type == pygame.MOUSEMOTION:
                         if self.dragging:
@@ -297,8 +298,10 @@ class Stage4Scene:
                             self.tension = 0.0
                             audio.play("success")
                     else:
-                        # 가만히 있으면 tension만 서서히 감소
+                        # 손을 놓으면 다시 잡을 수 있도록 '준비' 상태로 복귀한다 (탈곡 진행도는 유지).
+                        # 이 복귀가 없어서, 벼를 끝까지 못 털고 손을 떼면 다시 못 잡아 나머지 수확이 막혔다.
                         self.tension = max(0.0, self.tension - 60.0 * dt)
+                        self.pull_phase = "ready"
                 elif self.rice_phase == "hull":
                     # 도정(껍질 벗기기) 완료 체크
                     if self.hull_progress >= 100.0:

@@ -164,14 +164,16 @@ XYbYYX
 XBYYBX
 .XbbX.
 ''', 2)
+    # 초록 벼 줄기 + 고개 숙인 금빛 이삭 (다른 mini 아이콘과 톤을 맞춘 벼 한 포기)
     sprites['mini_rice'] = create_sprite_from_string('''
-.Y.
-yYy
-.Y.
-yYy
-.Y.
-yYy
-.y.
+....Yy
+...YYy
+..Yy..
+.GgY..
+LGg...
+.Gg...
+.Gg...
+LGgL..
 ''', 2)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
@@ -564,8 +566,11 @@ def draw_crop_food(screen, cx, cy, crop_key, r=26):
         pygame.draw.ellipse(screen, (249, 249, 245), (cx - int(r * 1.0), ty - int(r * 0.72), int(r * 2.0), int(r * 1.05)))
         pygame.draw.ellipse(screen, (255, 255, 255), (cx - int(r * 0.62), ty - int(r * 0.66), int(r * 0.8), int(r * 0.42)))  # 하이라이트
         for gx, gy in [(-int(r * 0.5), -int(r * 0.26)), (0, -int(r * 0.34)), (int(r * 0.5), -int(r * 0.18)),
-                       (-int(r * 0.24), -int(r * 0.04)), (int(r * 0.28), -int(r * 0.1))]:
-            pygame.draw.ellipse(screen, (232, 232, 226), (cx + gx, ty - int(r * 0.18) + gy, 4, 3))  # 낟알 결
+                       (-int(r * 0.24), -int(r * 0.04)), (int(r * 0.28), -int(r * 0.1)),
+                       (-int(r * 0.42), -int(r * 0.02)), (int(r * 0.14), -int(r * 0.24)), (-int(r * 0.06), -int(r * 0.14))]:
+            px_, py_ = cx + gx, ty - int(r * 0.18) + gy
+            pygame.draw.ellipse(screen, (198, 196, 186), (px_ + 1, py_ + 1, 4, 3))   # 낟알 그늘 (또렷하게)
+            pygame.draw.ellipse(screen, (255, 255, 255), (px_, py_, 4, 3))            # 낟알
         pygame.draw.ellipse(screen, (214, 220, 230), (cx - tw // 2, ty - 5, tw, 12), 2)  # 그릇 앞 테두리
         return
     # carrot (기본): 픽셀 당근 스프라이트
