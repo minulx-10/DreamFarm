@@ -290,7 +290,7 @@ class WeedPull:
     def draw(self, screen):
         from core.game_state import game_state
         _veil(screen)
-        wsp = sprites["weed"]
+        wsp = sprites["weed_nm"] if game_state.nightmare else sprites["weed"]
         is_apple = (game_state.crop == "apple")
         
         for w in self.items:

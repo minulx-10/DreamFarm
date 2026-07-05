@@ -228,13 +228,13 @@ class GalleryScene:
 
         # 2열 그리드
         col_w = (area.w - 50) // 2
-        cell_h = 56
-        ox, oy = area.x + 18, area.y + 56
+        cell_h = 58
+        ox, oy = area.x + 18, area.y + 54
         for i, (ach, unlocked) in enumerate(items):
             col = i % 2
             row = i // 2
             cx = ox + col * (col_w + 14)
-            cy = oy + row * (cell_h + 5)
+            cy = oy + row * (cell_h + 4)
             cell = pygame.Rect(cx, cy, col_w, cell_h)
 
             base = (250, 240, 214) if unlocked else (222, 216, 206)
@@ -246,10 +246,14 @@ class GalleryScene:
             if unlocked:
                 achievements._draw_medal(screen, mcx, mcy, ach["tier"], r=15)
                 title = self.font_body.render(ach["title"], True, TEXT_DARK)
-                screen.blit(title, (cell.x + 52, cell.y + 9))
-                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 66, max_lines=2)):
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                # 등급(브론즈/실버/골드/플래티넘) 라벨
+                rank = achievements.TIER_LABELS.get(ach["tier"], "")
+                rk = get_font(11).render(rank, True, achievements.TIER_COLORS.get(ach["tier"], (150, 150, 150)))
+                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 62, max_lines=2)):
                     ds = self.font_small.render(line, True, TEXT_MUTED)
-                    screen.blit(ds, (cell.x + 52, cell.y + 30 + j * 15))
+                    screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))
             else:
                 pygame.draw.circle(screen, (170, 164, 154), (mcx, mcy), 15)
                 pygame.draw.circle(screen, (140, 134, 124), (mcx, mcy), 15, 2)

@@ -183,7 +183,7 @@ LGgL..
 ..XooX..
 ...XX...
 ''', 5)
-    sprites['weed'] = create_sprite_from_string('''
+    _WEED_ART = '''
 ..w.X.w..
 .XwGwGwX.
 X.XGgGX.X
@@ -192,7 +192,11 @@ X.XGgGX.X
 ...XeX...
 ..XgegX..
 .Xg.X.gX.
-''', 5)
+'''
+    sprites['weed'] = create_sprite_from_string(_WEED_ART, 5)
+    # 악)몽중농원용 붉게 시든 잡초 (초록 팔레트를 붉은색으로 매핑)
+    sprites['weed_nm'] = create_sprite_from_string(
+        _WEED_ART.translate(str.maketrans({'G': 'i', 'g': 'q', 'e': '#', 'w': 'o'})), 5)
     sprites['rock'] = create_sprite_from_string('''
 ..XXXX..
 .XRRRRX.

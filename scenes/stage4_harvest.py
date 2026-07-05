@@ -553,9 +553,11 @@ class Stage4Scene:
             else:
                 screen.blit(carrot, (self.center_x - cw // 2 + sx, cy))
         elif self.is_potato:
-            # 감자: 흙 위에 드러난 노랗게 시든 잎과 줄기, 그리고 아래에 달린 감자알
+            # 감자: 흔들어 풀린 정도(potato_loosen)만큼 흙 밑에서 서서히 솟아오른다.
+            # 처음엔 땅에 묻혀 있다가, 다 풀리거나 뽑힌 뒤에 완전히 올라온다.
+            loosen = 100.0 if self.pull_phase == "feedback" else getattr(self, "potato_loosen", 0.0)
             px = int(self.potato_x + sx)
-            py = 366
+            py = 372 - int(loosen * 0.40)
             
             # 감자알들
             pygame.draw.ellipse(screen, (78, 52, 32), (px - 22, py + 12, 18, 12))

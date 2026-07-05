@@ -1602,8 +1602,9 @@ class FarmScene:
             if not self.no_weeds and self.weeds > 32:
                 weed_count = 2 if self.weeds < 55 else 4
                 weed_spots = [(86, 373), (258, 371), (348, 262), (166, 264)]
+                weed_spr = sprites["weed_nm"] if game_state.nightmare else sprites["weed"]
                 for x, y in weed_spots[:weed_count]:
-                    screen.blit(sprites["weed"], (x, y))
+                    screen.blit(weed_spr, (x, y))
 
             if self.pests > 32:
                 bug_count = 1 if self.pests < 55 else 3

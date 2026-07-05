@@ -10,24 +10,32 @@ from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core import audio, save_system
 
 
-# 등급별 메달 색 (common → legend)
+# 등급(브론즈/실버/골드/플래티넘)별 메달 색과 이름
 TIER_COLORS = {
-    "common": (176, 168, 150),
-    "rare": (108, 170, 214),
-    "epic": (222, 158, 92),
-    "legend": (224, 118, 128),
+    "bronze": (196, 130, 78),
+    "silver": (192, 198, 208),
+    "gold": (232, 194, 92),
+    "platinum": (150, 220, 224),
 }
+TIER_LABELS = {
+    "bronze": "브론즈",
+    "silver": "실버",
+    "gold": "골드",
+    "platinum": "플래티넘",
+}
+TIER_ORDER = ["bronze", "silver", "gold", "platinum"]
 
 ACHIEVEMENTS = [
-    {"id": "first_harvest", "title": "첫 결실", "desc": "작물을 처음으로 끝까지 길러 거두었다.", "tier": "common"},
-    {"id": "grow_carrot", "title": "흙을 아는 손", "desc": "당근을 수확했다.", "tier": "common"},
-    {"id": "grow_potato", "title": "메마른 해의 버팀목", "desc": "감자를 캐냈다.", "tier": "common"},
-    {"id": "grow_rice", "title": "물꼬를 쥔 농부", "desc": "벼를 길러 쌀을 얻었다.", "tier": "rare"},
-    {"id": "grow_apple", "title": "오래 기다린 자", "desc": "사과나무를 끝까지 길러 열매를 땄다.", "tier": "rare"},
-    {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "epic"},
-    {"id": "perfect_harvest", "title": "완벽주의자", "desc": "한 번의 실수도 없이 완벽하게만 수확했다.", "tier": "rare"},
-    {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "epic"},
-    {"id": "nightmare_clear", "title": "악몽에서 깨어나", "desc": "악)몽중농원을 끝까지 버텨 수확했다.", "tier": "legend"},
+    {"id": "first_harvest", "title": "첫 결실", "desc": "작물을 처음으로 끝까지 길러 거두었다.", "tier": "bronze"},
+    {"id": "grow_carrot", "title": "흙을 아는 손", "desc": "당근을 수확했다.", "tier": "bronze"},
+    {"id": "grow_potato", "title": "메마른 해의 버팀목", "desc": "감자를 캐냈다.", "tier": "bronze"},
+    {"id": "grow_rice", "title": "물꼬를 쥔 농부", "desc": "벼를 길러 쌀을 얻었다.", "tier": "silver"},
+    {"id": "grow_apple", "title": "오래 기다린 자", "desc": "사과나무를 끝까지 길러 열매를 땄다.", "tier": "silver"},
+    {"id": "perfect_harvest", "title": "완벽주의자", "desc": "한 번의 실수도 없이 완벽하게만 수확했다.", "tier": "silver"},
+    {"id": "veteran", "title": "열 번의 결실", "desc": "작물을 통틀어 열 번 길러 거두었다.", "tier": "gold"},
+    {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "gold"},
+    {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "gold"},
+    {"id": "nightmare_clear", "title": "악몽에서 깨어나", "desc": "악)몽중농원을 끝까지 버텨 수확했다.", "tier": "platinum"},
 ]
 
 _BY_ID = {a["id"]: a for a in ACHIEVEMENTS}
@@ -65,6 +73,8 @@ def on_harvest(crop, perfects, attempts):
     clears = save_system.crop_clears()
     if all(clears.get(c, 0) > 0 for c in ("carrot", "apple", "potato", "rice")):
         unlock("all_crops")
+    if sum(clears.values()) >= 10:
+        unlock("veteran")
     if perfects > 0 and attempts <= perfects:
         unlock("perfect_harvest")
     if getattr(game_state, "nightmare", False):
