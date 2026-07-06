@@ -449,9 +449,11 @@ class FarmScene:
             # (못하는 플레이어가 비실대는 채 수확까지 끌려가지 않게 — 회복하거나, 끝내 시들거나.)
             if not is_fail and action not in ("살펴보기", "기다리기"):
                 if action == "흙 북돋기":
-                    result += " 아직 기운이 없어 자라진 못하지만, 흙을 북돋우니 조금씩 살아난다."
+                    result += (" 아직 기운이 없어 자라진 못하지만, 거름을 주니 조금씩 살아난다." if self.is_tree
+                               else " 아직 기운이 없어 자라진 못하지만, 흙을 북돋우니 조금씩 살아난다.")
                 else:
-                    result += " 아직 기운이 없어 자라지는 못한다. 흙을 북돋아 기운부터 채우자."
+                    result += (" 아직 기운이 없어 자라지는 못한다. 거름을 주어 기운부터 채우자." if self.is_tree
+                               else " 아직 기운이 없어 자라지는 못한다. 흙을 북돋아 기운부터 채우자.")
         else:
             # 성장은 '제대로 된 돌봄'과 '안정된 상태에서의 기다림'에서만 일어난다.
             # 관찰(살펴보기)이나 실패한 행동으로는 자라지 않는다 → 살펴보기 남발 지배 전략 차단.
@@ -648,18 +650,23 @@ class FarmScene:
                 self.stress = max(0, self.stress - max(2, int(10 * frac)))
                 self.drainage += int(4 * frac)
                 if frac >= 0.85:
-                    return "흙을 두둑이 북돋우니 한결 생기가 돈다.", False
+                    return ("거름을 골고루 주니 한결 생기가 돈다." if self.is_tree
+                            else "흙을 두둑이 북돋우니 한결 생기가 돈다."), False
                 if frac >= 0.45:
-                    return "흙을 어느 정도 다독였다.", False
-                return "북돋다 말아 뿌리가 아직 허전하다.", False
+                    return ("거름을 어느 정도 주었다." if self.is_tree
+                            else "흙을 어느 정도 다독였다."), False
+                return ("거름이 부족해 뿌리가 아직 허전하다." if self.is_tree
+                        else "북돋다 말아 뿌리가 아직 허전하다."), False
             if self.health < 65 or self.stress > 24:
                 self.health += 8
                 self.stress = max(0, self.stress - 10)
                 self.drainage += 4
-                return "흙을 다독이니 한결 생기가 돈다.", False
+                return ("거름을 주니 한결 생기가 돈다." if self.is_tree
+                        else "흙을 다독이니 한결 생기가 돈다."), False
             self.health += 2
             self.moisture -= 4
-            return "흙을 만졌지만 큰 변화는 없다.", False
+            return ("거름을 조금 주었지만 큰 변화는 없다." if self.is_tree
+                    else "흙을 만졌지만 큰 변화는 없다."), False
 
         if action == "기다리기":
             if self.is_good_turn():
@@ -822,6 +829,8 @@ class FarmScene:
         if self.is_harvest_ready():
             return "다 자랐다. 이제 수확할 때다."
         if self.health < 45:
+            if self.is_tree:
+                return "당근이 축 처져 기운이 없다. 거름을 주어 기운을 끌어올려 주자."
             return "당근이 축 처져 기운이 없다. 흙을 북돋아 기운을 끌어올려 주자."
         if self.moisture < 30:
             return "흙이 바짝 말라 손끝이 버석거린다."
@@ -1327,12 +1336,25 @@ class FarmScene:
 
         trunk_h = 4 + int(13 * g)
 
-        # 갓 돋은 묘목 — 짧은 줄기 + 떡잎 두 장
-        if g < 0.10:
-            th = max(2, int(4 + 6 * (g / 0.10)))
-            for cy in range(th):
-                cell(0, cy, bark)
-            cell(-1, th, leaf_m); cell(1, th, leaf_m); cell(0, th, leaf_l)
+        # 갓 돋은 묘목 — 블록이 아니라 가늘게 휜 줄기 + 좌우로 벌어진 떡잎 두 장(자연스러운 새싹)
+        if g < 0.16:
+            lg = 0.35 + 0.65 * (g / 0.16)
+            h = int(14 + 44 * (g / 0.16))
+            topx, topy = base_x, base_y - h
+            # 살짝 휜 줄기
+            midx, midy = base_x - 2, base_y - h // 2
+            pygame.draw.line(screen, bark, (base_x, base_y), (midx, midy), 3)
+            pygame.draw.line(screen, bark, (midx, midy), (topx, topy + 3), 3)
+            pygame.draw.line(screen, bark_l, (base_x, base_y), (midx, midy), 1)
+            lw, lh = max(4, int(11 * lg)), max(3, int(7 * lg))
+            # 좌 떡잎 (아래로 살짝 처짐)
+            pygame.draw.ellipse(screen, leaf_d, (topx - lw - 1, topy - 1, lw, lh))
+            pygame.draw.ellipse(screen, leaf_m, (topx - lw, topy - 2, lw, lh))
+            # 우 떡잎
+            pygame.draw.ellipse(screen, leaf_d, (topx + 1, topy - 1, lw, lh))
+            pygame.draw.ellipse(screen, leaf_m, (topx, topy - 2, lw, lh))
+            # 가운데 새순
+            pygame.draw.circle(screen, leaf_l, (topx, topy - 3), max(2, int(3 * lg)))
             return
 
         # 줄기 (아래가 굵고 위가 가늘게)

@@ -74,10 +74,10 @@ class WaterPour:
         if self.pouring:
             self.level += self.fill_rate * dt
             if game_state.crop != "rice":
-                # 물방울은 내려간 입구 끝 물줄기 아래에서 떨어진다 (draw의 spout_y+물줄기 길이와 맞춤)
-                sx = PLOT.x + 150 + int(60 - 18 * self.pour_anim)
-                sy = 190 + int(34 * self.pour_anim) + 52
-                self.drops.append([sx + random.uniform(-3, 3), sy, 24.0 + random.uniform(-12, 12), 130.0])
+                # 물방울은 실제 입구에서 시작한 물줄기 끝에서 떨어진다
+                spx, spy = self._watering_spout()
+                slen = 38 + 22 * self.pour_anim
+                self.drops.append([spx + random.uniform(-3, 3), spy + slen, 24.0 + random.uniform(-12, 12), 130.0])
             if self.level >= self.GAUGE_MAX:
                 self.pouring = False
                 self._resolve()
@@ -97,10 +97,21 @@ class WaterPour:
         self.result = {"quality": q, "moisture_add": add}
         self.settle = 1.1
 
+    def _water_tilt(self):
+        return 34 - 44 * self.pour_anim
+
+    def _watering_spout(self):
+        """회전한 물뿌리개 스프라이트의 실제 입구(스파웃) 화면 좌표."""
+        can = sprites["watering_can"]
+        cw, ch = can.get_size()
+        center = (PLOT.x + 150, 172 + int(8 * self.pour_anim))
+        sv = pygame.math.Vector2(85 - cw / 2, 8 - ch / 2).rotate(-self._water_tilt())
+        return center[0] + sv.x, center[1] + sv.y
+
     def draw(self, screen):
         from core.game_state import game_state
         _veil(screen)
-        
+
         p = self.pour_anim
         if game_state.crop == "rice":
             # 목재 물꼬 틀 그리기
@@ -121,21 +132,21 @@ class WaterPour:
                 pygame.draw.rect(screen, (100, 170, 240), (PLOT.x + 140, open_y, 20, slen))
                 pygame.draw.rect(screen, (222, 242, 252), (PLOT.x + 145, open_y, 10, slen))
         else:
-            # 물뿌리개가 붓는 동안 입구(스파웃)를 아래로 기울여 내린다.
+            # 물뿌리개가 붓는 동안 입구(스파웃)를 아래로 기울인다. 물줄기는 회전한 스프라이트의
+            # 실제 입구 위치(중심 기준 오프셋을 -tilt로 회전)에서 정확히 시작한다.
+            spx, spy = self._watering_spout()
             can = sprites["watering_can"]
-            tilt = 34 - 44 * p                       # 쉼: 34(입구 위로) → 붓기: -10(입구 아래로 꺾임)
+            tilt = self._water_tilt()
             rot = pygame.transform.rotate(can, tilt)
-            screen.blit(rot, (PLOT.x + 150 - rot.get_width() // 2, 150 + int(10 * p)))  # 붓을수록 살짝 내려감
-            # 입구는 붓을수록 오른쪽 위 → 아래로 내려온다. 물줄기 시작점을 그에 맞춰 내린다.
-            spout_x = PLOT.x + 150 + int(60 - 18 * p)
-            spout_y = 190 + int(34 * p)
+            center = (PLOT.x + 150, 172 + int(8 * p))
+            screen.blit(rot, rot.get_rect(center=center))
             if p > 0.05:
-                slen = int(40 + 20 * p)
-                ribbon = pygame.Surface((30, slen + 6), pygame.SRCALPHA)
+                slen = int(38 + 22 * p)
+                ribbon = pygame.Surface((26, slen + 6), pygame.SRCALPHA)
                 for ox, a, wd in ((-3, int(70 * p) + 20, 6), (0, int(120 * p) + 30, 4), (3, int(80 * p) + 20, 5)):
-                    pygame.draw.line(ribbon, (150, 205, 235, a), (13 + ox, 0), (11 + ox, slen), wd)
-                pygame.draw.line(ribbon, (222, 242, 252, 210), (13, 0), (11, slen - 2), 2)
-                screen.blit(ribbon, (spout_x - 13, spout_y))
+                    pygame.draw.line(ribbon, (150, 205, 235, a), (11 + ox, 0), (11 + ox, slen), wd)
+                pygame.draw.line(ribbon, (222, 242, 252, 210), (11, 0), (11, slen - 2), 2)
+                screen.blit(ribbon, (int(spx) - 11, int(spy)))
         if game_state.crop != "rice":
             for d in self.drops:
                 glow = pygame.Surface((10, 10), pygame.SRCALPHA)

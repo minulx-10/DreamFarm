@@ -596,8 +596,9 @@ class EndingScene:
             # 1. 나무 식탁
             self._draw_dining_table(screen, tc)
 
-            # 2. 그릇 (입체 백자)
-            self._draw_plate(screen, 400, 345, tc)
+            # 2. 그릇 (입체 백자) — 쌀밥은 밥공기 자체가 그릇이라 접시를 깔지 않는다
+            if game_state.crop != "rice":
+                self._draw_plate(screen, 400, 345, tc)
 
             # 3. 그릇에 담긴 반찬/음식 조각들 (안면 가운데)
             if tc > 120:
@@ -666,8 +667,9 @@ class EndingScene:
         # 1. 나무 식탁
         self._draw_dining_table(screen)
 
-        # 2. 그릇 (입체 백자)
-        self._draw_plate(screen, 400, 345)
+        # 2. 그릇 (입체 백자) — 쌀밥은 밥공기 자체가 그릇이라 접시를 깔지 않는다
+        if game_state.crop != "rice":
+            self._draw_plate(screen, 400, 345)
 
         # 3. Golden Dream Sparkle Particles around the carrot
         import random

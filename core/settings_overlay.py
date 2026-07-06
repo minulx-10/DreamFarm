@@ -40,6 +40,9 @@ class SettingsOverlay:
         self._delete_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 284, 140, 36)
         self._main_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 284, 140, 36)
 
+        # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
+        self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
+
         self._close_btn = pygame.Rect(self.panel.centerx - 60, self.panel.y + 404, 120, 36)
 
         self.show_message = ""
@@ -124,6 +127,16 @@ class SettingsOverlay:
             audio.play("success")
             game_state.request_load = True
             self.open = False
+        elif self._confirm_action == "reset_all":
+            if save_system.reset_all():
+                audio.play("success")
+                self.show_message = "모든 기록이 초기화되었습니다."
+            else:
+                audio.play("break")
+                self.show_message = "초기화할 기록이 없습니다."
+            self.message_timer = 2.0
+            game_state.current_scene = "title"
+            self.open = False
         self._confirm_action = None
 
     def _on_press(self, pos, farm_scene=None):
@@ -165,6 +178,8 @@ class SettingsOverlay:
                 self.message_timer = 2.0
         elif self._main_btn.collidepoint(pos):
             self._confirm_action = "go_main"
+        elif self._reset_all_btn.collidepoint(pos):
+            self._confirm_action = "reset_all"
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
             self.open = False
         elif not self.panel.collidepoint(pos):
@@ -287,6 +302,9 @@ class SettingsOverlay:
         # 메인으로 돌아가기
         self._draw_text_button(screen, self._main_btn, "메인으로", active=False)
 
+        # 완전 초기화 (되돌릴 수 없는 파괴적 동작 → danger 스타일)
+        self._draw_text_button(screen, self._reset_all_btn, "완전 초기화 (태초부터)", active=False, danger=True)
+
         # 닫기
         self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
@@ -320,6 +338,7 @@ class SettingsOverlay:
             "save_game": ("현재 상태를 저장하시겠습니까?",
                           "기존 저장을 덮어씁니다." if save_system.has_save() else "새 저장을 만듭니다."),
             "load_game": ("저장된 게임을 불러오시겠습니까?", "저장하지 않은 진행은 사라집니다."),
+            "reset_all": ("완전 초기화 하시겠습니까?", "모든 엔딩·업적·이야기 기록이 사라집니다."),
         }
         msg, sub = info.get(self._confirm_action, ("진행하시겠습니까?", ""))
 

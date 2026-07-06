@@ -139,6 +139,20 @@ def delete_save():
     return False
 
 
+def reset_all():
+    """세이브 슬롯과 회차 기록(메타)을 모두 삭제 — 태초부터 다시 시작.
+    엔딩 해금·작물별 클리어 횟수·업적·이야기/기억 기록이 전부 사라진다."""
+    ok = False
+    for path in (SLOT_PATH, META_PATH):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                ok = True
+        except Exception:
+            pass
+    return ok
+
+
 # ────────────────────────────── 회차 기록(메타) ──────────────────────────────
 
 def load_meta():

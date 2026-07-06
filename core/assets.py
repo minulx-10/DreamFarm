@@ -257,17 +257,20 @@ XHOOOOOoX
 ...XoqX..
 ....XX...
 ''', 5)
-    # 굼벵이 — 통통하게 도르르 말린 애벌레 (갈색 머리 + 마디진 크림빛 몸통)
+    # 굼벵이 — 통통한 애벌레: 어두운 턱을 문 머리 + 붉은 눈 + 마디진 몸통 + 삐죽한 다리
     sprites['bug'] = create_sprite_from_string('''
-..XXXX...
-.XkkbSX..
-XkiksSsX.
-XkbSsSsSX
-XSsSsSsSX
-XSsSsSsSX
-.XSssSsX.
-..XSSsX..
-...XXX...
+...XXXX...
+..XkKKkX..
+.Xk#ii#kX.
+.XKsssKX..
+kXSsSsSXk.
+XKsSSSsKX.
+kXSsSsSXk.
+XKsSSSsKX.
+kXSssSSXk.
+.XKsssKX..
+..XSssX...
+...XXX....
 ''', 5)
     dad_path = resource_path("dad.png")
     loaded_dad = False
