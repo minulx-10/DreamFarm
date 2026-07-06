@@ -172,6 +172,8 @@ def main():
     settings_overlay = SettingsOverlay()
     from core.quit_overlay import QuitOverlay
     quit_overlay = QuitOverlay()
+    from core.dev_overlay import DevOverlay
+    dev_overlay = DevOverlay()   # F9로 여는 개발자/테스트 모드
 
     current_key = game_state.current_scene
     current_scene_obj = scenes[current_key]
@@ -213,6 +215,17 @@ def main():
                 if game_state.nightmare != current_nightmare:
                     update_display_mode()
                 audio.play_bgm("farm")
+
+        # 개발자 모드에서 작물을 바꾸면 밭을 새로 만들어 farm으로 이동
+        if getattr(game_state, "dev_new_farm", False):
+            game_state.dev_new_farm = False
+            scenes["farm"] = SCENE_FACTORIES["farm"]()
+            game_state.current_scene = "farm"
+            current_scene_obj = scenes["farm"]
+            current_key = "farm"
+            target_scene = "farm"
+            if game_state.nightmare != current_nightmare:
+                update_display_mode()
 
         desired_bgm = BGM_BY_SCENE.get(target_scene)
         # 이스터에그/악몽: 타이틀 등 밤 씬에서 악몽 모드면 긴장감 있는 곡으로 바꾼다.
@@ -259,7 +272,8 @@ def main():
         # 2. 모든 입력을 가상 좌표 이벤트로 흘려보냄
         # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
         if not quit_overlay.handle_events(mapped_events):
-            if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
+            if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")) \
+                    and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
                 for event in mapped_events:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                         audio.toggle_mute()
@@ -297,6 +311,7 @@ def main():
 
         settings_overlay.draw(virtual_screen)
         quit_overlay.draw(virtual_screen)
+        dev_overlay.draw(virtual_screen)
         achievements.draw(virtual_screen)   # 업적 토스트는 항상 맨 위에
 
         # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사 (종횡비 유지 검은 띠 적용)
