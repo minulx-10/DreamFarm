@@ -43,6 +43,10 @@ class QuitOverlay:
                     audio.play("click")
                     game_state.request_quit = False
                     return True
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    audio.play("click")
+                    game_state.running = False
+                    return True
         return True
 
     def draw(self, screen):

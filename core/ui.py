@@ -270,8 +270,18 @@ def draw_understanding_badge(screen, x, y, w):
     moon_x = x + label.get_width() + 8
     draw_moon_phase(screen, moon_x, y - 2, phase, 18)
     name_x = moon_x + 18 + 6
+    # 단계 이름이 패널 밖으로 삐져나가지 않게, 남는 폭에 맞춰 폰트를 줄이고 그래도 넘치면 말줄임.
+    avail = max(20, x + w + 6 - name_x)
     name_surf = font.render(stage_name, True, TEXT_DARK)
-    screen.blit(name_surf, (name_x, y))
+    if name_surf.get_width() > avail:
+        small = get_font(13)
+        name_surf = small.render(stage_name, True, TEXT_DARK)
+        if name_surf.get_width() > avail:
+            txt = stage_name
+            while txt and small.size(txt + "…")[0] > avail:
+                txt = txt[:-1]
+            name_surf = small.render((txt + "…") if txt else "…", True, TEXT_DARK)
+    screen.blit(name_surf, (name_x, y + 1))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))

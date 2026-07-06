@@ -257,21 +257,17 @@ XHOOOOOoX
 ...XoqX..
 ....XX...
 ''', 5)
-    # 굼벵이 — 통통한 애벌레: 어두운 턱을 문 머리 + 붉은 눈 + 마디진 몸통 + 삐죽한 다리
+    # 해충 — 예전의 작고 아담한 딱정벌레(붉은 눈). 크고 징그럽지 않게 작은 스케일로.
     sprites['bug'] = create_sprite_from_string('''
-...XXXX...
-..XkKKkX..
-.Xk#ii#kX.
-.XKsssKX..
-kXSsSsSXk.
-XKsSSSsKX.
-kXSsSsSXk.
-XKsSSSsKX.
-kXSssSSXk.
-.XKsssKX..
-..XSssX...
-...XXX....
-''', 5)
+.X....X.
+..XkkX..
+.XkKKkX.
+XkKiiKkX
+XkKKKKkX
+.XkKKkX.
+X.XkkX.X
+.XX..XX.
+''', 4)
     dad_path = resource_path("dad.png")
     loaded_dad = False
     if os.path.exists(dad_path):

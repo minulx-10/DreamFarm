@@ -26,12 +26,12 @@ TIER_LABELS = {
 TIER_ORDER = ["bronze", "silver", "gold", "platinum"]
 
 ACHIEVEMENTS = [
-    {"id": "first_harvest", "title": "첫 결실", "desc": "작물을 처음으로 끝까지 길러 거두었다.", "tier": "bronze"},
+    {"id": "first_harvest", "title": "첫 결실", "desc": "작물을 처음 끝까지 길러 냈다.", "tier": "bronze"},
     {"id": "grow_carrot", "title": "흙을 아는 손", "desc": "당근을 수확했다.", "tier": "bronze"},
     {"id": "grow_potato", "title": "메마른 해의 버팀목", "desc": "감자를 캐냈다.", "tier": "bronze"},
     {"id": "grow_rice", "title": "물꼬를 쥔 농부", "desc": "벼를 길러 쌀을 얻었다.", "tier": "silver"},
     {"id": "grow_apple", "title": "오래 기다린 자", "desc": "사과나무를 끝까지 길러 열매를 땄다.", "tier": "silver"},
-    {"id": "perfect_harvest", "title": "완벽주의자", "desc": "한 번의 실수도 없이 완벽하게만 수확했다.", "tier": "silver"},
+    {"id": "perfect_harvest", "title": "완벽주의자", "desc": "실수 없이 완벽하게만 수확했다.", "tier": "silver"},
     {"id": "veteran", "title": "열 번의 결실", "desc": "작물을 통틀어 열 번 길러 거두었다.", "tier": "gold"},
     {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "gold"},
     {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "gold"},

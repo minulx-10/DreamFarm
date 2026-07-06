@@ -33,6 +33,10 @@ class TitleScene:
         self.hovered_gallery = False
         self.hovered_settings = False
         self.hovered_quit = False
+
+        # 이스터에그: 달을 네 번 두드리면 악)몽중농원 모드가 켜지고 배경·음악이 검붉게 바뀐다.
+        self.moon_rect = pygame.Rect(648 - 42, 90 - 42, 84, 84)
+        self.moon_clicks = 0
         
         # 타이틀 화면의 반딧불이(꿈 입자) 리스트 생성
         self.fireflies = []
@@ -74,6 +78,15 @@ class TitleScene:
                 
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 이스터에그: 달 4연타 → 악)몽중농원 토글
+                if self.moon_rect.collidepoint(event.pos):
+                    self.moon_clicks += 1
+                    audio.play("pop")
+                    if self.moon_clicks >= 4:
+                        self.moon_clicks = 0
+                        game_state.nightmare = not game_state.nightmare
+                        audio.play("epiphany")
+                    continue
                 # 시작하기
                 if self.hovered_start:
                     audio.play("click")
@@ -124,8 +137,8 @@ class TitleScene:
                 f['speed_y'] *= -1
 
     def draw(self, screen):
-        # 1. 배경
-        draw_story_backdrop(screen, "night")
+        # 1. 배경 (달 이스터에그로 악몽 모드가 켜지면 검붉게)
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         
         # 2. 반딧불이 그리기
         for f in self.fireflies:

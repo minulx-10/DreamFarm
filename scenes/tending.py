@@ -451,13 +451,8 @@ class PestTap:
             pygame.draw.circle(ring, (255, 140, 95, 210) if not is_potato else (229, 180, 50, 210), (18, 18), 15, 3)
             screen.blit(ring, (bx - 18, by - 18))
             
-            if is_potato:
-                pygame.draw.ellipse(screen, (242, 239, 230), (bx - 12, by - 6, 24, 12))
-                pygame.draw.circle(screen, (120, 60, 20), (bx + 8, by), 4)
-                pygame.draw.line(screen, (200, 190, 180), (bx - 4, by - 5), (bx - 4, by + 5), 1)
-                pygame.draw.line(screen, (200, 190, 180), (bx + 2, by - 5), (bx + 2, by + 5), 1)
-            else:
-                screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
+            # 밭에 보이던 해충과 같은 스프라이트로 통일 (잡을 때 다른 벌레로 바뀌지 않게)
+            screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
         for p in self.puffs:
             r = int(10 * (1 - p[2] / 0.35)) + 3
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)

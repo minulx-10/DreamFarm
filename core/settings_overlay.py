@@ -87,6 +87,9 @@ class SettingsOverlay:
                         self._confirm_action = None
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self._confirm_action = None
+                elif event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    audio.play("click")
+                    self._execute_confirm(farm_scene)
                 continue
 
             if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_m):

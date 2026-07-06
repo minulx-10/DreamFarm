@@ -74,6 +74,8 @@ class Stage4Scene:
             self.carrot_y = 360.0
             self.carrot_start_y = 360.0
             self.carrot_target_y = 230.0  # 이 높이까지 뽑으면 성공 (130px 끌어올리기)
+            self.dragging = False
+            self.last_drag_y = 360.0
 
         self.pull_phase = "ready"  # ready → pulling → feedback
         self.tension = 0.0
@@ -187,8 +189,8 @@ class Stage4Scene:
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     if self.dragging:
                         self.dragging = False
-            else:
-                # 그 외 작물은 연타 클릭 방식
+            elif self.is_apple:
+                # 사과: 연타로 아래로 당겨 따냄 (기존 방식 유지)
                 carrot_rect = pygame.Rect(self.center_x - 55, self.carrot_y - 30, 110, 120)
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.pull_phase == "ready":
@@ -200,41 +202,44 @@ class Stage4Scene:
                     elif self.pull_phase == "pulling":
                         now = pygame.time.get_ticks() / 1000.0
                         interval = now - self.last_click_time
-
-                        if self.is_apple:
-                            self.carrot_y = min(self.carrot_target_y + 15.0, self.carrot_y + self.pull_per_click)
-                        else:
-                            self.carrot_y = max(self.carrot_target_y - 15.0, self.carrot_y - self.pull_per_click)
+                        self.carrot_y = min(self.carrot_target_y + 15.0, self.carrot_y + self.pull_per_click)
                         audio.play("pop")
-
                         if interval < self.rapid_threshold:
                             self.tension = min(100.0, self.tension + 8.0)
-
                         self.last_click_time = now
-
-                        # 파티클 생성
-                        if self.is_apple:
-                            for _ in range(random.randint(1, 2)):
-                                self.dirt_particles.append({
-                                    'x': random.uniform(self.center_x - 30, self.center_x + 30),
-                                    'y': random.uniform(160, 180),
-                                    'vx': random.uniform(-40, 40),
-                                    'vy': random.uniform(40, 100),
-                                    'color': random.choice([(76, 150, 78), (96, 180, 98), (56, 120, 58)]),
-                                    'size': random.randint(3, 6),
-                                    'life': random.uniform(0.5, 0.9)
-                                })
-                        else:
-                            for _ in range(random.randint(1, 3)):
-                                self.dirt_particles.append({
-                                    'x': random.uniform(self.center_x - 30, self.center_x + 30),
-                                    'y': random.uniform(330, 360),
-                                    'vx': random.uniform(-65, 65),
-                                    'vy': random.uniform(-40, 20),
-                                    'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
-                                    'size': random.randint(2, 5),
-                                    'life': random.uniform(0.3, 0.6)
-                                })
+                        for _ in range(random.randint(1, 2)):
+                            self.dirt_particles.append({
+                                'x': random.uniform(self.center_x - 30, self.center_x + 30),
+                                'y': random.uniform(160, 180),
+                                'vx': random.uniform(-40, 40), 'vy': random.uniform(40, 100),
+                                'color': random.choice([(76, 150, 78), (96, 180, 98), (56, 120, 58)]),
+                                'size': random.randint(3, 6), 'life': random.uniform(0.5, 0.9)})
+            else:
+                # 당근: 연타가 아니라 '잡고 위로 쭉 끌어올려' 뽑는다 (잡초 뽑듯).
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.pull_phase == "ready":
+                    carrot_rect = pygame.Rect(self.center_x - 55, self.carrot_y - 30, 110, 120)
+                    if carrot_rect.collidepoint(event.pos):
+                        self.pull_phase = "pulling"
+                        self.dragging = True
+                        self.last_drag_y = event.pos[1]
+                        self.tension = 0.0
+                        audio.play("pop")
+                elif event.type == pygame.MOUSEMOTION and self.dragging and self.pull_phase == "pulling":
+                    dy = event.pos[1] - self.last_drag_y
+                    if dy < 0:   # 위로 끌어올리는 동안만 뽑힌다
+                        self.carrot_y = max(self.carrot_target_y - 12.0, self.carrot_y + dy)
+                        for _ in range(random.randint(0, 2)):
+                            self.dirt_particles.append({
+                                'x': random.uniform(self.center_x - 26, self.center_x + 26),
+                                'y': random.uniform(340, 365),
+                                'vx': random.uniform(-60, 60), 'vy': random.uniform(-40, 10),
+                                'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
+                                'size': random.randint(2, 5), 'life': random.uniform(0.3, 0.6)})
+                    if abs(dy) > 60:   # 너무 홱 잡아채면 상한다
+                        self.tension = min(100.0, self.tension + 16.0)
+                    self.last_drag_y = event.pos[1]
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self.dragging = False
 
     def update(self, dt):
         if self.phase == "intro":
@@ -391,10 +396,13 @@ class Stage4Scene:
                     if self.carrot_y <= self.carrot_start_y:
                         self.carrot_y = self.carrot_start_y
                 else:
-                    if self.carrot_y < self.carrot_start_y:
-                        self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * dt)
-                    if self.carrot_y >= self.carrot_start_y:
-                        self.carrot_y = self.carrot_start_y
+                    # 당근: 잡고 있는 동안은 그 자리에서 버티고, 손을 놓으면 도로 묻히며 '준비'로 복귀.
+                    if not getattr(self, "dragging", False):
+                        if self.carrot_y < self.carrot_start_y:
+                            self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * 0.7 * dt)
+                        if self.carrot_y >= self.carrot_start_y:
+                            self.carrot_y = self.carrot_start_y
+                            self.pull_phase = "ready"
 
                 # 부러짐 체크 (tension 과다)
                 if self.tension >= 100.0:
@@ -697,8 +705,10 @@ class Stage4Scene:
                 txt = "너무 거칠어요! 살살 흔드세요." if warn else "좌우로 번갈아 흔들어 캐내세요!"
             elif self.is_rice:
                 txt = "너무 빨라요! 천천히 흔드세요." if warn else "마우스를 드래그해 좌우로 흔들어 터세요."
-            else:
+            elif self.is_apple:
                 txt = "너무 빨라요! 천천히 클릭하세요." if warn else "적당한 속도로 클릭하세요."
+            else:
+                txt = "너무 홱 채면 상해요! 살살." if warn else "잡고 위로 쭉 끌어올려 뽑으세요."
             color = (255, 124, 96) if warn else (236, 224, 200)
             surf = font_t.render(txt, True, color)
             wx, wy = 400 - surf.get_width() // 2, gy + 22
@@ -743,8 +753,10 @@ class Stage4Scene:
                 t2 = font_b.render("감자를 마우스 왼쪽 버튼으로 누른 채", True, (200, 180, 140))
             elif self.is_rice:
                 t2 = font_b.render("벼를 마우스 왼쪽 버튼으로 누른 채", True, (200, 180, 140))
-            else:
+            elif self.is_apple:
                 t2 = font_b.render("마우스 왼쪽 버튼을 연타해서", True, (200, 180, 140))
+            else:
+                t2 = font_b.render("당근을 잡고 마우스를 위로 끌어", True, (200, 180, 140))
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
             
             food_eul = append_josa(current_crop()["food"], "을/를")
@@ -758,8 +770,8 @@ class Stage4Scene:
                 t3 = font_b.render("좌우로 흔들어 이삭을 털고 (탈곡),", True, (200, 180, 140))
                 t4 = font_b.render("마우스로 비벼 낟알의 껍질을 벗기세요 (도정).", True, (200, 180, 140))
             else:
-                t3 = font_b.render(f"{food_eul} 조금씩 거둬 올리세요.", True, (200, 180, 140))
-                t4 = font_b.render("너무 빠르게 하면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
+                t3 = font_b.render(f"{food_eul} 쭉 뽑아 올리세요.", True, (200, 180, 140))
+                t4 = font_b.render("너무 홱 잡아채면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
             screen.blit(t3, (400 - t3.get_width() // 2, 290))
             screen.blit(t4, (400 - t4.get_width() // 2, 330))
         elif self.stage_clear:
@@ -778,4 +790,4 @@ class Stage4Scene:
             elif self.is_rice:
                 draw_bottom_bar(screen, "수확하기", f"좌우로 흔들어 이삭을 털고, 비벼서 껍질을 벗기세요.")
             else:
-                draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 거둬 올리세요. 너무 빠르면 상합니다.")
+                draw_bottom_bar(screen, "수확하기", f"{food_eul} 잡고 마우스를 위로 쭉 끌어 뽑으세요. 너무 홱 채면 상합니다.")

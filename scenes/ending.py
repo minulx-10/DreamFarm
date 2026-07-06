@@ -365,10 +365,6 @@ class EndingScene:
                     if self.phase in ("result", "journal") or self.finished:
                         self.retry()
                         return
-                elif (event.key in self.GALLERY_KEYS
-                      and self.gallery_unlocked()
-                      and self.phase in ("result", "journal")):
-                    self.change_ending(self.GALLERY_KEYS[event.key])
 
             click = (event.type == pygame.MOUSEBUTTONDOWN or
                      (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE))
@@ -843,8 +839,6 @@ class EndingScene:
             cont = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, (208, 198, 170))
             screen.blit(cont, (400 - cont.get_width() // 2, 516))
             sub = "R: 처음부터 다시"
-            if self.gallery_unlocked():
-                sub += "      1~7: 다른 엔딩 다시 보기"
             sub_surf = att_font.render(sub, True, (140, 134, 116))
             screen.blit(sub_surf, (400 - sub_surf.get_width() // 2, 548))
             self._draw_exit_button(screen)
@@ -965,8 +959,5 @@ class EndingScene:
             screen.blit(sh, (672 - sh.get_width(), 110))
 
         prompt = self.font_small.render("오른쪽 아래 버튼으로 나가기  ·  R: 다시하기", True, (214, 204, 178))
-        screen.blit(prompt, (360 - prompt.get_width() // 2, 554))
-        if self.gallery_unlocked():
-            g = get_font(14).render("1~7: 다른 엔딩 다시 보기", True, (150, 143, 122))
-            screen.blit(g, (400 - g.get_width() // 2, 578))
+        screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
         self._draw_exit_button(screen)

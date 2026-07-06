@@ -215,6 +215,9 @@ def main():
                 audio.play_bgm("farm")
 
         desired_bgm = BGM_BY_SCENE.get(target_scene)
+        # 이스터에그/악몽: 타이틀 등 밤 씬에서 악몽 모드면 긴장감 있는 곡으로 바꾼다.
+        if desired_bgm == "night" and game_state.nightmare:
+            desired_bgm = "event"
         if desired_bgm:
             audio.play_bgm(desired_bgm)
 
