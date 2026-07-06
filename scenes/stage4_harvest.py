@@ -76,6 +76,8 @@ class Stage4Scene:
             self.carrot_target_y = 230.0  # 이 높이까지 뽑으면 성공 (130px 끌어올리기)
             self.dragging = False
             self.last_drag_y = 360.0
+            self.carrot_loosen = 0.0   # 뽑힌 정도 (100이면 쏙). 여러 번 끌어당겨야 참
+            self.grab_carrot = 0.0     # 이번 잡음에서 뽑아낸 양(한 번에 다 못 뽑게 상한)
 
         self.pull_phase = "ready"  # ready → pulling → feedback
         self.tension = 0.0
@@ -215,19 +217,22 @@ class Stage4Scene:
                                 'color': random.choice([(76, 150, 78), (96, 180, 98), (56, 120, 58)]),
                                 'size': random.randint(3, 6), 'life': random.uniform(0.5, 0.9)})
             else:
-                # 당근: 연타가 아니라 '잡고 위로 쭉 끌어올려' 뽑는다 (잡초 뽑듯).
+                # 당근: 한 번에 안 뽑히고, 잡고-끌고-놓기를 여러 번 반복해야 뽑힌다.
+                # 한 번 잡았을 때 뽑히는 양(grab_carrot)에 상한을 둬, 빨리 홱 당겨도 끝까지 안 뽑힌다.
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.pull_phase == "ready":
-                    carrot_rect = pygame.Rect(self.center_x - 55, self.carrot_y - 30, 110, 120)
+                    carrot_rect = pygame.Rect(self.center_x - 55, self.carrot_y - 34, 110, 130)
                     if carrot_rect.collidepoint(event.pos):
                         self.pull_phase = "pulling"
                         self.dragging = True
                         self.last_drag_y = event.pos[1]
-                        self.tension = 0.0
+                        self.grab_carrot = 0.0
                         audio.play("pop")
                 elif event.type == pygame.MOUSEMOTION and self.dragging and self.pull_phase == "pulling":
                     dy = event.pos[1] - self.last_drag_y
-                    if dy < 0:   # 위로 끌어올리는 동안만 뽑힌다
-                        self.carrot_y = max(self.carrot_target_y - 12.0, self.carrot_y + dy)
+                    if dy < 0 and self.grab_carrot < 34.0:   # 위로 끌 때만, 이번 잡음에선 최대 34까지
+                        add = min(-dy * 0.45, 34.0 - self.grab_carrot)
+                        self.carrot_loosen = min(100.0, self.carrot_loosen + add)
+                        self.grab_carrot += add
                         for _ in range(random.randint(0, 2)):
                             self.dirt_particles.append({
                                 'x': random.uniform(self.center_x - 26, self.center_x + 26),
@@ -235,8 +240,8 @@ class Stage4Scene:
                                 'vx': random.uniform(-60, 60), 'vy': random.uniform(-40, 10),
                                 'color': random.choice([DIRT_COLOR, DIRT_DARK, (168, 112, 70)]),
                                 'size': random.randint(2, 5), 'life': random.uniform(0.3, 0.6)})
-                    if abs(dy) > 60:   # 너무 홱 잡아채면 상한다
-                        self.tension = min(100.0, self.tension + 16.0)
+                    if -dy > 85:   # 너무 홱 잡아채면 상한다
+                        self.tension = min(100.0, self.tension + 20.0)
                     self.last_drag_y = event.pos[1]
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     self.dragging = False
@@ -396,13 +401,11 @@ class Stage4Scene:
                     if self.carrot_y <= self.carrot_start_y:
                         self.carrot_y = self.carrot_start_y
                 else:
-                    # 당근: 잡고 있는 동안은 그 자리에서 버티고, 손을 놓으면 도로 묻히며 '준비'로 복귀.
+                    # 당근: 높이는 '뽑힌 정도'에 따라 결정된다. 손을 놓으면 풀린 정도는 유지한 채
+                    # '준비'로 돌아가 다시 잡을 수 있다 (여러 번 끌어당겨 뽑는 느낌).
+                    self.carrot_y = self.carrot_start_y - (self.carrot_start_y - self.carrot_target_y) * min(1.0, self.carrot_loosen / 100.0)
                     if not getattr(self, "dragging", False):
-                        if self.carrot_y < self.carrot_start_y:
-                            self.carrot_y = min(self.carrot_start_y, self.carrot_y + self.slide_speed * 0.7 * dt)
-                        if self.carrot_y >= self.carrot_start_y:
-                            self.carrot_y = self.carrot_start_y
-                            self.pull_phase = "ready"
+                        self.pull_phase = "ready"
 
                 # 부러짐 체크 (tension 과다)
                 if self.tension >= 100.0:
@@ -464,6 +467,9 @@ class Stage4Scene:
                         self.hull_progress = 0.0
                     else:
                         self.carrot_y = self.carrot_start_y
+                        self.carrot_loosen = 0.0
+                        self.grab_carrot = 0.0
+                        self.dragging = False
 
         # 흙 파티클 업데이트
         for p in self.dirt_particles[:]:

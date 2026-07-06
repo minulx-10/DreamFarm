@@ -266,22 +266,13 @@ def draw_understanding_badge(screen, x, y, w):
     label = label_font.render("이해도", True, TEXT_MUTED)
     screen.blit(label, (x, y - 1))
 
-    # 라벨 실제 폭 뒤로 달·단계명을 배치해 서로 겹치지 않게 한다
-    moon_x = x + label.get_width() + 8
-    draw_moon_phase(screen, moon_x, y - 2, phase, 18)
-    name_x = moon_x + 18 + 6
-    # 단계 이름이 패널 밖으로 삐져나가지 않게, 남는 폭에 맞춰 폰트를 줄이고 그래도 넘치면 말줄임.
-    avail = max(20, x + w + 6 - name_x)
+    # 달 위상 아이콘은 자꾸 어긋나 보여 빼고, 라벨 뒤에 단계명을 바로 붙여 이름이 잘리지 않게 한다.
+    name_x = x + label.get_width() + 8
+    avail = x + w - name_x
     name_surf = font.render(stage_name, True, TEXT_DARK)
     if name_surf.get_width() > avail:
-        small = get_font(13)
-        name_surf = small.render(stage_name, True, TEXT_DARK)
-        if name_surf.get_width() > avail:
-            txt = stage_name
-            while txt and small.size(txt + "…")[0] > avail:
-                txt = txt[:-1]
-            name_surf = small.render((txt + "…") if txt else "…", True, TEXT_DARK)
-    screen.blit(name_surf, (name_x, y + 1))
+        name_surf = get_font(13).render(stage_name, True, TEXT_DARK)
+    screen.blit(name_surf, (name_x, y))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))

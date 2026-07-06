@@ -150,9 +150,11 @@ class TitleScene:
             pygame.draw.circle(glow_surf, (255, 255, 200, alpha), (int(f['size'] * 3), int(f['size'] * 3)), int(f['size'] * 1.1))
             screen.blit(glow_surf, (int(f['x'] - f['size'] * 3), int(f['y'] - f['size'] * 3)))
             
-        # 3. 제목 ("몽중농원") 및 부제 그리기
-        title_surf = self.font_title.render("몽중농원", True, (255, 240, 206))
-        title_shadow = self.font_title.render("몽중농원", True, (38, 32, 34))
+        # 3. 제목 및 부제 그리기 (달 이스터에그로 악몽 모드면 제목도 '악)몽중농원')
+        title_text = "악)몽중농원" if game_state.nightmare else "몽중농원"
+        title_col = (255, 150, 140) if game_state.nightmare else (255, 240, 206)
+        title_surf = self.font_title.render(title_text, True, title_col)
+        title_shadow = self.font_title.render(title_text, True, (38, 32, 34))
         screen.blit(title_shadow, (400 - title_surf.get_width() // 2 + 3, 93))
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 90))
         

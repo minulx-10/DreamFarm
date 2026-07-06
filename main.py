@@ -285,8 +285,13 @@ def main():
             from core.assets import get_font
             from core.version import display_version
             font_ver = get_font(12)
-            ver_surf = font_ver.render(display_version(), True, (120, 120, 120))
-            virtual_screen.blit(ver_surf, (8, 6))
+            ver_surf = font_ver.render(display_version(), True, (236, 224, 190))
+            vbox = pygame.Rect(6, 4, ver_surf.get_width() + 12, ver_surf.get_height() + 6)
+            vbg = pygame.Surface(vbox.size, pygame.SRCALPHA)
+            vbg.fill((20, 24, 28, 200))
+            pygame.draw.rect(vbg, (120, 130, 120, 200), vbg.get_rect(), 1, border_radius=5)
+            virtual_screen.blit(vbg, vbox.topleft)
+            virtual_screen.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
         except Exception:
             pass
 

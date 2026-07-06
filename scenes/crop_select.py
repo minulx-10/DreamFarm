@@ -14,7 +14,8 @@ class CropSelectScene:
         self.font_btn = get_font(18)
         
         self.selected_crop = game_state.crop or "carrot"
-        self.nightmare_mode = False
+        # 달 이스터에그 등으로 악몽 모드가 켜져 있으면 체크박스도 기본으로 켜 둔다.
+        self.nightmare_mode = game_state.nightmare
         
         # 4개 작물 카드 Rect 정의
         # 800x600 화면에 가로로 4장 정렬 (간격 20, 좌우 여백 40, 너비 160, 높이 230)
@@ -69,7 +70,7 @@ class CropSelectScene:
                     audio.play("click")
                     self.selected_crop = self.hovered_card
                 # 악몽 체크박스 클릭 (진엔딩 달성시에만 해금)
-                elif self.hovered_nightmare and save_system.nightmare_unlocked():
+                elif self.hovered_nightmare and (save_system.nightmare_unlocked() or self.nightmare_mode):
                     audio.play("click")
                     self.nightmare_mode = not self.nightmare_mode
                 # 확인 버튼 클릭
@@ -147,8 +148,8 @@ class CropSelectScene:
             fam_surf = get_font(12).render(f"분류: {info['family']}", True, TEXT_MUTED)
             screen.blit(fam_surf, (rect.centerx - fam_surf.get_width() // 2, rect.bottom - 22))
 
-        # 4. [악)몽중농원] 모드 체크박스 (진엔딩 해금시에만 표시)
-        if save_system.nightmare_unlocked():
+        # 4. [악)몽중농원] 모드 체크박스 (진엔딩 해금 또는 달 이스터에그로 켜졌을 때 표시)
+        if save_system.nightmare_unlocked() or self.nightmare_mode:
             box_color = (255, 230, 220) if self.hovered_nightmare else (240, 210, 200)
             border_color = (200, 50, 50) if self.nightmare_mode else (130, 80, 80)
             

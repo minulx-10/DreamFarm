@@ -900,23 +900,22 @@ class EndingScene:
             y += 8 if is_section else 4
 
         if self.phase_timer > 0.6:
-            # 오른쪽 아래 구석: 스페이스바를 꾹 누르는 동안 차오르는 넘기기 게이지.
-            prompt = self.font_small.render("스페이스바 꾹 눌러 넘기기", True, (222, 216, 196))
-            pad = 9
-            gauge_h = 6
-            box = pygame.Rect(0, 0, prompt.get_width() + pad * 2, prompt.get_height() + pad * 2 + gauge_h + 4)
-            box.bottomright = (786, 588)
+            # 오른쪽 아래 구석에 작게 — 스토리 글자를 가리지 않도록 컴팩트하게.
+            f = get_font(12)
+            prompt = f.render("꾹 눌러 넘기기", True, (210, 204, 186))
+            pad = 6
+            gauge_h = 4
+            box = pygame.Rect(0, 0, prompt.get_width() + pad * 2, prompt.get_height() + pad * 2 + gauge_h + 2)
+            box.bottomright = (792, 592)
             bg = pygame.Surface((box.w, box.h), pygame.SRCALPHA)
-            bg.fill((10, 10, 15, 205))
-            pygame.draw.rect(bg, (60, 58, 50, 220), bg.get_rect(), 1, border_radius=8)
+            bg.fill((10, 10, 15, 170))
             screen.blit(bg, box.topleft)
-            screen.blit(prompt, (box.x + pad, box.y + pad))
-            # 게이지
-            gx, gy = box.x + pad, box.y + pad + prompt.get_height() + 3
+            screen.blit(prompt, (box.x + pad, box.y + pad - 1))
+            gx, gy = box.x + pad, box.y + pad + prompt.get_height() + 1
             gw = box.w - pad * 2
-            pygame.draw.rect(screen, (48, 46, 40), (gx, gy, gw, gauge_h), border_radius=3)
+            pygame.draw.rect(screen, (48, 46, 40), (gx, gy, gw, gauge_h), border_radius=2)
             if self.credit_hold > 0:
-                pygame.draw.rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), border_radius=3)
+                pygame.draw.rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), border_radius=2)
 
     def _draw_journal(self, screen):
         draw_story_backdrop(screen, "night")
