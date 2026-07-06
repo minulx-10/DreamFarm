@@ -48,6 +48,7 @@ class GalleryScene:
         self.modal_rect = pygame.Rect(120, 120, 560, 380)
         self.modal_close_btn = pygame.Rect(452, 440, 128, 36)
         self.modal_replay_btn = pygame.Rect(220, 440, 128, 36)   # 이벤트 다시 하기
+        self.star_replay_btn = pygame.Rect(290, 544, 220, 40)    # 별 잇기 다시 하기(이야기 탭)
         
         self.endings_seen = save_system.endings_seen()
         self.stories_seen = save_system.load_meta().get("stories_seen", [])
@@ -129,6 +130,12 @@ class GalleryScene:
                                 game_state.current_scene = "ending"
                                 return
                 else:
+                    # 별 잇기 다시 하기 — 특별 미니게임 재생(끝나면 갤러리로 복귀)
+                    if self.star_replay_btn.collidepoint(event.pos):
+                        audio.play("success")
+                        game_state.return_scene = "gallery"
+                        game_state.current_scene = "star_connect"
+                        return
                     # 사건목록 클릭
                     for rect, title, text in self.story_item_rects:
                         if rect.collidepoint(event.pos):
@@ -349,6 +356,10 @@ class GalleryScene:
                 txt = self.font_small.render("잃어버린 기억", True, (150, 145, 135))
                 screen.blit(txt, (rect.x + 10, rect.y + 8))
             y += 33
+
+        # 특별 미니게임 '별 잇기' 다시 하기 (아래 여백에 배치)
+        hov = self.star_replay_btn.collidepoint(mouse_pos)
+        draw_button(screen, self.star_replay_btn, "★ 별 잇기 다시 하기", self.font_btn, hovered=hov)
 
     def _draw_modal_popup(self, screen):
         # 반투명 장막
