@@ -129,11 +129,12 @@ class GalleryScene:
                                 game_state.crop = meta_crop
                                 game_state.current_scene = "ending"
                                 return
-                else:
+                elif self.active_tab == "stories":
                     # 별 잇기 다시 하기 — 특별 미니게임 재생(끝나면 갤러리로 복귀)
                     if self.star_replay_btn.collidepoint(event.pos):
                         audio.play("success")
                         game_state.return_scene = "gallery"
+                        game_state.event_replay = True   # 감상용 — 끝나도 이해도 장면 없이 갤러리로
                         game_state.current_scene = "star_connect"
                         return
                     # 사건목록 클릭
@@ -277,10 +278,14 @@ class GalleryScene:
                 pygame.draw.circle(screen, (140, 134, 124), (mcx, mcy), 15, 2)
                 q = self.font_body.render("?", True, (120, 114, 104))
                 screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
-                title = self.font_body.render("???", True, (140, 134, 124))
-                screen.blit(title, (cell.x + 52, cell.y + 9))
-                ds = self.font_small.render("아직 잠겨 있는 업적", True, (150, 144, 134))
-                screen.blit(ds, (cell.x + 52, cell.y + 32))
+                # 잠겼어도 이름은 보여줘 무엇을 노려야 할지 유추할 수 있게 (설명만 감춘다)
+                title = self.font_body.render(ach["title"], True, (150, 144, 134))
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                rank = achievements.TIER_LABELS.get(ach["tier"], "")
+                rk = get_font(11).render(rank, True, (170, 164, 154))
+                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                ds = self.font_small.render("아직 잠긴 업적 · 조건은 비밀", True, (160, 154, 144))
+                screen.blit(ds, (cell.x + 52, cell.y + 30))
 
     def _draw_stories_tab(self, screen):
         # 텃밭 사건 목록

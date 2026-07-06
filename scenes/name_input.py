@@ -31,6 +31,8 @@ class NameInputScene:
         if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
             audio.play("success")
             game_state.player_name = self.input_text.strip()
+            from core import achievements
+            achievements.on_name(game_state.player_name)   # 개발자 이름 이스터에그
             game_state.current_scene = "intro"
             pygame.key.set_repeat(0)         # 키 반복 입력 비활성화
             pygame.key.stop_text_input()

@@ -96,7 +96,7 @@ class FatherDayScene:
             if self.fade_alpha >= 255:
                 # #10: Activate dad mode in farm
                 game_state.dad_mode = True
-                game_state.dad_mode_turns = 4
+                game_state.dad_mode_turns = 2
                 game_state.transition_text = (
                     "[아버지의 밭]\n"
                     "아버지의 손으로, 같은 밭을 돌본다.\n"

@@ -87,6 +87,20 @@ def on_ending(ending_type):
         unlock("true_ending")
 
 
+# 개발자 이름 이스터에그
+_DEV_NAMES = {"서태양", "김민욱", "박서현"}
+
+
+def on_name(name):
+    """플레이어 이름이 개발자 이름이면 특별 인사 토스트를 띄운다 (이스터에그)."""
+    if name in _DEV_NAMES:
+        _toasts.append({"a": {"title": f"개발자 {name}, 등장!", "tier": "legend"}, "t": 0.0})
+        try:
+            audio.play("epiphany")
+        except Exception:
+            pass
+
+
 # ------------------------------------------------------------------ 토스트
 def update(dt):
     for t in _toasts:

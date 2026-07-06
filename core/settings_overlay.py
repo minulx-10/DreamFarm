@@ -48,8 +48,9 @@ class SettingsOverlay:
         self.show_message = ""
         self.message_timer = 0.0
 
-        # 확인 모달 상태 ("delete_save" | "go_main" | None)
+        # 확인 모달 상태 ("delete_save" | "go_main" | "reset_all" | ... | None)
         self._confirm_action = None
+        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력
         self._confirm_yes = pygame.Rect(self.panel.centerx - 80, self.panel.y + 350, 65, 32)
         self._confirm_no = pygame.Rect(self.panel.centerx + 15, self.panel.y + 350, 65, 32)
 
@@ -78,18 +79,32 @@ class SettingsOverlay:
 
             # 확인 모달이 뜬 상태에서는 확인/취소만 처리
             if self._confirm_action is not None:
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 완전 초기화는 실수 방지를 위해 '초기화'라고 직접 입력해야 확정된다.
+                need_type = (self._confirm_action == "reset_all")
+                type_ok = (self._reset_confirm_text.strip() == "초기화")
+                if event.type == pygame.TEXTINPUT and need_type:
+                    if len(self._reset_confirm_text) < 8:
+                        self._reset_confirm_text += event.text
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._confirm_yes.collidepoint(event.pos):
-                        audio.play("click")
-                        self._execute_confirm(farm_scene)
+                        if need_type and not type_ok:
+                            audio.play("break")
+                        else:
+                            audio.play("click")
+                            self._execute_confirm(farm_scene)
                     elif self._confirm_no.collidepoint(event.pos):
                         audio.play("click")
-                        self._confirm_action = None
+                        self._close_confirm()
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    self._confirm_action = None
+                    self._close_confirm()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE and need_type:
+                    self._reset_confirm_text = self._reset_confirm_text[:-1]
                 elif event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    audio.play("click")
-                    self._execute_confirm(farm_scene)
+                    if need_type and not type_ok:
+                        audio.play("break")
+                    else:
+                        audio.play("click")
+                        self._execute_confirm(farm_scene)
                 continue
 
             if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_m):
@@ -104,6 +119,15 @@ class SettingsOverlay:
                     audio.play("hover")
                 self._drag = None
         return consumed
+
+    def _close_confirm(self):
+        """확인 모달을 닫는다 (완전 초기화 입력 상태도 정리)."""
+        self._confirm_action = None
+        self._reset_confirm_text = ""
+        try:
+            pygame.key.stop_text_input()
+        except Exception:
+            pass
 
     def _execute_confirm(self, farm_scene=None):
         if self._confirm_action == "delete_save":
@@ -131,16 +155,23 @@ class SettingsOverlay:
             game_state.request_load = True
             self.open = False
         elif self._confirm_action == "reset_all":
-            if save_system.reset_all():
-                audio.play("success")
-                self.show_message = "모든 기록이 초기화되었습니다."
-            else:
-                audio.play("break")
-                self.show_message = "초기화할 기록이 없습니다."
+            save_system.reset_all()
+            audio.play("success")
+            self.show_message = "모든 기록이 초기화되었습니다."
             self.message_timer = 2.0
+            # 태초로 — 악몽 모드(달 이스터에그 등)와 회차 기록까지 완전 초기화
+            game_state.reset()
+            game_state.nightmare = False
+            game_state.is_second_run = False
+            game_state.player_name = "지후"
             game_state.current_scene = "title"
             self.open = False
         self._confirm_action = None
+        self._reset_confirm_text = ""
+        try:
+            pygame.key.stop_text_input()
+        except Exception:
+            pass
 
     def _on_press(self, pos, farm_scene=None):
         if self._bgm_track.inflate(24, 22).collidepoint(pos):
@@ -183,6 +214,11 @@ class SettingsOverlay:
             self._confirm_action = "go_main"
         elif self._reset_all_btn.collidepoint(pos):
             self._confirm_action = "reset_all"
+            self._reset_confirm_text = ""
+            try:
+                pygame.key.start_text_input()
+            except Exception:
+                pass
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
             self.open = False
         elif not self.panel.collidepoint(pos):
@@ -346,13 +382,29 @@ class SettingsOverlay:
         msg, sub = info.get(self._confirm_action, ("진행하시겠습니까?", ""))
 
         msg_surf = get_font(15).render(msg, True, TEXT_DARK)
-        screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 22))
+        screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 20))
 
-        if sub:
+        yes_disabled = False
+        if self._confirm_action == "reset_all":
+            # 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
+            typed = self._reset_confirm_text
+            ok = (typed.strip() == "초기화")
+            label = get_font(13).render("확인하려면 '초기화' 입력:", True, TEXT_MUTED)
+            box_w = 76
+            total = label.get_width() + 8 + box_w
+            lx = modal.centerx - total // 2
+            screen.blit(label, (lx, modal.y + 50))
+            ib = pygame.Rect(lx + label.get_width() + 8, modal.y + 47, box_w, 22)
+            pygame.draw.rect(screen, (255, 249, 230), ib, border_radius=4)
+            pygame.draw.rect(screen, (60, 150, 70) if ok else (170, 120, 80), ib, 2, border_radius=4)
+            tt = get_font(14).render(typed, True, (50, 140, 60) if ok else TEXT_DARK)
+            screen.blit(tt, (ib.x + 6, ib.centery - tt.get_height() // 2))
+            yes_disabled = not ok
+        elif sub:
             sub_surf = get_font(12).render(sub, True, TEXT_MUTED)
             screen.blit(sub_surf, (modal.centerx - sub_surf.get_width() // 2, modal.y + 48))
 
-        self._draw_text_button(screen, self._confirm_yes, "예", active=False)
+        self._draw_text_button(screen, self._confirm_yes, "예", active=False, disabled=yes_disabled)
         self._draw_text_button(screen, self._confirm_no, "아니오", active=False)
 
     def _draw_slider_row(self, screen, label, track, value):

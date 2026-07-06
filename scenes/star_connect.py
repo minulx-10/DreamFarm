@@ -90,6 +90,11 @@ class StarConnectScene:
         if self.finished:
             return
         self.finished = True
+        # 갤러리에서 감상용으로 다시 한 경우엔 이해도 획득·결과 장면 없이 바로 갤러리로 복귀.
+        if getattr(game_state, "event_replay", False):
+            game_state.event_replay = False
+            game_state.current_scene = "gallery"
+            return
         n = self.idx
         frac = n / self.total
         bonus = 18 if frac >= 0.99 else 12 if frac >= 0.7 else 7 if frac >= 0.4 else 3
