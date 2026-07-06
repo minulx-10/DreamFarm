@@ -438,7 +438,20 @@ class StoryChoiceScene:
         pygame.draw.line(screen, (184, 190, 196), (360, 308), (372, 356), 2)
 
     def _draw_stone(self, screen, cx, cy):
-        """주워 담을 돌 — 종류(색·모양·크기)를 다양하게, 위치로 시드해 매 프레임 고정."""
+        """주워 담을 돌 — 종류를 다양하게. (이스터에그: 박서현이면 모아이 석상)"""
+        if game_state.player_name == "박서현":
+            g0, g1, g2 = (120, 116, 110), (92, 88, 82), (150, 146, 140)
+            head = [(cx - 10, cy - 16), (cx + 10, cy - 16), (cx + 12, cy + 6), (cx + 8, cy + 18),
+                    (cx - 8, cy + 18), (cx - 12, cy + 6)]
+            pygame.draw.polygon(screen, (54, 50, 46), [(x, y + 3) for x, y in head])  # 그림자
+            pygame.draw.polygon(screen, g0, head)
+            pygame.draw.polygon(screen, g1, head, 2)
+            pygame.draw.rect(screen, g1, (cx - 11, cy - 10, 22, 4))          # 눈두덩(무거운 이마)
+            pygame.draw.rect(screen, (40, 38, 34), (cx - 8, cy - 6, 5, 4))   # 왼눈
+            pygame.draw.rect(screen, (40, 38, 34), (cx + 3, cy - 6, 5, 4))   # 오눈
+            pygame.draw.polygon(screen, g2, [(cx - 2, cy - 4), (cx + 2, cy - 4), (cx + 1, cy + 8), (cx - 1, cy + 8)])  # 긴 코
+            pygame.draw.rect(screen, (60, 56, 52), (cx - 5, cy + 11, 10, 3))  # 입
+            return
         import random as _r
         rng = _r.Random(cx * 31 + cy * 7)
         base, dark, light = rng.choice([
@@ -553,7 +566,18 @@ class StoryChoiceScene:
             pygame.draw.circle(screen, leaf, (cx + 7, y_bot + 1), 3)
 
     def _draw_deer(self, screen, cx, cy):
-        """울타리 너머로 고개를 들이민 고라니."""
+        """울타리 너머로 고개를 들이민 고라니. (이스터에그: 김민욱이면 돼지)"""
+        if game_state.player_name == "김민욱":
+            pink, pdark, pnose = (240, 170, 180), (210, 130, 145), (225, 150, 160)
+            pygame.draw.ellipse(screen, pink, (cx - 13, cy - 6, 9, 11))   # 왼귀
+            pygame.draw.ellipse(screen, pink, (cx + 6, cy - 6, 9, 11))    # 오른귀
+            pygame.draw.ellipse(screen, pink, (cx - 15, cy, 30, 28))      # 얼굴
+            pygame.draw.ellipse(screen, pdark, (cx - 9, cy + 12, 18, 13)) # 코(주둥이)
+            pygame.draw.circle(screen, pnose, (cx - 4, cy + 18), 2)
+            pygame.draw.circle(screen, pnose, (cx + 4, cy + 18), 2)
+            pygame.draw.circle(screen, (30, 24, 20), (cx - 6, cy + 6), 2)
+            pygame.draw.circle(screen, (30, 24, 20), (cx + 6, cy + 6), 2)
+            return
         body, dark, nose = (126, 100, 74), (94, 72, 52), (58, 46, 38)
         pygame.draw.ellipse(screen, body, (cx - 15, cy - 4, 8, 15))   # 왼귀
         pygame.draw.ellipse(screen, body, (cx + 7, cy - 4, 8, 15))    # 오른귀

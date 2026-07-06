@@ -175,9 +175,22 @@ def draw_story_backdrop(screen, mood="night"):
         a = int(40 * (1 - r / 84.0))
         pygame.draw.circle(halo, (moon_glow[0], moon_glow[1], moon_glow[2], a), (90, 90), r)
     screen.blit(halo, (mx - 90, my - 90))
-    pygame.draw.circle(screen, moon_glow, (mx, my), 32)
-    pygame.draw.circle(screen, mix_color(moon_glow, WHITE, 0.4), (mx, my), 30)
-    pygame.draw.circle(screen, sky(my / 600.0), (mx - 13, my - 7), 27)  # 그림자로 초승달
+    if game_state.player_name == "서태양":
+        # 이스터에그: 달 대신 '얼굴 그려진 태양'
+        for i in range(12):
+            ang = i * (math.pi / 6)
+            x1, y1 = mx + int(38 * math.cos(ang)), my + int(38 * math.sin(ang))
+            x2, y2 = mx + int(50 * math.cos(ang)), my + int(50 * math.sin(ang))
+            pygame.draw.line(screen, (255, 210, 90), (x1, y1), (x2, y2), 3)
+        pygame.draw.circle(screen, (255, 214, 92), (mx, my), 34)
+        pygame.draw.circle(screen, (255, 236, 150), (mx, my), 34, 3)
+        pygame.draw.circle(screen, (120, 80, 20), (mx - 12, my - 6), 4)   # 왼눈
+        pygame.draw.circle(screen, (120, 80, 20), (mx + 12, my - 6), 4)   # 오눈
+        pygame.draw.arc(screen, (120, 80, 20), (mx - 14, my - 2, 28, 22), 3.34, 6.08, 3)  # 미소
+    else:
+        pygame.draw.circle(screen, moon_glow, (mx, my), 32)
+        pygame.draw.circle(screen, mix_color(moon_glow, WHITE, 0.4), (mx, my), 30)
+        pygame.draw.circle(screen, sky(my / 600.0), (mx - 13, my - 7), 27)  # 그림자로 초승달
 
     # 산 2겹 (멀고 옅은 뒤, 가깝고 짙은 앞)
     pygame.draw.polygon(screen, hill_far, [(0, 332), (140, 264), (300, 320), (470, 250), (650, 318), (800, 268), (800, 600), (0, 600)])

@@ -1353,25 +1353,26 @@ class FarmScene:
 
         trunk_h = 4 + int(13 * g)
 
-        # 갓 돋은 묘목 — 블록이 아니라 가늘게 휜 줄기 + 좌우로 벌어진 떡잎 두 장(자연스러운 새싹)
+        # 갓 돋은 묘목 — '독버섯'처럼 둥근 갓이 아니라, 곧은 나무 줄기 + 뾰족한 잎사귀로 어린 나무답게.
         if g < 0.16:
-            lg = 0.35 + 0.65 * (g / 0.16)
-            h = int(14 + 44 * (g / 0.16))
+            lg = 0.4 + 0.6 * (g / 0.16)
+            h = int(16 + 44 * (g / 0.16))
             topx, topy = base_x, base_y - h
-            # 살짝 휜 줄기
-            midx, midy = base_x - 2, base_y - h // 2
-            pygame.draw.line(screen, bark, (base_x, base_y), (midx, midy), 3)
-            pygame.draw.line(screen, bark, (midx, midy), (topx, topy + 3), 3)
-            pygame.draw.line(screen, bark_l, (base_x, base_y), (midx, midy), 1)
-            lw, lh = max(4, int(11 * lg)), max(3, int(7 * lg))
-            # 좌 떡잎 (아래로 살짝 처짐)
-            pygame.draw.ellipse(screen, leaf_d, (topx - lw - 1, topy - 1, lw, lh))
-            pygame.draw.ellipse(screen, leaf_m, (topx - lw, topy - 2, lw, lh))
-            # 우 떡잎
-            pygame.draw.ellipse(screen, leaf_d, (topx + 1, topy - 1, lw, lh))
-            pygame.draw.ellipse(screen, leaf_m, (topx, topy - 2, lw, lh))
-            # 가운데 새순
-            pygame.draw.circle(screen, leaf_l, (topx, topy - 3), max(2, int(3 * lg)))
+            # 곧게 선 나무 줄기 (굵기 있게)
+            pygame.draw.line(screen, bark_d, (base_x, base_y), (topx, topy + 4), 4)
+            pygame.draw.line(screen, bark, (base_x, base_y), (topx, topy + 4), 2)
+            # 잔가지 두 갈래
+            fy = topy + int(h * 0.3)
+            pygame.draw.line(screen, bark, (base_x, fy), (base_x - int(7 * lg), fy - int(6 * lg)), 2)
+            pygame.draw.line(screen, bark, (base_x, fy), (base_x + int(7 * lg), fy - int(6 * lg)), 2)
+            # 뾰족한 잎 3장 (다이아몬드형 — 둥근 갓 느낌을 없앤다)
+            def _leaf(ex, ey, s, col_d, col_m):
+                w2, h2 = int(4 * lg * s), int(8 * lg * s)
+                pygame.draw.polygon(screen, col_d, [(ex, ey - h2), (ex - w2, ey), (ex, ey + h2 // 2), (ex + w2, ey)])
+                pygame.draw.polygon(screen, col_m, [(ex, ey - h2 + 2), (ex - w2 + 1, ey), (ex + w2 - 1, ey)])
+            _leaf(base_x - int(7 * lg), fy - int(6 * lg), 0.8, leaf_d, leaf_m)   # 왼가지 잎
+            _leaf(base_x + int(7 * lg), fy - int(6 * lg), 0.8, leaf_d, leaf_m)   # 오가지 잎
+            _leaf(topx, topy, 1.0, leaf_m, leaf_l)                               # 우듬지 잎
             return
 
         # 줄기 (아래가 굵고 위가 가늘게)
