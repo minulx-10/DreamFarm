@@ -104,6 +104,11 @@ class StoryChoiceScene:
                 tx = 190 + int((i + 0.5) * (420 / count))
                 ty = 302 + random.randint(-5, 5)
                 self.qte_targets.append({"pos": (tx, ty), "done": False})
+        elif self.qte_kind == "rub":
+            # 녹슨 자국은 실제 호미 '날' 위에 있어야 한다 — 날 위 지점들에 배치
+            blade_spots = [(378, 316), (398, 330), (366, 336), (388, 348), (356, 326), (408, 344)]
+            for i in range(count):
+                self.qte_targets.append({"pos": blade_spots[i % len(blade_spots)], "done": False})
         else:
             # 서로 겹치지 않게 랜덤 배치 (tap/hold/rub 공용)
             placed = []
@@ -284,7 +289,12 @@ class StoryChoiceScene:
             self.result_timer -= dt
             if self.result_timer <= 0:
                 game_state.choice_data = None
-                game_state.current_scene = "farm"
+                # 갤러리에서 '다시 하기'로 들어온 감상이면 갤러리로 복귀 (실제 진행에 영향 X)
+                if getattr(game_state, "event_replay", False):
+                    game_state.event_replay = False
+                    game_state.current_scene = "gallery"
+                else:
+                    game_state.current_scene = "farm"
             return
 
         if self.finished:
@@ -327,11 +337,7 @@ class StoryChoiceScene:
                 if t["done"]:
                     continue
                 cx, cy = t["pos"]
-                # 주워 담을 돌멩이
-                pygame.draw.circle(screen, (60, 50, 44, 90), (cx, cy + 4), 16)
-                pygame.draw.circle(screen, (150, 146, 138), (cx, cy), 15)
-                pygame.draw.circle(screen, (110, 104, 96), (cx, cy), 15, 2)
-                pygame.draw.circle(screen, (196, 192, 184), (cx - 4, cy - 4), 5)
+                self._draw_stone(screen, cx, cy)
 
         elif self.qte_kind == "trail":
             # 잎들을 잇는 점선 경로
@@ -392,22 +398,70 @@ class StoryChoiceScene:
             screen.blit(hint, (400 - hint.get_width() // 2, 430))
 
         elif self.qte_kind == "rub":
+            self._draw_hoe(screen)   # 실제 낡은 호미(자루+날)
             for t in self.qte_targets:
                 cx, cy = t["pos"]
                 if t["done"]:
-                    pygame.draw.circle(screen, (170, 176, 182), (cx, cy), 15)   # 반짝이는 금속
-                    pygame.draw.circle(screen, (230, 236, 240), (cx - 4, cy - 4), 4)
+                    # 닦인 자리 — 반짝이는 금속
+                    pygame.draw.circle(screen, (176, 182, 190), (cx, cy), 11)
+                    pygame.draw.circle(screen, (232, 238, 244), (cx - 3, cy - 3), 4)
                     continue
-                # 녹슨 자국
-                pygame.draw.circle(screen, (150, 92, 44), (cx, cy), 16)
-                pygame.draw.circle(screen, (120, 70, 34), (cx, cy), 16, 2)
+                # 녹슨 자국 (울퉁불퉁한 붉은 녹)
+                import random as _r
+                rng = _r.Random(cx * 17 + cy)
+                for _ in range(5):
+                    ox, oy = rng.randint(-8, 8), rng.randint(-7, 7)
+                    rr = rng.randint(4, 8)
+                    col = rng.choice([(150, 92, 44), (128, 72, 34), (172, 108, 52)])
+                    pygame.draw.circle(screen, col, (cx + ox, cy + oy), rr)
                 if t is active:
-                    pygame.draw.circle(screen, (210, 150, 90), (cx, cy), int(20 + 4 * pulse), 2)
+                    pygame.draw.circle(screen, (210, 150, 90), (cx, cy), int(16 + 4 * pulse), 2)
                     if self.qte_progress > 0:
-                        w = int(28 * self.qte_progress)
-                        pygame.draw.rect(screen, (180, 186, 192), (cx - 14, cy + 20, w, 4), border_radius=2)
-            hint = t_font.render("표적 위에서 마우스를 좌우로 문지르세요", True, TEXT_MUTED)
-            screen.blit(hint, (400 - hint.get_width() // 2, 430))
+                        w = int(24 * self.qte_progress)
+                        pygame.draw.rect(screen, (180, 186, 192), (cx - 12, cy + 16, w, 4), border_radius=2)
+            hint = t_font.render("호미의 녹슨 자리에서 마우스를 좌우로 문지르세요", True, TEXT_MUTED)
+            screen.blit(hint, (400 - hint.get_width() // 2, 418))
+
+    def _draw_hoe(self, screen):
+        """아버지의 낡은 호미 — 나무 자루 + 아래로 휜 삼각 쇠날."""
+        top, neck = (458, 226), (392, 300)
+        pygame.draw.line(screen, (86, 58, 34), top, neck, 12)
+        pygame.draw.line(screen, (120, 82, 48), top, neck, 8)
+        pygame.draw.line(screen, (150, 108, 66), (top[0] - 2, top[1] + 1), (neck[0] - 2, neck[1] + 1), 2)
+        pygame.draw.circle(screen, (120, 82, 48), top, 7)
+        pygame.draw.circle(screen, (86, 58, 34), top, 7, 2)
+        pygame.draw.circle(screen, (108, 110, 116), neck, 7)   # 쇠목
+        blade = [(392, 298), (416, 316), (402, 344), (372, 358), (348, 338), (360, 308)]
+        pygame.draw.polygon(screen, (58, 50, 44), [(x, y + 3) for x, y in blade])
+        pygame.draw.polygon(screen, (138, 142, 148), blade)
+        pygame.draw.polygon(screen, (92, 96, 102), blade, 2)
+        pygame.draw.line(screen, (184, 190, 196), (360, 308), (372, 356), 2)
+
+    def _draw_stone(self, screen, cx, cy):
+        """주워 담을 돌 — 종류(색·모양·크기)를 다양하게, 위치로 시드해 매 프레임 고정."""
+        import random as _r
+        rng = _r.Random(cx * 31 + cy * 7)
+        base, dark, light = rng.choice([
+            ((150, 146, 138), (108, 104, 96), (198, 194, 186)),   # 회색 화강암
+            ((152, 122, 92), (112, 88, 64), (198, 172, 138)),     # 갈색 사암
+            ((96, 100, 108), (62, 66, 74), (150, 156, 164)),      # 짙은 현무암
+            ((170, 152, 130), (128, 112, 94), (212, 198, 180)),   # 밝은 석회암
+        ])
+        r = rng.randint(11, 17)
+        n = 7
+        pts = []
+        for i in range(n):
+            ang = i * (2 * math.pi / n) + rng.uniform(-0.2, 0.2)
+            rr = r * rng.uniform(0.76, 1.14)
+            pts.append((cx + rr * math.cos(ang), cy + rr * math.sin(ang) * 0.88))
+        pygame.draw.polygon(screen, (52, 46, 42), [(x, y + 4) for x, y in pts])   # 그림자
+        pygame.draw.polygon(screen, base, pts)
+        pygame.draw.polygon(screen, dark, pts, 2)
+        pygame.draw.circle(screen, light, (int(cx - r // 3), int(cy - r // 3)), max(3, r // 4))
+        for _ in range(rng.randint(1, 3)):   # 결·얼룩
+            sx = cx + rng.randint(-r // 2, r // 2)
+            sy = cy + rng.randint(-r // 2, r // 2)
+            pygame.draw.circle(screen, dark, (sx, sy), 1)
 
     def _draw_flower(self, screen, cx, cy, done, active, pulse):
         """길 잃은 벌의 목적지 — 꽃밭의 꽃 한 송이."""

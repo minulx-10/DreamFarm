@@ -46,7 +46,8 @@ class GalleryScene:
         self.reading_title = None
         self.reading_text = None
         self.modal_rect = pygame.Rect(120, 120, 560, 380)
-        self.modal_close_btn = pygame.Rect(340, 440, 120, 36)
+        self.modal_close_btn = pygame.Rect(452, 440, 128, 36)
+        self.modal_replay_btn = pygame.Rect(220, 440, 128, 36)   # 이벤트 다시 하기
         
         self.endings_seen = save_system.endings_seen()
         self.stories_seen = save_system.load_meta().get("stories_seen", [])
@@ -68,8 +69,18 @@ class GalleryScene:
         # 모달 팝업이 띄워져 있는가
         if self.reading_title:
             self.hovered_modal_close = self.modal_close_btn.collidepoint(mouse_pos)
+            replay_ev = self._find_replay_event(self.reading_title)
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if replay_ev is not None and self.modal_replay_btn.collidepoint(event.pos):
+                        # 그 이벤트(선택형 미니게임)를 다시 플레이 — 끝나면 갤러리로 복귀
+                        audio.play("click")
+                        game_state.choice_data = replay_ev
+                        game_state.event_replay = True
+                        self.reading_title = None
+                        self.reading_text = None
+                        game_state.current_scene = "story_choice"
+                        return
                     if self.hovered_modal_close or not self.modal_rect.collidepoint(pos := event.pos):
                         audio.play("click")
                         self.reading_title = None
@@ -364,5 +375,16 @@ class GalleryScene:
                 screen.blit(line_surf, (self.modal_rect.x + 40, y))
                 y += 24
                 
-        # 닫기 버튼
+        # 다시 하기 버튼 (선택형 이벤트인 경우만) + 닫기 버튼
+        if self._find_replay_event(self.reading_title) is not None:
+            hov = self.modal_replay_btn.collidepoint(pygame.mouse.get_pos())
+            draw_button(screen, self.modal_replay_btn, "다시 하기", self.font_small, hovered=hov)
         draw_button(screen, self.modal_close_btn, "닫기", self.font_small, hovered=self.hovered_modal_close)
+
+    def _find_replay_event(self, title):
+        """제목이 선택형 이벤트(STORY_EVENTS)와 일치하면 그 이벤트 데이터를 돌려준다 (다시 하기용)."""
+        from core.game_state import STORY_EVENTS
+        for ev in STORY_EVENTS:
+            if ev.get("title") == title:
+                return ev
+        return None

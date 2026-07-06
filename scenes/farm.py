@@ -832,12 +832,19 @@ class FarmScene:
             if self.is_tree:
                 return "당근이 축 처져 기운이 없다. 거름을 주어 기운을 끌어올려 주자."
             return "당근이 축 처져 기운이 없다. 흙을 북돋아 기운을 끌어올려 주자."
-        if self.moisture < 30:
-            return "흙이 바짝 말라 손끝이 버석거린다."
-        if self.moisture > 72:
-            return "흙이 질척이고 물이 고여 있다."
-        if self.drainage < 35:
-            return "물길이 막혀 물이 잘 빠지지 않는다."
+        if game_state.crop == "rice":
+            # 논(관개농업)은 물이 고여 있는 게 정상 — 넘칠 때만 알린다.
+            if self.moisture < 34:
+                return "논바닥이 드러날 만큼 물이 말랐다. 물을 대주자."
+            if self.moisture > 92:
+                return "논물이 너무 넘친다. 물꼬를 터 물을 빼자."
+        else:
+            if self.moisture < 30:
+                return "흙이 바짝 말라 손끝이 버석거린다."
+            if self.moisture > 72:
+                return "흙이 질척이고 물이 고여 있다."
+            if self.drainage < 35:
+                return "물길이 막혀 물이 잘 빠지지 않는다."
         if self.weeds > 50:
             return "잡초가 빼곡히 올라와 있다."
         if self.pests > 42:
@@ -1305,10 +1312,20 @@ class FarmScene:
             for cx, cy in self.crop_positions()[:3]:
                 pygame.draw.ellipse(screen, mud, (cx - 20, cy - 6, 40, 16))
 
-        # 모내기 자리마다 2겹 동심원 잔물결
+        # 모를 심은 진흙 둔덕이 물 위로 봉긋 드러나 흙이 보인다 (무논이라도 흙이 안 보이던 문제)
+        mound_top = mix_color(mud, (206, 172, 118) if not nm else (150, 60, 50), 0.45)
         for cx, cy in self.crop_positions():
-            pygame.draw.ellipse(screen, hl, (cx - 16, cy + 3, 32, 10), 1)
-            pygame.draw.ellipse(screen, hl, (cx - 9, cy + 5, 18, 6), 1)
+            pygame.draw.ellipse(screen, mix_color(mud, (0, 0, 0), 0.25), (cx - 19, cy - 1, 38, 15))  # 둔덕 그늘
+            pygame.draw.ellipse(screen, mud, (cx - 18, cy - 4, 36, 15))                               # 둔덕 흙
+            pygame.draw.ellipse(screen, mound_top, (cx - 12, cy - 5, 24, 8))                          # 밝은 윗면
+            # 흙 알갱이 몇 점
+            for dx, dy in ((-6, -2), (5, -1), (0, 1)):
+                pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.3), (cx + dx, cy + dy, 2, 2))
+
+        # 모내기 자리마다 2겹 동심원 잔물결 (둔덕 밑 물가에)
+        for cx, cy in self.crop_positions():
+            pygame.draw.ellipse(screen, hl, (cx - 18, cy + 5, 36, 10), 1)
+            pygame.draw.ellipse(screen, hl, (cx - 10, cy + 7, 20, 6), 1)
 
     def _draw_tree(self, screen, ratio):
         """나무류 작물 — 픽셀 아트 한 그루가 현실 나무처럼 자란다.
