@@ -1526,12 +1526,13 @@ class FarmScene:
             # 벼 성장기: 물에 뿌리내린 포기에서 살짝 휜 벼 잎사귀 다발이 자라 오른다
             self._rice_water_base(screen, x, y)
             gd, gm, gl = (40, 120, 58), (78, 168, 92), (150, 220, 120)
+            # 옆으로 넓게 퍼지면 공작새처럼 보인다 → 폭을 좁히고 위로 곧게 세워 벼 포기답게.
             if adj_stage < 10:
-                blades = [(-5, -12), (0, -17), (5, -12)]
+                blades = [(-3, -15), (0, -20), (3, -15)]
             elif adj_stage < 16:
-                blades = [(-8, -14), (-3, -21), (3, -21), (8, -14)]
+                blades = [(-5, -18), (-2, -25), (2, -25), (5, -18)]
             else:
-                blades = [(-12, -16), (-6, -25), (-1, -31), (2, -31), (7, -25), (12, -16)]
+                blades = [(-7, -21), (-3, -29), (0, -34), (2, -34), (5, -29), (8, -21)]
             for dx, dy in blades:
                 self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
             return
@@ -1568,7 +1569,7 @@ class FarmScene:
                 # 벼: 노랗게 익어 아래로 휜 벼잎 + 고개 숙인 황금빛 이삭
                 self._rice_water_base(screen, x, y)
                 gd, gm, gl = (150, 120, 36), (196, 166, 60), (236, 214, 120)
-                for dx, dy in [(-11, -13), (-5, -19), (5, -19), (11, -13)]:
+                for dx, dy in [(-6, -17), (-2, -24), (2, -24), (6, -17)]:
                     self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
                 # 무게로 고개 숙인 이삭 세 가닥
                 self._rice_ear(screen, x - 8, y - 15, -1)
