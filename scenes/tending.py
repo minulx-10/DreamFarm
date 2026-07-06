@@ -114,23 +114,33 @@ class WaterPour:
 
         p = self.pour_anim
         if game_state.crop == "rice":
-            # 목재 물꼬 틀 그리기
-            gate_rect = pygame.Rect(PLOT.x + 130, 140, 40, 60)
-            pygame.draw.rect(screen, (80, 50, 30), gate_rect)
-            pygame.draw.rect(screen, (122, 86, 53), gate_rect.inflate(-4, -4))
-
-            # 나무 판자가 스르륵 들려 올라가며(입구가 열리며) 문턱으로 물이 쏟아진다
-            lift = int(26 * p)
-            panel_rect = pygame.Rect(PLOT.x + 136, 150 - lift, 28, 40)
-            pygame.draw.rect(screen, (60, 35, 20), panel_rect)
-            pygame.draw.rect(screen, (87, 51, 25), panel_rect.inflate(-4, -4))
-
+            # 픽셀풍 나무 물꼬(水門) — 좌우 기둥 + 대들보 + 미닫이 판자, 열리면 문턱으로 물이 쏟아진다.
+            gx, gw = PLOT.x + 120, 58
+            wood_d, wood, grain = (86, 56, 30), (140, 98, 54), (104, 72, 40)
+            for px in (gx, gx + gw - 10):                       # 좌우 기둥
+                pygame.draw.rect(screen, wood_d, (px, 138, 10, 68))
+                pygame.draw.rect(screen, wood, (px + 1, 139, 8, 66))
+                for yy in range(144, 204, 9):
+                    pygame.draw.line(screen, grain, (px + 1, yy), (px + 8, yy), 1)
+            pygame.draw.rect(screen, wood_d, (gx, 134, gw, 11))  # 대들보
+            pygame.draw.rect(screen, wood, (gx + 2, 135, gw - 4, 8))
+            # 미닫이 막이 판 — p만큼 위로 들린다 (가로 판자 3장)
+            lift = int(30 * p)
+            for i in range(3):
+                by = (150 - lift) + i * 11
+                pygame.draw.rect(screen, (66, 42, 22), (gx + 11, by, gw - 22, 10))
+                pygame.draw.rect(screen, (112, 78, 44), (gx + 12, by + 1, gw - 24, 7))
+                pygame.draw.line(screen, (150, 108, 66), (gx + 13, by + 2), (gx + gw - 13, by + 2), 1)
+            # 열린 문턱에서 쏟아지는 픽셀 물기둥
             if p > 0.05:
-                open_y = 194                    # 판이 들려 드러난 아래쪽 문턱(입구)
-                slen = int(30 + 26 * p)
-                pygame.draw.ellipse(screen, (150, 205, 235), (PLOT.x + 138, open_y - 3, 24, 7))
-                pygame.draw.rect(screen, (100, 170, 240), (PLOT.x + 140, open_y, 20, slen))
-                pygame.draw.rect(screen, (222, 242, 252), (PLOT.x + 145, open_y, 10, slen))
+                wx, top_y = gx + gw // 2, 196
+                wlen = int(28 + 30 * p)
+                pygame.draw.rect(screen, (150, 200, 236), (wx - 12, top_y - 4, 24, 5))  # 문턱 물보라
+                for k in range(0, wlen, 4):                     # 짙고/밝은 물 블록 교차
+                    wob = -2 if (k // 8) % 2 == 0 else 2
+                    shade = (84, 148, 214) if (k // 4) % 2 == 0 else (120, 182, 234)
+                    pygame.draw.rect(screen, shade, (wx - 8 + wob, top_y + k, 16, 4))
+                pygame.draw.rect(screen, (206, 230, 248), (wx - 2, top_y, 4, wlen))     # 밝은 심줄
         else:
             # 물뿌리개가 붓는 동안 입구(스파웃)를 아래로 기울인다. 물줄기는 회전한 스프라이트의
             # 실제 입구 위치(중심 기준 오프셋을 -tilt로 회전)에서 정확히 시작한다.

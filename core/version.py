@@ -10,7 +10,7 @@
 여기 VERSION은 '안정 채널' 표기용이다. Git 태그 이름이 실제 배포 채널(안정/프리릴리스)을 정한다.
 """
 
-VERSION = "1.0.6-dev.13"
+VERSION = "1.0.6-dev.14"
 
 
 def display_version():
