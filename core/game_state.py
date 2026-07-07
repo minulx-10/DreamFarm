@@ -637,6 +637,7 @@ def save_progress():
         empathy_choices=game_state.empathy_choices,
         patience_score=game_state.patience_score,
         crop=game_state.crop, # 마지막으로 키웠던 작물 정보를 갤러리를 위해 함께 기록
+        player_name=game_state.player_name, # 이스터에그 이름을 유지하기 위해 플레이어 이름 기록
     )
 
 
@@ -655,7 +656,16 @@ def load_progress():
 def apply_second_run():
     """#14 Apply 2nd playthrough state."""
     data = load_progress()
-    if data and data.get("completed"):
-        game_state.is_second_run = True
-        game_state.prev_ending = data.get("ending", "")
-        game_state.prev_understanding = data.get("understanding", 0)
+    if data:
+        if data.get("completed"):
+            game_state.is_second_run = True
+            game_state.prev_ending = data.get("ending", "")
+            game_state.prev_understanding = data.get("understanding", 0)
+        if "player_name" in data:
+            game_state.player_name = data["player_name"]
+            
+    # 이어하기 슬롯 파일(save_slot.json)이 존재할 경우 해당 슬롯에 기록된 이름을 우선하여 복구
+    from core import save_system
+    slot = save_system.load_slot()
+    if slot and "game_state" in slot and "player_name" in slot["game_state"]:
+        game_state.player_name = slot["game_state"]["player_name"]

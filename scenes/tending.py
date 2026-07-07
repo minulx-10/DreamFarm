@@ -98,7 +98,8 @@ class WaterPour:
         self.settle = 1.1
 
     def _water_tilt(self):
-        return 34 - 44 * self.pour_anim
+        # 붓는 동안 입구를 더 깊이 기울여 물이 자연스럽게 쏟아지도록 한다.
+        return 34 - 94 * self.pour_anim
 
     def _watering_spout(self):
         """회전한 물뿌리개 스프라이트의 실제 입구(스파웃) 화면 좌표."""
@@ -343,7 +344,9 @@ class WeedPull:
                 pygame.draw.ellipse(glow, (255, 250, 210, 120), (9, 6, 28, 12))
                 screen.blit(glow, (gx2 - 23, gy2 + 6))
                 if self.grabbed is w and (ox or oy):
-                    pygame.draw.line(screen, (96, 132, 70), (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
+                    # 악)몽중농원에선 잡초가 붉으니 끌어당기는 선도 붉게 맞춘다.
+                    line_col = (196, 78, 66) if game_state.nightmare else (96, 132, 70)
+                    pygame.draw.line(screen, line_col, (w["x"], w["y"] + 10), (w["x"] + ox, w["y"] + oy), 3)
                 screen.blit(wsp, (gx2 - wsp.get_width() // 2, gy2 - wsp.get_height() // 2))
                 
         for p in self.puffs:

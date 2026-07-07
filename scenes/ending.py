@@ -397,8 +397,11 @@ class EndingScene:
                 # 넘기기는 update()에서 스페이스바 '꾹 누름' 게이지로 처리 (실수 방지)
                 pass
             elif self.phase == "journal":
-                # 휠(또는 휠 버튼)로만 스크롤. 나가기는 '메인으로' 버튼(또는 R:다시하기)으로만.
-                # 스페이스바/좌클릭으로 실수로 새 게임이 시작되지 않게 한다.
+                # 휠(또는 휠 버튼)로만 스크롤. 스페이스바는 메인 화면으로 나간다(새 게임 시작 아님).
+                # 좌클릭으로 실수로 새 게임이 시작되지 않게 한다. R: 다시하기.
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    self._to_title()
+                    return
                 if event.type == pygame.MOUSEWHEEL:
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll - event.y * 30))

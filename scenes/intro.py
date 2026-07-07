@@ -138,7 +138,12 @@ class IntroScene:
         draw_light_panel(screen, box_rect)
 
         lines = self.printed_text.split("\n")
-        draw_centered_lines(screen, lines, self.font, TEXT_DARK, 400, 288, line_gap=5)
+        # 박스 안에서 상하 가운데 정렬 — 타이핑 중 글이 튀지 않도록 '완성된 페이지' 줄 수 기준으로 시작 y 계산
+        line_gap = 5
+        full_lines = self.text_to_print.split("\n")
+        block_h = len(full_lines) * (self.font.get_height() + line_gap) - line_gap
+        start_y = box_rect.centery - block_h // 2
+        draw_centered_lines(screen, lines, self.font, TEXT_DARK, 400, start_y, line_gap=line_gap)
 
         page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 538))

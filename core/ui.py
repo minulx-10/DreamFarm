@@ -176,17 +176,35 @@ def draw_story_backdrop(screen, mood="night"):
         pygame.draw.circle(halo, (moon_glow[0], moon_glow[1], moon_glow[2], a), (90, 90), r)
     screen.blit(halo, (mx - 90, my - 90))
     if game_state.player_name == "서태양":
-        # 이스터에그: 달 대신 '얼굴 그려진 태양'
+        # 이스터에그: 달 대신 '얼굴 그려진 태양'. 악)몽중농원에서는 붉게 물들고 선글라스를 낀다.
+        nm = (mood == "nightmare")
+        ray_col = (222, 74, 52) if nm else (255, 210, 90)
+        body_col = (204, 60, 50) if nm else (255, 214, 92)
+        edge_col = (255, 140, 120) if nm else (255, 236, 150)
         for i in range(12):
             ang = i * (math.pi / 6)
             x1, y1 = mx + int(38 * math.cos(ang)), my + int(38 * math.sin(ang))
             x2, y2 = mx + int(50 * math.cos(ang)), my + int(50 * math.sin(ang))
-            pygame.draw.line(screen, (255, 210, 90), (x1, y1), (x2, y2), 3)
-        pygame.draw.circle(screen, (255, 214, 92), (mx, my), 34)
-        pygame.draw.circle(screen, (255, 236, 150), (mx, my), 34, 3)
-        pygame.draw.circle(screen, (120, 80, 20), (mx - 12, my - 6), 4)   # 왼눈
-        pygame.draw.circle(screen, (120, 80, 20), (mx + 12, my - 6), 4)   # 오눈
-        pygame.draw.arc(screen, (120, 80, 20), (mx - 14, my - 2, 28, 22), 3.34, 6.08, 3)  # 미소
+            pygame.draw.line(screen, ray_col, (x1, y1), (x2, y2), 3)
+        pygame.draw.circle(screen, body_col, (mx, my), 34)
+        pygame.draw.circle(screen, edge_col, (mx, my), 34, 3)
+        if nm:
+            # 검붉은 해 + 선글라스 (지옥의 여유)
+            lens, frame, shine = (26, 22, 30), (12, 10, 14), (96, 90, 104)
+            pygame.draw.rect(screen, lens, (mx - 22, my - 12, 18, 14), border_radius=5)   # 왼 렌즈
+            pygame.draw.rect(screen, lens, (mx + 4, my - 12, 18, 14), border_radius=5)    # 오 렌즈
+            pygame.draw.rect(screen, frame, (mx - 22, my - 12, 18, 14), 2, border_radius=5)
+            pygame.draw.rect(screen, frame, (mx + 4, my - 12, 18, 14), 2, border_radius=5)
+            pygame.draw.line(screen, frame, (mx - 4, my - 8), (mx + 4, my - 8), 3)        # 브릿지
+            pygame.draw.line(screen, frame, (mx - 22, my - 9), (mx - 33, my - 13), 2)     # 왼 다리
+            pygame.draw.line(screen, frame, (mx + 22, my - 9), (mx + 33, my - 13), 2)     # 오 다리
+            pygame.draw.line(screen, shine, (mx - 19, my - 9), (mx - 14, my - 3), 2)      # 렌즈 반짝임
+            pygame.draw.line(screen, shine, (mx + 7, my - 9), (mx + 12, my - 3), 2)
+            pygame.draw.arc(screen, (70, 22, 18), (mx - 13, my + 2, 26, 18), 3.4, 6.02, 3)  # 씩 웃음
+        else:
+            pygame.draw.circle(screen, (120, 80, 20), (mx - 12, my - 6), 4)   # 왼눈
+            pygame.draw.circle(screen, (120, 80, 20), (mx + 12, my - 6), 4)   # 오눈
+            pygame.draw.arc(screen, (120, 80, 20), (mx - 14, my - 2, 28, 22), 3.34, 6.08, 3)  # 미소
     else:
         pygame.draw.circle(screen, moon_glow, (mx, my), 32)
         pygame.draw.circle(screen, mix_color(moon_glow, WHITE, 0.4), (mx, my), 30)
@@ -321,8 +339,9 @@ def draw_top_bar(screen, show_stats=True):
         score_value = font.render(f"{game_state.score:06d}", True, WHITE)
         screen.blit(score_value, (score_rect.right - score_value.get_width() - 12, score_rect.y + 5))
     else:
-        title_text = "몽중농원"
-        title_surf = get_font(27).render(title_text, True, WHITE)
+        title_text = "악)몽중농원" if game_state.nightmare else "몽중농원"
+        title_col = (255, 158, 148) if game_state.nightmare else WHITE
+        title_surf = get_font(27).render(title_text, True, title_col)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 24))
         # 음소거/음량은 오른쪽 위 스피커 버튼(소리 설정)에서 관리
 

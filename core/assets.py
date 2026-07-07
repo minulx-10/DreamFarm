@@ -541,10 +541,11 @@ def draw_crop_food(screen, cx, cy, crop_key, r=26):
     if crop_key == "apple":
         pygame.draw.circle(screen, (60, 16, 16), (cx, cy + 3), r)                 # 그림자
         pygame.draw.circle(screen, (200, 48, 44), (cx, cy), r)                    # 몸통
-        pygame.draw.circle(screen, (160, 30, 30), (cx + r // 4, cy + r // 4), r - 3, 3)  # 아랫 음영
+        # 아랫 음영 — 몸통 안쪽에 머무는 채워진 원(밖으로 삐져나오지 않게)
+        pygame.draw.circle(screen, (168, 32, 32), (cx + r // 6, cy + r // 6), int(r * 0.48))
         pygame.draw.circle(screen, (240, 120, 105), (cx - r // 3, cy - r // 3), max(3, r // 3))  # 하이라이트
-        pygame.draw.rect(screen, (96, 62, 36), (cx - 2, cy - r - 5, 4, 9), border_radius=2)  # 꼭지
-        pygame.draw.ellipse(screen, (86, 168, 84), (cx + 2, cy - r - 3, 13, 8))   # 잎
+        pygame.draw.rect(screen, (96, 62, 36), (cx - 2, cy - r - 4, 4, 8), border_radius=2)  # 꼭지
+        pygame.draw.ellipse(screen, (86, 168, 84), (cx + 1, cy - r - 2, 12, 7))   # 잎
         return
     if crop_key == "potato":
         pygame.draw.ellipse(screen, (78, 52, 32), (cx - r, cy - int(r * 0.7) + 3, 2 * r, int(1.4 * r)))  # 그림자

@@ -87,12 +87,9 @@ class CropSelectScene:
         # 1. 배경 (밤하늘)
         draw_story_backdrop(screen, "night")
         
-        # 2. 타이틀 텍스트
-        title_surf = self.font_title.render("기르고자 하는 작물 선택", True, WHITE)
-        screen.blit(title_surf, (400 - title_surf.get_width() // 2, 60))
-        
-        desc_top = get_font(15).render("회차마다 다른 작물을 길러 아버지의 시간을 깊이 들여다보세요.", True, TEXT_MUTED)
-        screen.blit(desc_top, (400 - desc_top.get_width() // 2, 105))
+        # 2. 안내 문구 — '작물 선택' 제목 대신 이 문장을 제목 자리에 둔다
+        title_surf = get_font(23).render("회차마다 다른 작물을 길러 아버지의 시간을 깊이 들여다보세요", True, WHITE)
+        screen.blit(title_surf, (400 - title_surf.get_width() // 2, 78))
         
         # 3. 작물 카드 그리기
         clears = save_system.crop_clears()

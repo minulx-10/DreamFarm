@@ -50,7 +50,8 @@ class SettingsOverlay:
 
         # 확인 모달 상태 ("delete_save" | "go_main" | "reset_all" | ... | None)
         self._confirm_action = None
-        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력
+        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력(확정된 글자)
+        self._reset_ime = ""            # 한글 조합 중인 미확정 글자
         self._confirm_yes = pygame.Rect(self.panel.centerx - 80, self.panel.y + 350, 65, 32)
         self._confirm_no = pygame.Rect(self.panel.centerx + 15, self.panel.y + 350, 65, 32)
 
@@ -82,9 +83,14 @@ class SettingsOverlay:
                 # 완전 초기화는 실수 방지를 위해 '초기화'라고 직접 입력해야 확정된다.
                 need_type = (self._confirm_action == "reset_all")
                 type_ok = (self._reset_confirm_text.strip() == "초기화")
-                if event.type == pygame.TEXTINPUT and need_type:
+                if event.type == pygame.TEXTEDITING and need_type:
+                    # 한글은 조합이 끝나야 TEXTINPUT으로 확정된다. 조합 중(미확정) 글자를
+                    # 실시간으로 보여줘야 '초'가 안 뜨고 한 글자씩 밀려 보이던 문제가 사라진다.
+                    self._reset_ime = event.text
+                elif event.type == pygame.TEXTINPUT and need_type:
                     if len(self._reset_confirm_text) < 8:
                         self._reset_confirm_text += event.text
+                    self._reset_ime = ""
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._confirm_yes.collidepoint(event.pos):
                         if need_type and not type_ok:
@@ -124,6 +130,7 @@ class SettingsOverlay:
         """확인 모달을 닫는다 (완전 초기화 입력 상태도 정리)."""
         self._confirm_action = None
         self._reset_confirm_text = ""
+        self._reset_ime = ""
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -168,6 +175,7 @@ class SettingsOverlay:
             self.open = False
         self._confirm_action = None
         self._reset_confirm_text = ""
+        self._reset_ime = ""
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -387,8 +395,8 @@ class SettingsOverlay:
         yes_disabled = False
         if self._confirm_action == "reset_all":
             # 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
-            typed = self._reset_confirm_text
-            ok = (typed.strip() == "초기화")
+            ok = (self._reset_confirm_text.strip() == "초기화")   # 판정은 확정된 글자만
+            typed = self._reset_confirm_text + self._reset_ime    # 표시는 조합 중 글자까지
             label = get_font(13).render("확인하려면 '초기화' 입력:", True, TEXT_MUTED)
             box_w = 76
             total = label.get_width() + 8 + box_w

@@ -44,7 +44,10 @@ class NameInputScene:
         audio.play("click")
         pygame.key.set_repeat(0)
         pygame.key.stop_text_input()
-        game_state.current_scene = "crop_select"
+        # 첫 회차(작물 미해금)에는 타이틀에서 작물을 carrot으로 고정한 뒤 바로 여기로 온다.
+        # 이 경우 작물 선택 화면이 없으므로 돌아가기는 타이틀로 보내야 한다.
+        from core import save_system
+        game_state.current_scene = "crop_select" if save_system.crops_unlocked() else "title"
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()

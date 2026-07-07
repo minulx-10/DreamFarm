@@ -714,7 +714,7 @@ class Stage4Scene:
             elif self.is_apple:
                 txt = "너무 빨라요! 천천히 클릭하세요." if warn else "적당한 속도로 클릭하세요."
             else:
-                txt = "너무 홱 채면 상해요! 살살." if warn else "잡고 위로 쭉 끌어올려 뽑으세요."
+                txt = "너무 홱 채면 상해요! 살살." if warn else "잡고 위로 끌어올리길 여러 번 — 한 번엔 안 뽑혀요"
             color = (255, 124, 96) if warn else (236, 224, 200)
             surf = font_t.render(txt, True, color)
             wx, wy = 400 - surf.get_width() // 2, gy + 22
@@ -762,7 +762,7 @@ class Stage4Scene:
             elif self.is_apple:
                 t2 = font_b.render("마우스 왼쪽 버튼을 연타해서", True, (200, 180, 140))
             else:
-                t2 = font_b.render("당근을 잡고 마우스를 위로 끌어", True, (200, 180, 140))
+                t2 = font_b.render("당근을 잡고 마우스를 위로 끌어올리길", True, (200, 180, 140))
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
             
             food_eul = append_josa(current_crop()["food"], "을/를")
@@ -776,7 +776,7 @@ class Stage4Scene:
                 t3 = font_b.render("좌우로 흔들어 이삭을 털고 (탈곡),", True, (200, 180, 140))
                 t4 = font_b.render("마우스로 비벼 낟알의 껍질을 벗기세요 (도정).", True, (200, 180, 140))
             else:
-                t3 = font_b.render(f"{food_eul} 쭉 뽑아 올리세요.", True, (200, 180, 140))
+                t3 = font_b.render("여러 번 반복해야 쏙 뽑힙니다 — 한 번엔 안 뽑혀요.", True, (200, 180, 140))
                 t4 = font_b.render("너무 홱 잡아채면 상해서 못 쓰게 됩니다.", True, (230, 110, 90))
             screen.blit(t3, (400 - t3.get_width() // 2, 290))
             screen.blit(t4, (400 - t4.get_width() // 2, 330))
@@ -796,4 +796,4 @@ class Stage4Scene:
             elif self.is_rice:
                 draw_bottom_bar(screen, "수확하기", f"좌우로 흔들어 이삭을 털고, 비벼서 껍질을 벗기세요.")
             else:
-                draw_bottom_bar(screen, "수확하기", f"{food_eul} 잡고 마우스를 위로 쭉 끌어 뽑으세요. 너무 홱 채면 상합니다.")
+                draw_bottom_bar(screen, "수확하기", f"{food_eul} 잡고 위로 끌어올리길 여러 번 반복해 뽑으세요. 한 번엔 안 뽑히고, 홱 채면 상합니다.")
