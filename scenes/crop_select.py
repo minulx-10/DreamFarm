@@ -84,12 +84,14 @@ class CropSelectScene:
         pass
 
     def draw(self, screen):
-        # 1. 배경 (밤하늘)
-        draw_story_backdrop(screen, "night")
+        # 1. 배경 (밤하늘 / 악몽 모드 활성화 시 악몽 하늘)
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         
-        # 2. 안내 문구 — '작물 선택' 제목 대신 이 문장을 제목 자리에 둔다
-        title_surf = get_font(23).render("회차마다 다른 작물을 길러 아버지의 시간을 깊이 들여다보세요", True, WHITE)
-        screen.blit(title_surf, (400 - title_surf.get_width() // 2, 78))
+        # 2. 안내 문구 — 우측 상단의 달/태양(이스터에그)을 전혀 가리지 않도록 2줄로 나누어 컴팩트하게 배치
+        line1 = get_font(18).render("회차마다 다른 작물을 길러", True, WHITE)
+        line2 = get_font(18).render("아버지의 시간을 깊이 들여다보세요", True, (255, 230, 180)) # 가독성 좋은 따뜻한 오프화이트/금빛 강조
+        screen.blit(line1, (400 - line1.get_width() // 2, 64))
+        screen.blit(line2, (400 - line2.get_width() // 2, 90))
         
         # 3. 작물 카드 그리기
         clears = save_system.crop_clears()

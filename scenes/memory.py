@@ -79,7 +79,7 @@ class MemoryScene:
                 self.finished = True
 
     def draw(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
 
         panel = pygame.Rect(70, 85, 660, 430)
         draw_light_panel(screen, panel)

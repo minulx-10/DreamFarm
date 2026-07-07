@@ -77,7 +77,9 @@ class EndingScene:
 
     def _select_ending_bgm(self):
         """현재 엔딩(last_ending)에 맞는 배경음으로 전환. 갤러리 감상에서도 곡이 바뀌도록 분리."""
-        if game_state.last_ending in ("true", "happy", "growth"):
+        if game_state.nightmare or game_state.last_ending == "nightmare":
+            audio.play_bgm("event")
+        elif game_state.last_ending in ("true", "happy", "growth"):
             audio.play_bgm("ending_warm")
         elif game_state.last_ending in ("rush", "bad", "wither"):
             audio.play_bgm("ending_sad")
@@ -103,6 +105,11 @@ class EndingScene:
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
         ending_type = force_type or get_attitude_ending()
+        
+        # 악몽 모드 플레이 중 정상 클리어 시 악)몽중농원 전용 엔딩 지정
+        if game_state.nightmare and ending_type != "wither" and not force_type:
+            ending_type = "nightmare"
+            
         game_state.last_ending = ending_type
 
         # Record ending in meta save data
@@ -114,7 +121,20 @@ class EndingScene:
             from core import achievements
             achievements.on_ending(ending_type)
 
+        crop_food = current_crop()["food"]
+
         endings = {
+            "nightmare": {
+                "title": "악몽의 끝: 비워진 식탁",
+                "result": "Nightmare Cleared",
+                "text": swap_crop_word(
+                    f"식탁 위에 여태 남겨두었던 마지막 당근 한 조각까지 모두 삼켜 냈다.\n"
+                    f"순간, 목을 짓누르던 무거운 죄책감이 거짓말처럼 사라진다.\n"
+                    f"쩍 쩍 갈라지는 붉은 하늘을 너머 마주한 아침, 식탁은 말끔히 비어 있었다.\n"
+                    f"'남기지 마라. 이번엔, 끝까지.' 그 말씀이 마음에 조용히 박혔다.",
+                    crop_food
+                ),
+            },
             "true": {
                 "title": "진엔딩: 내일 새벽, 함께",
                 "result": "True Ending",
@@ -498,7 +518,7 @@ class EndingScene:
             self._draw_journal(screen)
 
     def _draw_narration(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         dad = sprites["dad"]
         shadow = dad.copy()
         shadow.set_alpha(80)
@@ -575,7 +595,7 @@ class EndingScene:
 
     def _draw_table(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
         dark_overlay.fill((15, 10, 5, 140))
         screen.blit(dark_overlay, (0, 0))
@@ -651,7 +671,7 @@ class EndingScene:
 
     def _draw_carrot_click(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
         dark_overlay.fill((15, 10, 5, 140))
         screen.blit(dark_overlay, (0, 0))
@@ -805,7 +825,7 @@ class EndingScene:
             screen.blit(prompt, (400 - prompt.get_width() // 2, 450))
 
     def _draw_result(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         result_text = self.ending_data["result"]
         color = (255, 225, 130) if self.is_happy else (180, 180, 180)
         result = self.font_result.render(result_text, True, color)
@@ -921,7 +941,7 @@ class EndingScene:
                 pygame.draw.rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), border_radius=2)
 
     def _draw_journal(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         panel = pygame.Rect(70, 36, 660, 514)
         draw_light_panel(screen, panel)
         title = self.font.render("밭일 일지", True, TEXT_DARK)

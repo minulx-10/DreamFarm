@@ -189,17 +189,36 @@ def draw_story_backdrop(screen, mood="night"):
         pygame.draw.circle(screen, body_col, (mx, my), 34)
         pygame.draw.circle(screen, edge_col, (mx, my), 34, 3)
         if nm:
-            # 검붉은 해 + 선글라스 (지옥의 여유)
-            lens, frame, shine = (26, 22, 30), (12, 10, 14), (96, 90, 104)
-            pygame.draw.rect(screen, lens, (mx - 22, my - 12, 18, 14), border_radius=5)   # 왼 렌즈
-            pygame.draw.rect(screen, lens, (mx + 4, my - 12, 18, 14), border_radius=5)    # 오 렌즈
-            pygame.draw.rect(screen, frame, (mx - 22, my - 12, 18, 14), 2, border_radius=5)
-            pygame.draw.rect(screen, frame, (mx + 4, my - 12, 18, 14), 2, border_radius=5)
-            pygame.draw.line(screen, frame, (mx - 4, my - 8), (mx + 4, my - 8), 3)        # 브릿지
-            pygame.draw.line(screen, frame, (mx - 22, my - 9), (mx - 33, my - 13), 2)     # 왼 다리
-            pygame.draw.line(screen, frame, (mx + 22, my - 9), (mx + 33, my - 13), 2)     # 오 다리
-            pygame.draw.line(screen, shine, (mx - 19, my - 9), (mx - 14, my - 3), 2)      # 렌즈 반짝임
-            pygame.draw.line(screen, shine, (mx + 7, my - 9), (mx + 12, my - 3), 2)
+            # 검붉은 해 + 캣아이 선글라스 (지옥의 간지)
+            lens, frame, shine = (16, 12, 20), (5, 4, 6), (180, 175, 190)
+            
+            # 왼쪽/오른쪽 프레임 (바깥쪽 테두리 먼저 검게 채우기)
+            left_frame = [(mx - 1, my - 9), (mx - 27, my - 15), (mx - 19, my + 3), (mx - 3, my - 4)]
+            right_frame = [(mx + 1, my - 9), (mx + 27, my - 15), (mx + 19, my + 3), (mx + 3, my - 4)]
+            pygame.draw.polygon(screen, frame, left_frame)
+            pygame.draw.polygon(screen, frame, right_frame)
+            
+            # 왼쪽/오른쪽 렌즈 (내부에 렌즈 색 얹기)
+            left_lens = [(mx - 2, my - 7), (mx - 24, my - 13), (mx - 18, my + 1), (mx - 4, my - 3)]
+            right_lens = [(mx + 2, my - 7), (mx + 24, my - 13), (mx + 18, my + 1), (mx + 4, my - 3)]
+            pygame.draw.polygon(screen, lens, left_lens)
+            pygame.draw.polygon(screen, lens, right_lens)
+            
+            # 외곽선 살짝 깎아 윤곽 뚜렷이
+            pygame.draw.polygon(screen, (35, 30, 40), left_frame, 1)
+            pygame.draw.polygon(screen, (35, 30, 40), right_frame, 1)
+
+            # 브릿지 (두 알 연결)
+            pygame.draw.line(screen, frame, (mx - 2, my - 6), (mx + 2, my - 6), 3)
+            # 선글라스 다리 (귀 쪽으로 비스듬히)
+            pygame.draw.line(screen, frame, (mx - 25, my - 11), (mx - 33, my - 13), 2)
+            pygame.draw.line(screen, frame, (mx + 25, my - 11), (mx + 33, my - 13), 2)
+            
+            # 캣아이 선글라스 렌즈 반짝임 사선
+            pygame.draw.line(screen, shine, (mx - 20, my - 10), (mx - 15, my - 4), 2)
+            pygame.draw.line(screen, shine, (mx + 15, my - 4), (mx + 20, my - 10), 2)
+            
+            # 씩 웃는 입
             pygame.draw.arc(screen, (70, 22, 18), (mx - 13, my + 2, 26, 18), 3.4, 6.02, 3)  # 씩 웃음
         else:
             pygame.draw.circle(screen, (120, 80, 20), (mx - 12, my - 6), 4)   # 왼눈

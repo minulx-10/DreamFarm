@@ -627,7 +627,7 @@ class StoryChoiceScene:
         draw_button(screen, rect, label, self.font_small, hovered=hovered)
 
     def draw(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
 
         panel = pygame.Rect(50, 50, 700, 500)
         draw_light_panel(screen, panel)

@@ -43,7 +43,9 @@ class SettingsOverlay:
         # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
         self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
 
-        self._close_btn = pygame.Rect(self.panel.centerx - 60, self.panel.y + 404, 120, 36)
+        # 닫기 버튼과 버전 표시 버튼을 나란히 대칭 배치
+        self._close_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 404, 140, 36)
+        self._version_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 404, 140, 36)
 
         self.show_message = ""
         self.message_timer = 0.0
@@ -227,6 +229,10 @@ class SettingsOverlay:
                 pygame.key.start_text_input()
             except Exception:
                 pass
+        elif self._version_btn.collidepoint(pos):
+            current_show = save_system.get_setting("show_version")
+            save_system.set_setting("show_version", not current_show)
+            audio.play("click")
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
             self.open = False
         elif not self.panel.collidepoint(pos):
@@ -354,6 +360,10 @@ class SettingsOverlay:
 
         # 닫기
         self._draw_text_button(screen, self._close_btn, "닫기", active=False)
+
+        # 버전 표시 토글 버튼 그리기
+        show_ver = save_system.get_setting("show_version")
+        self._draw_text_button(screen, self._version_btn, f"버전 표시: {'ON' if show_ver else 'OFF'}", active=show_ver)
 
         # 알림 메시지 출력
         if self.show_message:

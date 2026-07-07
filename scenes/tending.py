@@ -324,15 +324,24 @@ class WeedPull:
             if is_apple:
                 # 나무 밑동(anchor)에서 가지가 뻗어 나온 것처럼 굵은 곁가지를 그린다.
                 ax, ay = self.tree_anchor
-                pygame.draw.line(screen, (78, 52, 30), (ax, ay), (gx2, gy2), 7)
-                pygame.draw.line(screen, (120, 82, 46), (ax, ay), (gx2, gy2), 4)
+                # 악몽 모드일 때 검붉은 핏빛 나뭇가지 색
+                branch_col1 = (60, 20, 20) if game_state.nightmare else (78, 52, 30)
+                branch_col2 = (90, 30, 30) if game_state.nightmare else (120, 82, 46)
+                branch_col3 = (80, 25, 25) if game_state.nightmare else (110, 76, 44)
+
+                pygame.draw.line(screen, branch_col1, (ax, ay), (gx2, gy2), 7)
+                pygame.draw.line(screen, branch_col2, (ax, ay), (gx2, gy2), 4)
                 # 잔가지
-                pygame.draw.line(screen, (110, 76, 44), (gx2, gy2), (gx2 - 8, gy2 - 10), 3)
-                pygame.draw.line(screen, (110, 76, 44), (gx2, gy2), (gx2 + 9, gy2 - 6), 3)
-                # 곁가지 잎 (쳐내야 할 웃자란 잎)
-                pygame.draw.circle(screen, (60, 120, 58), (gx2 - 6, gy2 - 12), 7)
-                pygame.draw.circle(screen, (86, 162, 78), (gx2 + 9, gy2 - 9), 6)
-                pygame.draw.circle(screen, (108, 190, 96), (gx2 + 2, gy2 - 15), 5)
+                pygame.draw.line(screen, branch_col3, (gx2, gy2), (gx2 - 8, gy2 - 10), 3)
+                pygame.draw.line(screen, branch_col3, (gx2, gy2), (gx2 + 9, gy2 - 6), 3)
+                # 곁가지 잎 (쳐내야 할 웃자란 잎) - 악몽 모드일 때 붉은 빛깔 잎사귀
+                leaf_col1 = (120, 32, 32) if game_state.nightmare else (60, 120, 58)
+                leaf_col2 = (160, 48, 48) if game_state.nightmare else (86, 162, 78)
+                leaf_col3 = (190, 70, 70) if game_state.nightmare else (108, 190, 96)
+
+                pygame.draw.circle(screen, leaf_col1, (gx2 - 6, gy2 - 12), 7)
+                pygame.draw.circle(screen, leaf_col2, (gx2 + 9, gy2 - 9), 6)
+                pygame.draw.circle(screen, leaf_col3, (gx2 + 2, gy2 - 15), 5)
                 # 잡는 곳 표시
                 glow = pygame.Surface((30, 30), pygame.SRCALPHA)
                 pygame.draw.circle(glow, (240, 255, 210, 90), (15, 15), 14)
@@ -352,7 +361,13 @@ class WeedPull:
         for p in self.puffs:
             r = int(14 * (1 - p[2] / 0.45)) + 4
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            color = (130, 160, 110, int(150 * (p[2] / 0.45))) if is_apple else (150, 110, 70, int(150 * (p[2] / 0.45)))
+            if is_apple:
+                if game_state.nightmare:
+                    color = (160, 48, 48, int(150 * (p[2] / 0.45)))
+                else:
+                    color = (130, 160, 110, int(150 * (p[2] / 0.45)))
+            else:
+                color = (150, 110, 70, int(150 * (p[2] / 0.45)))
             pygame.draw.circle(s, color, (r, r), r)
             screen.blit(s, (p[0] - r, p[1] - r))
 

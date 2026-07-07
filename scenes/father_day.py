@@ -107,7 +107,7 @@ class FatherDayScene:
                 game_state.current_scene = "transition"
 
     def draw(self, screen):
-        draw_story_backdrop(screen, "night")
+        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
 
         # Warm amber glow in center
         pulse = 0.8 + 0.2 * math.sin(self.glow_timer * 1.2)

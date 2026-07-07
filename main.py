@@ -214,7 +214,7 @@ def main():
                 # 지옥 모드 여부에 맞게 창 크기 즉시 갱신
                 if game_state.nightmare != current_nightmare:
                     update_display_mode()
-                audio.play_bgm("farm")
+                audio.play_bgm("event" if game_state.nightmare else "farm")
 
         # 개발자 모드에서 작물을 바꾸면 밭을 새로 만들어 farm으로 이동
         if getattr(game_state, "dev_new_farm", False):
@@ -228,8 +228,8 @@ def main():
                 update_display_mode()
 
         desired_bgm = BGM_BY_SCENE.get(target_scene)
-        # 이스터에그/악몽: 타이틀 등 밤 씬에서 악몽 모드면 긴장감 있는 곡으로 바꾼다.
-        if desired_bgm == "night" and game_state.nightmare:
+        # 이스터에그/악몽: 악몽 모드가 켜져 있다면 밤 BGM(night)과 농장 밭 BGM(farm)을 타이틀 악몽 BGM인 'event'로 바꾼다.
+        if game_state.nightmare and desired_bgm in ("night", "farm"):
             desired_bgm = "event"
         if desired_bgm:
             audio.play_bgm(desired_bgm)
@@ -296,16 +296,18 @@ def main():
         
         # 좌상단 디버그 버전 표시 (회색 소형 텍스트) — core/version.py 한 곳에서 관리
         try:
-            from core.assets import get_font
-            from core.version import display_version
-            font_ver = get_font(12)
-            ver_surf = font_ver.render(display_version(), True, (236, 224, 190))
-            vbox = pygame.Rect(6, 4, ver_surf.get_width() + 12, ver_surf.get_height() + 6)
-            vbg = pygame.Surface(vbox.size, pygame.SRCALPHA)
-            vbg.fill((20, 24, 28, 200))
-            pygame.draw.rect(vbg, (120, 130, 120, 200), vbg.get_rect(), 1, border_radius=5)
-            virtual_screen.blit(vbg, vbox.topleft)
-            virtual_screen.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
+            from core import save_system
+            if save_system.get_setting("show_version"):
+                from core.assets import get_font
+                from core.version import display_version
+                font_ver = get_font(12)
+                ver_surf = font_ver.render(display_version(), True, (236, 224, 190))
+                vbox = pygame.Rect(6, 4, ver_surf.get_width() + 12, ver_surf.get_height() + 6)
+                vbg = pygame.Surface(vbox.size, pygame.SRCALPHA)
+                vbg.fill((20, 24, 28, 200))
+                pygame.draw.rect(vbg, (120, 130, 120, 200), vbg.get_rect(), 1, border_radius=5)
+                virtual_screen.blit(vbg, vbox.topleft)
+                virtual_screen.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
         except Exception:
             pass
 
