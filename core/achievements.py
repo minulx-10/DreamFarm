@@ -36,6 +36,11 @@ ACHIEVEMENTS = [
     {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "gold"},
     {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "gold"},
     {"id": "nightmare_clear", "title": "악몽에서 깨어나", "desc": "악)몽중농원을 끝까지 버텨 수확했다.", "tier": "platinum"},
+
+    # 히든 업적 (hidden: True)
+    {"id": "hundred_clears", "title": "백전노장", "desc": "작물을 통틀어 백 번 길러 거두었다.", "tier": "platinum", "hidden": True},
+    {"id": "nightmare_ending", "title": "붉은 새벽을 걷다", "desc": "악)몽중농원 전용 엔딩을 마주했다.", "tier": "platinum", "hidden": True},
+    {"id": "developer_secret", "title": "창조주의 악수", "desc": "개발자의 이름을 기입하여 경의를 표했다.", "tier": "platinum", "hidden": True},
 ]
 
 _BY_ID = {a["id"]: a for a in ACHIEVEMENTS}
@@ -73,8 +78,13 @@ def on_harvest(crop, perfects, attempts):
     clears = save_system.crop_clears()
     if all(clears.get(c, 0) > 0 for c in ("carrot", "apple", "potato", "rice")):
         unlock("all_crops")
-    if sum(clears.values()) >= 10:
+    
+    total_clears = sum(clears.values())
+    if total_clears >= 10:
         unlock("veteran")
+    if total_clears >= 100:
+        unlock("hundred_clears")
+        
     if perfects > 0 and attempts <= perfects:
         unlock("perfect_harvest")
     if getattr(game_state, "nightmare", False):
@@ -85,6 +95,8 @@ def on_ending(ending_type):
     """엔딩에 도달했을 때 (갤러리 감상이 아닌 실제 플레이에서만) 호출."""
     if ending_type == "true":
         unlock("true_ending")
+    elif ending_type == "nightmare":
+        unlock("nightmare_ending")
 
 
 # 개발자 이름 이스터에그
@@ -92,8 +104,11 @@ _DEV_NAMES = {"서태양", "김민욱", "박서현"}
 
 
 def on_name(name):
-    """플레이어 이름이 개발자 이름이면 특별 인사 토스트를 띄운다 (이스터에그)."""
+    """플레이어 이름이 개발자 이름이면 히든 업적 해제 및 환영 토스트를 띄운다."""
     if name in _DEV_NAMES:
+        # 히든 업적 잠금해제 처리
+        unlock("developer_secret")
+        # 추가 인사 토스트를 대기열에 삽입
         _toasts.append({"a": {"title": f"개발자 {name}, 등장!", "tier": "legend"}, "t": 0.0})
         try:
             audio.play("epiphany")
@@ -159,7 +174,20 @@ def draw(screen):
     screen.blit(title, (x + 60, y + 27))
 
 
-def all_with_state():
-    """갤러리 표시용 — (업적, 해제여부) 목록."""
+def has_any_hidden_unlocked():
+    """히든 업적 중 하나라도 해제되었는지 여부 확인."""
     unlocked = set(save_system.achievements_unlocked())
-    return [(a, a["id"] in unlocked) for a in ACHIEVEMENTS]
+    hidden_ids = {"hundred_clears", "nightmare_ending", "developer_secret"}
+    return any(hid in unlocked for hid in hidden_ids)
+
+
+def all_with_state():
+    """갤러리 표시용 — 일반 업적 (업적, 해제여부) 목록."""
+    unlocked = set(save_system.achievements_unlocked())
+    return [(a, a["id"] in unlocked) for a in ACHIEVEMENTS if not a.get("hidden")]
+
+
+def hidden_with_state():
+    """갤러리 표시용 — 히든 업적 (업적, 해제여부) 목록."""
+    unlocked = set(save_system.achievements_unlocked())
+    return [(a, a["id"] in unlocked) for a in ACHIEVEMENTS if a.get("hidden")]

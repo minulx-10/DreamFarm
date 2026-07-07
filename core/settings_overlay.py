@@ -115,9 +115,12 @@ class SettingsOverlay:
                         self._execute_confirm(farm_scene)
                 continue
 
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_m):
-                self.open = False
-                self._drag = None
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.open = False
+                    self._drag = None
+                elif event.key == pygame.K_m:
+                    audio.toggle_mute()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 self._on_press(event.pos, farm_scene)
             elif event.type == pygame.MOUSEMOTION and self._drag:

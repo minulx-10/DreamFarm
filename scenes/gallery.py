@@ -16,11 +16,12 @@ class GalleryScene:
         
         self.active_tab = "endings" # "endings" | "stories"
         
-        # 탭 Rects (엔딩 / 이야기 / 업적)
-        self.tab1_rect = pygame.Rect(158, 105, 158, 34)
-        self.tab2_rect = pygame.Rect(322, 105, 158, 34)
-        self.tab3_rect = pygame.Rect(486, 105, 158, 34)
         self.back_rect = pygame.Rect(30, 24, 100, 32)
+        self.tab1_rect = None
+        self.tab2_rect = None
+        self.tab3_rect = None
+        self.tab4_rect = None
+        self._update_tab_rects()
         
         # 엔딩 슬롯 Rects (제목 2줄 + 설명 3줄 + 버튼이 겹치지 않도록 높이 확보)
         self.ending_slots = {
@@ -58,7 +59,24 @@ class GalleryScene:
         self.hovered_tab1 = False
         self.hovered_tab2 = False
         self.hovered_tab3 = False
+        self.hovered_tab4 = False
         self.hovered_modal_close = False
+
+    def _update_tab_rects(self):
+        from core import achievements
+        hidden_unlocked = achievements.has_any_hidden_unlocked()
+        if hidden_unlocked:
+            # 히든이 열리면 4개 탭을 대칭 정렬
+            self.tab1_rect = pygame.Rect(78, 105, 150, 34)
+            self.tab2_rect = pygame.Rect(234, 105, 150, 34)
+            self.tab3_rect = pygame.Rect(390, 105, 150, 34)
+            self.tab4_rect = pygame.Rect(546, 105, 150, 34)
+        else:
+            # 기존 3개 탭 대칭 정렬
+            self.tab1_rect = pygame.Rect(158, 105, 158, 34)
+            self.tab2_rect = pygame.Rect(322, 105, 158, 34)
+            self.tab3_rect = pygame.Rect(486, 105, 158, 34)
+            self.tab4_rect = None
         
         # 리스트 아이템 마우스 오버용 위치 매핑 리스트
         self.story_item_rects = []
@@ -88,10 +106,12 @@ class GalleryScene:
                         self.reading_text = None
             return
 
+        self._update_tab_rects()
         self.hovered_back = self.back_rect.collidepoint(mouse_pos)
         self.hovered_tab1 = self.tab1_rect.collidepoint(mouse_pos)
         self.hovered_tab2 = self.tab2_rect.collidepoint(mouse_pos)
         self.hovered_tab3 = self.tab3_rect.collidepoint(mouse_pos)
+        self.hovered_tab4 = self.tab4_rect.collidepoint(mouse_pos) if self.tab4_rect else False
 
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -110,6 +130,9 @@ class GalleryScene:
                 elif self.hovered_tab3:
                     audio.play("click")
                     self.active_tab = "achievements"
+                elif self.hovered_tab4 and self.tab4_rect:
+                    audio.play("click")
+                    self.active_tab = "hidden_achievements"
                 
                 # 콘텐츠별 클릭
                 if self.active_tab == "endings":
@@ -159,6 +182,9 @@ class GalleryScene:
         # 1. 배경
         draw_story_backdrop(screen, "night")
         
+        # 실시간 탭 상태 갱신
+        self._update_tab_rects()
+        
         # 2. 타이틀
         title_surf = self.font_title.render("추억 저장소", True, WHITE)
         screen.blit(title_surf, (400 - title_surf.get_width() // 2, 40))
@@ -171,14 +197,19 @@ class GalleryScene:
                     hovered=self.hovered_tab1, selected=(self.active_tab == "endings"))
         draw_button(screen, self.tab2_rect, "이야기·기억", self.font_btn,
                     hovered=self.hovered_tab2, selected=(self.active_tab == "stories"))
-        draw_button(screen, self.tab3_rect, "업적", self.font_btn,
+        draw_button(screen, self.tab3_rect, "일반 업적" if self.tab4_rect else "업적", self.font_btn,
                     hovered=self.hovered_tab3, selected=(self.active_tab == "achievements"))
+        if self.tab4_rect:
+            draw_button(screen, self.tab4_rect, "히든 업적", self.font_btn,
+                        hovered=self.hovered_tab4, selected=(self.active_tab == "hidden_achievements"))
 
         # 4. 콘텐츠 그리기
         if self.active_tab == "endings":
             self._draw_endings_tab(screen)
         elif self.active_tab == "achievements":
             self._draw_achievements_tab(screen)
+        elif self.active_tab == "hidden_achievements":
+            self._draw_hidden_achievements_tab(screen)
         else:
             self._draw_stories_tab(screen)
             
@@ -404,3 +435,62 @@ class GalleryScene:
             if ev.get("title") == title:
                 return ev
         return None
+
+    def _draw_hidden_achievements_tab(self, screen):
+        from core import achievements
+        items = achievements.hidden_with_state()
+        got = sum(1 for _, unlocked in items if unlocked)
+
+        area = pygame.Rect(80, 160, 640, 372)
+        # 일반 판넬보다 살짝 더 신비롭고 어두운 틴트 얹어주기
+        draw_light_panel(screen, area)
+        header = self.font_section.render(f"히든 업적  {got} / {len(items)}", True, (139, 38, 38))
+        screen.blit(header, (area.x + 20, area.y + 12))
+        pygame.draw.line(screen, (200, 150, 150), (area.x + 20, area.y + 44),
+                         (area.right - 20, area.y + 44), 1)
+
+        # 2열 그리드
+        col_w = (area.w - 50) // 2
+        cell_h = 58
+        ox, oy = area.x + 18, area.y + 54
+        for i, (ach, unlocked) in enumerate(items):
+            col = i % 2
+            row = i // 2
+            cx = ox + col * (col_w + 14)
+            cy = oy + row * (cell_h + 4)
+            cell = pygame.Rect(cx, cy, col_w, cell_h)
+
+            if unlocked:
+                # 해금된 히든 업적: 살짝 붉은빛이 감도는 골드/플래티넘 연출
+                base = (255, 238, 238)
+                edge = (180, 60, 60)
+                draw_panel(screen, cell, fill=base, border=edge, radius=8, shadow=False)
+                
+                achievements._draw_medal(screen, cell.x + 26, cell.centery, ach["tier"], r=15)
+                title = self.font_body.render(ach["title"], True, (90, 20, 20))
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                
+                rank = "히든"
+                rk = get_font(11).render(rank, True, (190, 48, 48))
+                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                
+                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 62, max_lines=2)):
+                    ds = self.font_small.render(line, True, (120, 80, 80))
+                    screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))
+            else:
+                # 아직 잠긴 히든 업적: "?"로 물들이고 철저히 은폐
+                base = (218, 214, 210)
+                edge = (168, 160, 150)
+                draw_panel(screen, cell, fill=base, border=edge, radius=8, shadow=False)
+                
+                mcx, mcy = cell.x + 26, cell.centery
+                pygame.draw.circle(screen, (150, 144, 134), (mcx, mcy), 15)
+                pygame.draw.circle(screen, (120, 114, 104), (mcx, mcy), 15, 2)
+                q = self.font_body.render("?", True, (90, 84, 74))
+                screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
+                
+                title = self.font_body.render("기밀 히든 업적", True, (138, 130, 120))
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                
+                ds = self.font_small.render("비밀스러운 농가 공적을 세우면 드러납니다.", True, (148, 140, 130))
+                screen.blit(ds, (cell.x + 52, cell.y + 30))
