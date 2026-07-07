@@ -492,5 +492,7 @@ class GalleryScene:
                 title = self.font_body.render("기밀 히든 업적", True, (138, 130, 120))
                 screen.blit(title, (cell.x + 52, cell.y + 7))
                 
-                ds = self.font_small.render("비밀스러운 농가 공적을 세우면 드러납니다.", True, (148, 140, 130))
-                screen.blit(ds, (cell.x + 52, cell.y + 30))
+                lock_desc = "비밀스러운 농가 공적을 세우면 드러납니다."
+                for j, line in enumerate(wrap_text(lock_desc, self.font_small, col_w - 62, max_lines=2)):
+                    ds = self.font_small.render(line, True, (148, 140, 130))
+                    screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))

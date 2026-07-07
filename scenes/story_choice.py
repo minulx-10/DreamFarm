@@ -106,7 +106,7 @@ class StoryChoiceScene:
                 self.qte_targets.append({"pos": (tx, ty), "done": False})
         elif self.qte_kind == "rub":
             # 녹슨 자국은 실제 호미 '날' 위에 있어야 한다 — 좁고 길쭉한 곡선날 안쪽 지점들에 배치
-            blade_spots = [(402, 326), (392, 332), (384, 338), (376, 344), (372, 352), (396, 336)]
+            blade_spots = [(360, 305), (348, 308), (336, 314), (324, 322), (312, 332), (304, 340)]
             for i in range(count):
                 self.qte_targets.append({"pos": blade_spots[i % len(blade_spots)], "done": False})
         else:
@@ -423,43 +423,50 @@ class StoryChoiceScene:
             screen.blit(hint, (400 - hint.get_width() // 2, 418))
 
     def _draw_hoe(self, screen):
-        """아버지의 낡은 호미 — 한국식 손호미. 짧은 나무 자루 끝에 쇠목이 ㄱ자로 꺾이고,
-        꺾인 뒤 좁고 길쭉한 쇠날이 아래쪽으로 휘어지며 끝이 뾰족하다(삽처럼 넓적하지 않다)."""
+        """아버지의 낡은 호미 — 한국식 전통 손호미.
+        비스듬한 나무 자루 끝에 스완넥(S자) 형태로 곡선을 그리며 꺾여 뻗어나가는 쇠목을 그리고,
+        그 끝에 비대칭 역삼각형(등은 볼록하고 안쪽 날은 오목하게 휘어져 날 끝이 아래로 날카롭게 휘어지는) 쇠날을 구현함."""
         wood_d, wood, wood_l = (92, 62, 36), (140, 98, 58), (176, 132, 82)
         iron_d, iron, iron_l = (78, 82, 90), (134, 140, 148), (196, 202, 210)
 
-        # 1) 나무 자루 — 오른쪽 위에서 왼쪽 아래로 비스듬히 (약간 더 세운다)
-        grip_top, ferrule = (470, 226), (426, 296)
+        # 1) 나무 자루
+        grip_top, ferrule = (475, 230), (430, 290)
         pygame.draw.line(screen, wood_d, grip_top, ferrule, 14)
         pygame.draw.line(screen, wood, grip_top, ferrule, 10)
         pygame.draw.line(screen, wood_l, (grip_top[0] - 2, grip_top[1] + 2),
                          (ferrule[0] - 2, ferrule[1] + 2), 3)
-        # 손잡이 끝 둥근 혹
+        # 손잡이 끝 둥근 자루 마감
         pygame.draw.circle(screen, wood, grip_top, 9)
         pygame.draw.circle(screen, wood_d, grip_top, 9, 2)
 
-        # 2) 쇠 물미(자루와 쇠를 잇는 테)
+        # 2) 쇠 물미 (자루 끝 쇠칼라)
         pygame.draw.circle(screen, iron, ferrule, 8)
         pygame.draw.circle(screen, iron_d, ferrule, 8, 2)
 
-        # 3) 쇠목: 물미에서 짧게 아래로 → ㄱ자로 확실히 꺾여서 왼쪽으로 진행
-        neck_end = (422, 318)   # 아래로 짧게 내려감
-        pygame.draw.line(screen, iron_d, ferrule, neck_end, 8)
-        pygame.draw.line(screen, iron, ferrule, neck_end, 5)
+        # 3) S자 형태의 쇠목 (물미에서 위로 부드럽게 솟았다가 날 윗부분 어깨로 꺾여 내려감)
+        neck_pts = [
+            ferrule,
+            (414, 275),
+            (394, 278),
+            (376, 292) # 쇠날 어깨 부착부
+        ]
+        pygame.draw.lines(screen, iron_d, False, neck_pts, 8)
+        pygame.draw.lines(screen, iron, False, neck_pts, 5)
+        # 꺾이는 마디 반짝임 하이라이트
+        pygame.draw.circle(screen, iron_l, (394, 278), 3)
 
-        # 4) ㄱ자 꺾이는 지점 — 무릎 부분
-        knee = (418, 322)
-        pygame.draw.circle(screen, iron_l, knee, 3)   # 꺾이는 무릎 반짝임
-
-        # 5) 쇠날: 쇠목에서 시작하여 왼쪽 아래로 곡선을 그리며 부드럽게 휘어져 뾰족해지는 호미 날 (삽 느낌 완전 배제)
+        # 4) 호미 날 (볼록한 등날과 오목한 안쪽 날이 조화롭게 만나는 역삼각 뾰족날)
+        # 쇠목 부착부 (376, 292)에서 시작하여 좌측 및 하단으로 펼쳐지며 끝이 뾰족해짐
         blade_pts = [
-            (414, 324),    # 쇠목 부착부 (우상단)
-            (394, 332),    # 등날 외곽 곡선 1
-            (378, 344),    # 등날 외곽 곡선 2
-            (370, 366),    # 뾰족한 날 끝 (좌하단)
-            (382, 358),    # 안쪽 날선 곡선 1
-            (394, 348),    # 안쪽 날선 곡선 2
-            (404, 338),    # 안쪽 날선 곡선 3
+            (376, 292),    # 쇠목 부착부 (우상단)
+            (355, 280),    # 등날 볼록 시작 1
+            (330, 284),    # 등날 볼록 2
+            (314, 298),    # 등날 어깨부 3
+            (304, 320),    # 뾰족한 날 끝 근처 4
+            (298, 348),    # 뾰족한 날 끝 (좌하단 끝점)
+            (320, 334),    # 안쪽 날 오목 1
+            (342, 318),    # 안쪽 날 오목 2
+            (362, 304),    # 안쪽 날 오목 3
         ]
         # 그림자
         pygame.draw.polygon(screen, iron_d, [(px, py + 3) for px, py in blade_pts])
@@ -467,11 +474,11 @@ class StoryChoiceScene:
         pygame.draw.polygon(screen, iron, blade_pts)
         pygame.draw.polygon(screen, iron_d, blade_pts, 2)
 
-        # 날 등 능선 및 날선 반짝임 표현
-        pygame.draw.line(screen, iron_l, (408, 324), (374, 356), 2)
-        pygame.draw.line(screen, iron_l, (396, 322), (372, 344), 1)
-        # 날 끝의 살짝 밝은 쐐기 (뾰족함 강조)
-        pygame.draw.polygon(screen, iron_l, [(374, 360), (370, 366), (376, 360)])
+        # 5) 호미 날 등의 주름/능선 및 날선 반짝임 표현 (입체감 유도)
+        pygame.draw.line(screen, iron_l, (370, 294), (302, 342), 2)
+        pygame.draw.line(screen, iron_l, (350, 286), (300, 328), 1)
+        # 날 끝의 뾰족한 면 밝은 쐐기광 추가
+        pygame.draw.polygon(screen, iron_l, [(302, 342), (298, 348), (306, 344)])
 
     def _draw_stone(self, screen, cx, cy):
         """주워 담을 돌 — 종류를 다양하게. (이스터에그: 박서현이면 모아이 석상)"""
