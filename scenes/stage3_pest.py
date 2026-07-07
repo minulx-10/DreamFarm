@@ -12,16 +12,30 @@ class Bug:
         self.sprite = sprites['bug']
         self.size = self.sprite.get_width()
         self.rect = pygame.Rect(self.x, self.y, self.size, self.size)
-        self.dx = random.choice([-3, -2, 2, 3])
-        self.dy = random.choice([-3, -2, 2, 3])
+        # 기존 프레임당 2~3픽셀 속도를 초당 120~180픽셀의 물리 속도로 매핑
+        self.dx = random.choice([-180, -120, 120, 180])
+        self.dy = random.choice([-180, -120, 120, 180])
         self.alive = True
 
-    def update(self):
-        self.x += self.dx
-        self.y += self.dy
-        if self.x < 50 or self.x > 750: self.dx *= -1
-        if self.y < 100 or self.y > 500: self.dy *= -1
-        self.rect.topleft = (self.x, self.y)
+    def update(self, dt):
+        self.x += self.dx * dt
+        self.y += self.dy * dt
+        # 경계 충돌 검사 및 위치 보정
+        if self.x < 50:
+            self.x = 50
+            self.dx *= -1
+        elif self.x > 750 - self.size:
+            self.x = 750 - self.size
+            self.dx *= -1
+            
+        if self.y < 100:
+            self.y = 100
+            self.dy *= -1
+        elif self.y > 500 - self.size:
+            self.y = 500 - self.size
+            self.dy *= -1
+            
+        self.rect.topleft = (int(self.x), int(self.y))
 
     def draw(self, screen):
         if self.alive:
@@ -73,7 +87,7 @@ class Stage3Scene:
             self.stage_clear = True
 
         for bug in self.bugs:
-            if bug.alive: bug.update()
+            if bug.alive: bug.update(dt)
 
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)

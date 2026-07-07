@@ -10,6 +10,7 @@ from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites, 
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
 from core import audio
 from core.crops import current_crop, swap_crop_word
+from core.ui_utils import Typewriter
 
 
 class EndingScene:
@@ -20,11 +21,7 @@ class EndingScene:
         self.font_result = get_font(42)
         self.font_small = get_font(18)
         self.font_dad = get_font(30)
-        self.printed_text = ""
-        self.char_idx = 0
-        self.char_timer = 0
-        self.char_delay = 0.065
-        self.finished = False
+        self.typewriter = Typewriter(0.065)
         # 갤러리에서 특정 엔딩을 감상하려고 들어온 경우, 그 엔딩을 강제한다.
         forced = game_state.forced_ending
         game_state.forced_ending = None
@@ -42,6 +39,7 @@ class EndingScene:
         self.pages = self.build_pages()
         self.page_index = 0
         self.text_to_print = self.prepare_page(self.page_index)
+        self.typewriter.set_text(self.text_to_print)
         # Enhanced ending phases
         self.phase = "narration"  # narration -> table -> carrot -> golden -> dad_voice -> result -> credits -> journal
         self.phase_timer = 0
@@ -279,18 +277,14 @@ class EndingScene:
         return "\n".join(lines)
 
     def advance(self):
-        if not self.finished:
-            self.printed_text = self.text_to_print
-            self.char_idx = len(self.text_to_print)
-            self.finished = True
+        if not self.typewriter.finished:
+            self.typewriter.skip()
             return
 
         if self.page_index < len(self.pages) - 1:
             self.page_index += 1
-            self.printed_text = ""
-            self.char_idx = 0
-            self.finished = False
             self.text_to_print = self.prepare_page(self.page_index)
+            self.typewriter.set_text(self.text_to_print)
         else:
             # 시듦 엔딩은 베어 무는 연출(테이블·당근)이 없으니 바로 결과로
             self.phase = "result" if self.crop_failed else "table"
@@ -312,11 +306,9 @@ class EndingScene:
         self.ending_data = self.get_ending(ending_type)
         self.pages = self.build_pages()
         self.page_index = 0
-        self.text_to_print = self.prepare_page(self.page_index)
+        self.text_to_print = self.prepare_page(ending_type) if False else self.prepare_page(self.page_index)
         self.phase = "narration"
-        self.printed_text = ""
-        self.char_idx = 0
-        self.finished = False
+        self.typewriter.set_text(self.text_to_print)
         self.phase_timer = 0
         self.show_result = False
         self.result_done = False
@@ -434,17 +426,7 @@ class EndingScene:
         self.carrot_pulse += dt
 
         if self.phase == "narration":
-            if self.finished:
-                return
-            self.char_timer += dt
-            if self.char_timer >= self.char_delay:
-                self.char_timer = 0
-                if self.char_idx < len(self.text_to_print):
-                    self.printed_text += self.text_to_print[self.char_idx]
-                    self.char_idx += 1
-                    audio.type_tick(self.text_to_print[self.char_idx - 1])
-                else:
-                    self.finished = True
+            self.typewriter.update(dt)
 
         elif self.phase == "table":
             self.phase_timer += dt
@@ -526,10 +508,10 @@ class EndingScene:
         screen.blit(dad, (400 - dad.get_width() // 2, 50))
         box_rect = pygame.Rect(58, 286, 684, 256)
         draw_light_panel(screen, box_rect)
-        draw_centered_lines(screen, self.printed_text.split("\n"), self.font, TEXT_DARK, 400, 318, line_gap=5)
+        draw_centered_lines(screen, self.typewriter.printed_text.split("\n"), self.font, TEXT_DARK, 400, 318, line_gap=5)
         page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 548))
-        if self.finished:
+        if self.typewriter.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "계속"
             prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 562))

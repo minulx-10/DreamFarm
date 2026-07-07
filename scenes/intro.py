@@ -3,6 +3,7 @@ from core.game_state import append_josa, game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WHITE, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
 from core import audio
+from core.ui_utils import Typewriter
 
 
 class IntroScene:
@@ -11,12 +12,9 @@ class IntroScene:
         self.font_small = get_font(18)
         self.pages = self.get_intro_pages()
         self.page_index = 0
-        self.printed_text = ""
-        self.char_idx = 0
-        self.char_timer = 0
-        self.char_delay = 0.065
-        self.finished = False
         self.text_to_print = self.prepare_page(self.page_index)
+        self.typewriter = Typewriter(0.065)
+        self.typewriter.set_text(self.text_to_print)
 
     def get_intro_pages(self):
         from core.crops import current_crop, swap_crop_word, NIGHTMARE_INTRO
@@ -77,18 +75,14 @@ class IntroScene:
         return "\n".join(lines)
 
     def advance(self):
-        if not self.finished:
-            self.printed_text = self.text_to_print
-            self.char_idx = len(self.text_to_print)
-            self.finished = True
+        if not self.typewriter.finished:
+            self.typewriter.skip()
             return
 
         if self.page_index < len(self.pages) - 1:
             self.page_index += 1
-            self.printed_text = ""
-            self.char_idx = 0
-            self.finished = False
             self.text_to_print = self.prepare_page(self.page_index)
+            self.typewriter.set_text(self.text_to_print)
         else:
             self.start_game()
 
@@ -112,18 +106,7 @@ class IntroScene:
         game_state.current_scene = "transition"
 
     def update(self, dt):
-        if self.finished:
-            return
-
-        self.char_timer += dt
-        if self.char_timer >= self.char_delay:
-            self.char_timer = 0
-            if self.char_idx < len(self.text_to_print):
-                self.printed_text += self.text_to_print[self.char_idx]
-                self.char_idx += 1
-                audio.type_tick(self.text_to_print[self.char_idx - 1])
-            else:
-                self.finished = True
+        self.typewriter.update(dt)
 
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
@@ -137,7 +120,7 @@ class IntroScene:
         box_rect = pygame.Rect(58, 256, 684, 272)
         draw_light_panel(screen, box_rect)
 
-        lines = self.printed_text.split("\n")
+        lines = self.typewriter.printed_text.split("\n")
         # 박스 안에서 상하 가운데 정렬 — 타이핑 중 글이 튀지 않도록 '완성된 페이지' 줄 수 기준으로 시작 y 계산
         line_gap = 5
         full_lines = self.text_to_print.split("\n")
@@ -148,7 +131,7 @@ class IntroScene:
         page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 538))
 
-        if self.finished:
+        if self.typewriter.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "시작하기"
             prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 560))

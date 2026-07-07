@@ -6,6 +6,7 @@ from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE
 from core.ui import draw_story_backdrop, draw_button
 from core import audio
 from core import save_system
+from core.ui_utils import FireflyEmitter
 
 class TitleScene:
     def __init__(self):
@@ -39,16 +40,7 @@ class TitleScene:
         self.moon_clicks = 0
         
         # 타이틀 화면의 반딧불이(꿈 입자) 리스트 생성
-        self.fireflies = []
-        for _ in range(16):
-            self.fireflies.append({
-                'x': random.randint(30, 770),
-                'y': random.randint(30, 570),
-                'speed_x': random.uniform(-10.0, 10.0),
-                'speed_y': random.uniform(-5.0, 5.0),
-                'scale_timer': random.uniform(0.0, 6.28),
-                'size': random.uniform(2.5, 5.0)
-            })
+        self.firefly_emitter = FireflyEmitter(16)
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -127,28 +119,14 @@ class TitleScene:
                         game_state.current_scene = "name_input"
 
     def update(self, dt):
-        for f in self.fireflies:
-            f['x'] += f['speed_x'] * dt
-            f['y'] += f['speed_y'] * dt
-            f['scale_timer'] += 2.0 * dt
-            if f['x'] < 10 or f['x'] > 790:
-                f['speed_x'] *= -1
-            if f['y'] < 10 or f['y'] > 590:
-                f['speed_y'] *= -1
+        self.firefly_emitter.update(dt)
 
     def draw(self, screen):
         # 1. 배경 (달 이스터에그로 악몽 모드가 켜지면 검붉게)
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         
         # 2. 반딧불이 그리기
-        for f in self.fireflies:
-            alpha = int(110 + 70 * math.sin(f['scale_timer']))
-            alpha = max(0, min(255, alpha))
-            glow_color = (255, 235, 140)
-            glow_surf = pygame.Surface((int(f['size'] * 6), int(f['size'] * 6)), pygame.SRCALPHA)
-            pygame.draw.circle(glow_surf, (glow_color[0], glow_color[1], glow_color[2], int(alpha * 0.45)), (int(f['size'] * 3), int(f['size'] * 3)), int(f['size'] * 2.5))
-            pygame.draw.circle(glow_surf, (255, 255, 200, alpha), (int(f['size'] * 3), int(f['size'] * 3)), int(f['size'] * 1.1))
-            screen.blit(glow_surf, (int(f['x'] - f['size'] * 3), int(f['y'] - f['size'] * 3)))
+        self.firefly_emitter.draw(screen)
             
         # 3. 제목 및 부제 그리기 (달 이스터에그로 악몽 모드면 제목도 '악)몽중농원')
         title_text = "악)몽중농원" if game_state.nightmare else "몽중농원"

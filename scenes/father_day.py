@@ -4,6 +4,7 @@ from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
 from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
 from core import audio
+from core.ui_utils import Typewriter
 
 
 class FatherDayScene:
@@ -21,12 +22,9 @@ class FatherDayScene:
         pages_raw = FATHER_DAY_NARRATIONS.get(self.threshold, ["..."])
         self.pages = pages_raw
         self.page_index = 0
-        self.printed_text = ""
-        self.char_idx = 0
-        self.char_timer = 0
-        self.char_delay = 0.075  # Slightly slower for weight
-        self.finished = False
+        self.typewriter = Typewriter(0.075)  # Slightly slower for weight
         self.text_to_print = self._prepare(self.pages[0])
+        self.typewriter.set_text(self.text_to_print)
 
         # Phases: fade_in → narration → fade_to_farm
         self.phase = "fade_in"
@@ -56,16 +54,12 @@ class FatherDayScene:
                 continue
 
             if self.phase == "narration":
-                if not self.finished:
-                    self.printed_text = self.text_to_print
-                    self.char_idx = len(self.text_to_print)
-                    self.finished = True
+                if not self.typewriter.finished:
+                    self.typewriter.skip()
                 elif self.page_index < len(self.pages) - 1:
                     self.page_index += 1
-                    self.printed_text = ""
-                    self.char_idx = 0
-                    self.finished = False
                     self.text_to_print = self._prepare(self.pages[self.page_index])
+                    self.typewriter.set_text(self.text_to_print)
                 else:
                     self.phase = "fade_to_farm"
                     self.transition_timer = 0
@@ -79,16 +73,7 @@ class FatherDayScene:
                 self.phase = "narration"
 
         elif self.phase == "narration":
-            if not self.finished:
-                self.char_timer += dt
-                if self.char_timer >= self.char_delay:
-                    self.char_timer = 0
-                    if self.char_idx < len(self.text_to_print):
-                        self.printed_text += self.text_to_print[self.char_idx]
-                        self.char_idx += 1
-                        audio.type_tick(self.text_to_print[self.char_idx - 1])
-                    else:
-                        self.finished = True
+            self.typewriter.update(dt)
 
         elif self.phase == "fade_to_farm":
             self.transition_timer += dt
@@ -127,7 +112,7 @@ class FatherDayScene:
             pygame.draw.line(screen, (100, 80, 50), (200, 105), (600, 105), 2)
 
             # Narration text
-            lines = self.printed_text.split("\n")
+            lines = self.typewriter.printed_text.split("\n")
             draw_centered_lines(screen, lines, self.font, (200, 180, 130), 400, 140, line_gap=8)
 
             # Page indicator
@@ -137,7 +122,7 @@ class FatherDayScene:
                 screen.blit(pg, (700, 540))
 
             # Prompt
-            if self.finished:
+            if self.typewriter.finished:
                 label = "다음으로" if self.page_index < len(self.pages) - 1 else "아버지의 밭으로"
                 prompt = self.font_small.render(f"{label} ▸ 클릭하거나 스페이스바", True, (172, 148, 106))
                 screen.blit(prompt, (400 - prompt.get_width() // 2, 520))

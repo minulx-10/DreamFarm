@@ -61,13 +61,20 @@ def _noise(dur):
 
 
 def _lowpass(x, alpha=0.15):
-    """간단한 1차 저역통과 (부드럽게)."""
-    y = np.empty_like(x)
-    acc = 0.0
-    for i in range(len(x)):
-        acc += alpha * (x[i] - acc)
-        y[i] = acc
-    return y
+    """간단한 1차 저역통과 (부드럽게) - numpy convolve 벡터화 최적화."""
+    if alpha >= 1.0:
+        return x.copy()
+    if alpha <= 0.0:
+        return np.zeros_like(x)
+    
+    # 지수 감쇠 커널 길이 결정 (커널 값이 1e-5 미만으로 떨어지는 지점 계산)
+    # (1 - alpha)^K < 1e-5  =>  K > log(1e-5) / log(1 - alpha)
+    ln_threshold = -11.5129
+    K = int(np.ceil(ln_threshold / np.log(1.0 - alpha)))
+    K = max(1, min(len(x), K, 500))  # 최대 500으로 제한하여 극소 알파값 방어
+    
+    kernel = alpha * ((1.0 - alpha) ** np.arange(K))
+    return np.convolve(x, kernel, mode='full')[:len(x)]
 
 
 def _to_sound(wave, gain=1.0):

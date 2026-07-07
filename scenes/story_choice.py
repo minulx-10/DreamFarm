@@ -5,6 +5,7 @@ from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font, WHITE, GOLD
 from core.ui import draw_button, draw_light_panel, draw_story_backdrop, wrap_text, mix_color, draw_panel
 from core import audio
+from core.ui_utils import Typewriter
 
 
 class StoryChoiceScene:
@@ -14,14 +15,10 @@ class StoryChoiceScene:
         self.font_title = get_font(24)
         self.font = get_font(20)
         self.font_small = get_font(18)
-        self.printed_text = ""
-        self.char_idx = 0
-        self.char_timer = 0
-        self.char_delay = 0.04
-        self.finished = False
         self.choice_made = False
         self.result_text = ""
         self.result_timer = 0
+        self.typewriter = Typewriter(0.04)
 
         # QTE 상태 변수
         self.qte_active = False
@@ -48,6 +45,7 @@ class StoryChoiceScene:
         self.choice_b = (swap_crop_word(raw_b_label, crop_word), self._cropify_effects(b_effects, crop_word))
         
         self.text_to_print = self._prepare(self.text)
+        self.typewriter.set_text(self.text_to_print)
 
         self.btn_a = pygame.Rect(80, 390, 290, 65)
         self.btn_b = pygame.Rect(430, 390, 290, 65)
@@ -230,28 +228,24 @@ class StoryChoiceScene:
                     if event.type == pygame.MOUSEMOTION:
                         tgt = self._active_target()
                         if tgt and self._near(event.pos, tgt["pos"], r=32):
-                            moved = abs(event.rel[0]) + abs(event.rel[1])
-                            self.qte_progress += moved / 240.0
+                            self.qte_progress = min(1.0, self.qte_progress + 0.05)
                             if self.qte_progress >= 1.0:
                                 tgt["done"] = True
                                 self.qte_progress = 0.0
-                                audio.play("soil")
-                # hold는 update()에서 마우스 눌림 상태로 처리
-                if self.qte_targets and all(t["done"] for t in self.qte_targets):
-                    self._resolve_qte(success=True)
-                continue
+                                audio.play("rub")
+                    # rub은 떼어도 유지되지만, 시간이 지나면 서서히 복구됨
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                         pass
 
-            if event.type == pygame.MOUSEMOTION and self.finished and not self.choice_made:
+            if not self.qte_active and event.type == pygame.MOUSEMOTION and self.typewriter.finished and not self.choice_made:
                 self.hover_a = self.btn_a.collidepoint(event.pos)
                 self.hover_b = self.btn_b.collidepoint(event.pos)
-
-            if not self.finished:
+ 
+            if not self.typewriter.finished:
                 if event.type == pygame.MOUSEBUTTONDOWN or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
                 ):
-                    self.printed_text = self.text_to_print
-                    self.char_idx = len(self.text_to_print)
-                    self.finished = True
+                    self.typewriter.skip()
             elif not self.choice_made:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.btn_a.collidepoint(event.pos):
@@ -297,18 +291,10 @@ class StoryChoiceScene:
                     game_state.current_scene = "farm"
             return
 
-        if self.finished:
+        if self.typewriter.finished:
             return
-
-        self.char_timer += dt
-        if self.char_timer >= self.char_delay:
-            self.char_timer = 0
-            if self.char_idx < len(self.text_to_print):
-                self.printed_text += self.text_to_print[self.char_idx]
-                self.char_idx += 1
-                audio.type_tick(self.text_to_print[self.char_idx - 1])
-            else:
-                self.finished = True
+ 
+        self.typewriter.update(dt)
 
     def _draw_qte(self, screen):
         # 상단 프롬프트

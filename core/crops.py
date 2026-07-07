@@ -9,7 +9,7 @@
 - fragile       : 건강이 깎이는 피해 배율 (나무는 튼튼, 어린 벼는 여림)
 """
 
-from core.game_state import game_state
+from core.game_state import game_state, has_batchim
 
 CROPS = {
     "carrot": {
@@ -71,11 +71,6 @@ def current_crop():
 # ── 조사(을/를 등)까지 맞춰 작물 이름을 갈아 끼우는 헬퍼 ──
 
 _JOSA_PAIRS = [("을", "를"), ("이", "가"), ("은", "는"), ("과", "와")]
-
-
-def _has_batchim(word):
-    ch = word[-1]
-    return ord("가") <= ord(ch) <= ord("힣") and (ord(ch) - ord("가")) % 28 > 0
 
 
 def swap_crop_word(text, word):
@@ -154,7 +149,7 @@ def swap_crop_word(text, word):
                 nxt = text[i]
                 for with_b, without_b in _JOSA_PAIRS:
                     if nxt in (with_b, without_b):
-                        out.append(with_b if _has_batchim(word_to_use) else without_b)
+                        out.append(with_b if has_batchim(word_to_use) else without_b)
                         i += 1
                         break
         else:

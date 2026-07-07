@@ -3,6 +3,7 @@ from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font
 from core.ui import draw_light_panel, draw_story_backdrop, wrap_text
 from core import audio
+from core.ui_utils import Typewriter
 
 
 class MemoryScene:
@@ -12,12 +13,9 @@ class MemoryScene:
         self.font_title = get_font(26)
         self.font = get_font(20)
         self.font_small = get_font(18)
-        self.printed_text = ""
-        self.char_idx = 0
-        self.char_timer = 0
-        self.char_delay = 0.065
-        self.finished = False
         self.text_to_print = self.prepare_text(game_state.memory_text)
+        self.typewriter = Typewriter(0.065)
+        self.typewriter.set_text(self.text_to_print)
         # Transition effect
         self.phase = "fade_in"
         self.transition_alpha = 255
@@ -43,10 +41,8 @@ class MemoryScene:
                 event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
             ):
                 audio.play("click")
-                if not self.finished:
-                    self.printed_text = self.text_to_print
-                    self.char_idx = len(self.text_to_print)
-                    self.finished = True
+                if not self.typewriter.finished:
+                    self.typewriter.skip()
                 elif self.phase != "fade_out":
                     self.phase = "fade_out"
                     self.exit_flash = 180
@@ -65,18 +61,7 @@ class MemoryScene:
                 game_state.current_scene = game_state.memory_next
             return
 
-        if self.finished:
-            return
-
-        self.char_timer += dt
-        if self.char_timer >= self.char_delay:
-            self.char_timer = 0
-            if self.char_idx < len(self.text_to_print):
-                self.printed_text += self.text_to_print[self.char_idx]
-                self.char_idx += 1
-                audio.type_tick(self.text_to_print[self.char_idx - 1])
-            else:
-                self.finished = True
+        self.typewriter.update(dt)
 
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
@@ -92,12 +77,12 @@ class MemoryScene:
         pygame.draw.rect(screen, WOOD_LIGHT, line)
 
         y = 205
-        for text_line in self.printed_text.split("\n"):
+        for text_line in self.typewriter.printed_text.split("\n"):
             surf = self.font.render(text_line, True, TEXT_DARK)
             screen.blit(surf, (120, y))
             y += 29
 
-        if self.finished:
+        if self.typewriter.finished:
             prompt = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 470))
 

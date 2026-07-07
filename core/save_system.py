@@ -31,6 +31,9 @@ SLOT_PATH = os.path.join(_DIR, "save_slot.json")
 META_PATH = os.path.join(_DIR, "save_data.json")
 SETTINGS_PATH = os.path.join(_DIR, "user_settings.json")
 
+_settings_cache = None
+_meta_cache = None
+
 
 def _read_json(path):
     try:
@@ -43,11 +46,27 @@ def _read_json(path):
 
 
 def _write_json(path, data):
+    global _settings_cache, _meta_cache
+    tmp_path = path + ".tmp"
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
+        
+        if os.path.exists(tmp_path):
+            os.replace(tmp_path, path)
+            
+        # 성공적으로 기록된 경우 캐시 동기화
+        if path == SETTINGS_PATH:
+            _settings_cache = data
+        elif path == META_PATH:
+            _meta_cache = data
         return True
     except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
         return False
 
 
@@ -156,7 +175,10 @@ def reset_all():
 # ────────────────────────────── 회차 기록(메타) ──────────────────────────────
 
 def load_meta():
-    return _read_json(META_PATH) or {}
+    global _meta_cache
+    if _meta_cache is None:
+        _meta_cache = _read_json(META_PATH) or {}
+    return _meta_cache
 
 
 def update_meta(**kwargs):
@@ -247,11 +269,14 @@ _DEFAULT_SETTINGS = {"autosave": True, "show_version": True}
 
 
 def load_settings():
-    data = _read_json(SETTINGS_PATH)
-    merged = dict(_DEFAULT_SETTINGS)
-    if isinstance(data, dict):
-        merged.update(data)
-    return merged
+    global _settings_cache
+    if _settings_cache is None:
+        data = _read_json(SETTINGS_PATH)
+        merged = dict(_DEFAULT_SETTINGS)
+        if isinstance(data, dict):
+            merged.update(data)
+        _settings_cache = merged
+    return _settings_cache
 
 
 def get_setting(key):

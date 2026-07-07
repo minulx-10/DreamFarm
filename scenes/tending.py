@@ -16,7 +16,37 @@ def _font(sz):
     return get_font(sz)
 
 
-class WaterPour:
+class MiniGameBase:
+    """밭일/날씨 미니게임의 공통 상태 및 수명주기(Settle)를 정의하는 부모 클래스."""
+    def __init__(self, farm):
+        self.farm = farm
+        self.done = False
+        self.result = None
+        self.settle = 0.0
+        self.feedback = ""
+        self.feedback_color = (255, 255, 255)
+
+    def handle(self, event):
+        if self.done or self.result is not None:
+            return
+        self._handle_event(event)
+
+    def _handle_event(self, event):
+        pass
+
+    def update(self, dt):
+        if self.result is not None:
+            self.settle -= dt
+            if self.settle <= 0:
+                self.done = True
+            return
+        self._update_game(dt)
+
+    def _update_game(self, dt):
+        pass
+
+
+class WaterPour(MiniGameBase):
     """꾹 눌러 직접 물을 붓는다. 초록 '적정'에서 떼면 알맞게, 넘기면 과습(실패)."""
     PER_LEVEL = 0.7
     GAUGE_MAX = 112.0
@@ -24,16 +54,10 @@ class WaterPour:
     PROMPT = "꾹 눌러 물을 붓고, 초록 칸에서 손을 떼세요"
 
     def __init__(self, farm):
-        from core.game_state import game_state
-        self.farm = farm
+        super().__init__(farm)
         m = farm.moisture
         self.level = 0.0
         self.pouring = False
-        self.done = False
-        self.result = None
-        self.settle = 0.0
-        self.feedback = ""
-        self.feedback_color = (255, 255, 255)
         self.drops = []
         self.pour_played = False
         self.pour_anim = 0.0   # 0=쉼(입구 위), 1=붓는 중(입구가 아래로 기울어짐)
@@ -50,9 +74,7 @@ class WaterPour:
         if self.good_high <= self.good_low:
             self.good_high = self.good_low + 6
 
-    def handle(self, event):
-        if self.done or self.result is not None:
-            return
+    def _handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self.pouring = True
             if not self.pour_played:
@@ -62,12 +84,7 @@ class WaterPour:
             self.pouring = False
             self._resolve()
 
-    def update(self, dt):
-        if self.result is not None:
-            self.settle -= dt
-            if self.settle <= 0:
-                self.done = True
-            return
+    def _update_game(self, dt):
         # 붓기 시작/멈춤을 부드럽게 — 물뿌리개 입구가 스르륵 기울어지도록
         target = 1.0 if self.pouring else 0.0
         self.pour_anim += (target - self.pour_anim) * min(1.0, dt * 10.0)
@@ -207,14 +224,13 @@ class WaterPour:
                  hot=(self.result is None and self.pouring))
 
 
-class WeedPull:
+class WeedPull(MiniGameBase):
     """잡초를 잡고 쭉 뽑아낸다. 뿌리째 끌어내야(드래그 거리) 뽑힌다 — 많이 걷어낼수록 좋다."""
     PROMPT = "잡초를 잡고 쭉 끌어내 뽑으세요"
 
     def __init__(self, farm):
-        from core.game_state import game_state
+        super().__init__(farm)
         import math
-        self.farm = farm
         self.is_apple = (game_state.crop == "apple")
         # 사과나무 가지치기는 나무에서 뻗어 나온 곁가지를 잡아 밖으로 끌어낸다.
         # 가지들이 실제 나무 우듬지에서 뻗어 나오도록 밑동(anchor) 기준 방사형으로 배치한다.
@@ -243,18 +259,11 @@ class WeedPull:
         self.total = len(self.items)
         self.grabbed = None
         self.timer = 6.5
-        self.done = False
-        self.result = None
-        self.settle = 0.0
-        self.feedback = ""
-        self.feedback_color = (255, 255, 255)
         self.puffs = []
         
         self.PROMPT = "가지를 잡아 밭 밖으로 끌어내어 가지치기 하세요" if game_state.crop == "apple" else "잡초를 잡고 쭉 끌어내 뽑으세요"
 
-    def handle(self, event):
-        if self.done or self.result is not None:
-            return
+    def _handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for w in self.items:
                 if not w["pulled"] and abs(event.pos[0] - w["x"]) < 22 and abs(event.pos[1] - w["y"]) < 28:
@@ -276,12 +285,7 @@ class WeedPull:
             if all(x["pulled"] for x in self.items):
                 self._resolve()
 
-    def update(self, dt):
-        if self.result is not None:
-            self.settle -= dt
-            if self.settle <= 0:
-                self.done = True
-            return
+    def _update_game(self, dt):
         self.timer -= dt
         for p in self.puffs:
             p[2] -= dt
@@ -290,7 +294,6 @@ class WeedPull:
             self._resolve()
 
     def _resolve(self):
-        from core.game_state import game_state
         cleared = sum(1 for w in self.items if w["pulled"])
         frac = cleared / max(1, self.total)
         is_apple = (game_state.crop == "apple")
@@ -310,7 +313,6 @@ class WeedPull:
         self.settle = 1.0
 
     def draw(self, screen):
-        from core.game_state import game_state
         _veil(screen)
         wsp = sprites["weed_nm"] if game_state.nightmare else sprites["weed"]
         is_apple = (game_state.crop == "apple")
@@ -379,13 +381,12 @@ class WeedPull:
             _counter(screen, remain_txt, self.timer / 6.5)
 
 
-class PestTap:
+class PestTap(MiniGameBase):
     """잎 사이를 기어다니는 해충을 빠르게 잡는다. 움직이니 놓치기 쉽다."""
     PROMPT = "잎의 벌레를 빠르게 잡으세요"
 
     def __init__(self, farm):
-        from core.game_state import game_state
-        self.farm = farm
+        super().__init__(farm)
         n = min(8, max(4, farm.pests // 7)) + random.randint(0, 1)   # 변형: 개수
         self.bugs = []
         for _ in range(n):
@@ -400,18 +401,11 @@ class PestTap:
             })
         self.total = len(self.bugs)
         self.timer = 6.0
-        self.done = False
-        self.result = None
-        self.settle = 0.0
-        self.feedback = ""
-        self.feedback_color = (255, 255, 255)
         self.puffs = []
         
         self.PROMPT = "밭의 굼벵이를 빠르게 잡으세요" if game_state.crop == "potato" else "잎의 벌레를 빠르게 잡으세요"
 
-    def handle(self, event):
-        if self.done or self.result is not None:
-            return
+    def _handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for b in self.bugs:
                 if not b["dead"] and abs(event.pos[0] - b["x"]) < 20 and abs(event.pos[1] - b["y"]) < 20:
@@ -422,12 +416,7 @@ class PestTap:
             if all(b["dead"] for b in self.bugs):
                 self._resolve()
 
-    def update(self, dt):
-        if self.result is not None:
-            self.settle -= dt
-            if self.settle <= 0:
-                self.done = True
-            return
+    def _update_game(self, dt):
         self.timer -= dt
         for b in self.bugs:
             if b["dead"]:
@@ -445,7 +434,6 @@ class PestTap:
             self._resolve()
 
     def _resolve(self):
-        from core.game_state import game_state
         killed = sum(1 for b in self.bugs if b["dead"])
         frac = killed / max(1, self.total)
         is_potato = (game_state.crop == "potato")
@@ -465,7 +453,6 @@ class PestTap:
         self.settle = 1.0
 
     def draw(self, screen):
-        from core.game_state import game_state
         _veil(screen)
         bsp = sprites["bug"]
         is_potato = (game_state.crop == "potato")
@@ -501,9 +488,13 @@ class SoilMound:
     잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""
     PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
 
+class SoilMound(MiniGameBase):
+    """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
+    잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""
+    PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
+
     def __init__(self, farm):
-        from core.game_state import game_state
-        self.farm = farm
+        super().__init__(farm)
         if farm.is_tree:
             pts = [(225, 360)]
         else:
@@ -517,19 +508,12 @@ class SoilMound:
         self.raking = False
         self.mx, self.my = 0, 0
         self.timer = 6.5
-        self.done = False
-        self.result = None
-        self.settle = 0.0
-        self.feedback = ""
-        self.feedback_color = (255, 255, 255)
         self.puffs = []
         self.rake_played = False
         
         self.PROMPT = "마우스를 누른 채 거름을 골고루 주어 영양을 채우세요" if game_state.crop == "apple" else "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
 
-    def handle(self, event):
-        if self.done or self.result is not None:
-            return
+    def _handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self.raking = True
             self.mx, self.my = event.pos
@@ -538,12 +522,7 @@ class SoilMound:
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             self.raking = False
 
-    def update(self, dt):
-        if self.result is not None:
-            self.settle -= dt
-            if self.settle <= 0:
-                self.done = True
-            return
+    def _update_game(self, dt):
         self.timer -= dt
         if self.raking:
             near = False
@@ -570,7 +549,6 @@ class SoilMound:
             self._resolve()
 
     def _resolve(self):
-        from core.game_state import game_state
         done = sum(1 for s in self.spots if s["done"])
         frac = done / max(1, self.total)
         is_apple = (game_state.crop == "apple")
@@ -590,7 +568,6 @@ class SoilMound:
         self.settle = 1.0
 
     def draw(self, screen):
-        from core.game_state import game_state
         _veil(screen)
         is_apple = (game_state.crop == "apple")
         for s in self.spots:
