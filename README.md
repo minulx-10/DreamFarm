@@ -81,4 +81,8 @@ scenes/             title · name_input · intro · crop_select · farm · stage
   태그는 프리릴리스, 그 외 `vX.Y.Z`는 정식 릴리스(Latest)로 올라갑니다.
 - 브랜치: `dev`(개발) → `main`(안정). 버전은 `core/version.py`에서 관리합니다.
 - 변경 내역은 [`CHANGELOG.md`](CHANGELOG.md)에, 개발 인수인계·노하우는 [`HANDOFF.md`](HANDOFF.md)에
-  정리되어 있습니다. 코드/버전 규칙은 [`agent_rules.md`](agent_rules.md) 참고.
+  정리되어 있습니다.
+
+---
+
+© Gamizm. All Rights Reserved.
