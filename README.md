@@ -85,4 +85,4 @@ scenes/             title · name_input · intro · crop_select · farm · stage
 
 ---
 
-© Gamizm. All Rights Reserved.
+© 삼광. All Rights Reserved.

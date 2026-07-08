@@ -216,7 +216,7 @@ class GalleryScene:
         # 하단 중앙 저작권(Copyright) 표시
         cr_font = get_font(13)
         cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© Gamizm", True, cr_col)
+        cr_surf = cr_font.render("© 삼광", True, cr_col)
         screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 568))
 
         # 5. 모달 팝업 그리기 (오버레이)
