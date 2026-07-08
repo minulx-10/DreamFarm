@@ -55,7 +55,7 @@ class WaterPour(MiniGameBase):
 
     def __init__(self, farm):
         super().__init__(farm)
-        m = farm.moisture
+        m = farm.sim.moisture
         self.level = 0.0
         self.pouring = False
         self.drops = []
@@ -184,7 +184,7 @@ class WaterPour(MiniGameBase):
 
         wet = min(1.0, self.level / max(1.0, self.overflow))
         if wet > 0:
-            if self.farm.is_tree:
+            if self.farm.sim.is_tree:
                 if self.level <= self.overflow:
                     col = (90, 150, 190, int(70 * wet))
                 else:
@@ -248,7 +248,7 @@ class WeedPull(MiniGameBase):
                     "strength": random.randint(26, 44),
                 })
         else:
-            n = min(6, max(3, farm.weeds // 11)) + random.randint(0, 1)   # 변형: 개수
+            n = min(6, max(3, farm.sim.weeds // 11)) + random.randint(0, 1)   # 변형: 개수
             for _ in range(n):
                 self.items.append({
                     "x": random.randint(PLOT.x + 40, PLOT.right - 56),
@@ -387,7 +387,7 @@ class PestTap(MiniGameBase):
 
     def __init__(self, farm):
         super().__init__(farm)
-        n = min(8, max(4, farm.pests // 7)) + random.randint(0, 1)   # 변형: 개수
+        n = min(6, max(3, farm.sim.pests // 7)) + random.randint(0, 1)   # 변형: 개수
         self.bugs = []
         for _ in range(n):
             sp = random.uniform(40, 95)        # 변형: 속도
@@ -495,7 +495,7 @@ class SoilMound(MiniGameBase):
 
     def __init__(self, farm):
         super().__init__(farm)
-        if farm.is_tree:
+        if farm.sim.is_tree:
             pts = [(225, 360)]
         else:
             pts = farm.crop_positions() or [(PLOT.centerx, PLOT.centery)]
