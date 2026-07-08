@@ -118,6 +118,7 @@ class EndingScene:
         if not getattr(self, "from_gallery", False):
             from core import achievements
             achievements.on_ending(ending_type)
+            save_system.delete_save()
 
         crop_food = current_crop()["food"]
 
@@ -181,6 +182,7 @@ class EndingScene:
         food = current_crop()["food"]
         if food != "당근":
             data = dict(data)
+            data["title"] = swap_crop_word(data["title"], food)
             data["text"] = swap_crop_word(data["text"], food)
         return data
 
@@ -374,9 +376,13 @@ class EndingScene:
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    if self.phase in ("result", "journal") or self.finished:
+                    if self.phase in ("result", "journal"):
                         self.retry()
                         return
+                elif self.gallery_unlocked() and event.key in self.GALLERY_KEYS:
+                    ending_type = self.GALLERY_KEYS[event.key]
+                    self.change_ending(ending_type)
+                    return
 
             click = (event.type == pygame.MOUSEBUTTONDOWN or
                      (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE))
@@ -945,9 +951,16 @@ class EndingScene:
                     surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
                     screen.blit(surf, (120, y))
                 y += 26 if is_head else 22
-                if self.is_happy and line.strip() in JOURNAL_RETROSPECTIVES:
+                retro_text = None
+                from core.crops import current_crop, swap_crop_word
+                food = current_crop()["food"]
+                for k, v in JOURNAL_RETROSPECTIVES.items():
+                    if swap_crop_word(k, food) == line.strip():
+                        retro_text = swap_crop_word(v, food)
+                        break
+                if self.is_happy and retro_text is not None:
                     if view.top - 30 < y < view.bottom + 4:
-                        rs = retro_font.render(JOURNAL_RETROSPECTIVES[line.strip()], True, TEXT_MUTED)
+                        rs = retro_font.render(retro_text, True, TEXT_MUTED)
                         screen.blit(rs, (140, y))
                     y += 18
             y += 12

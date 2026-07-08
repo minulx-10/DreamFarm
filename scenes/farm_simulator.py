@@ -57,8 +57,8 @@ class FarmSimulator:
         self.stress = 0
         self.actions_taken = 0
         self.last_action = ""
-        self.message = "낯선 밭에서 눈을 떴다."
-        self.notice = "밭의 상태부터 천천히 살펴보자."
+        self.message = self._cropify("낯선 밭에서 눈을 떴다.")
+        self.notice = self._cropify("밭의 상태부터 천천히 살펴보자.")
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
         self.weather_minigame_cooldown = 2  # 날씨 미니게임 쿨다운 (2턴 후부터 발동 가능)
@@ -183,8 +183,8 @@ class FarmSimulator:
                 self.health -= 8
                 self.stress += 10
                 self.mistakes += 1
-                self.message = "아직 덜 자랐다. 성급하면 다 망친다."
-                self.notice = "밭부터 돌보며 더 기다리자."
+                self.message = self._cropify("아직 덜 자랐다. 성급하면 다 망친다.")
+                self.notice = self._cropify("밭부터 돌보며 더 기다리자.")
             return
 
         from scenes.farm import TACTILE_INTERACTIONS
@@ -261,8 +261,8 @@ class FarmSimulator:
                     thought = sense
         self.push_thought(thought)
 
-        self.message = result
-        self.notice = self.build_notice()
+        self.message = self._cropify(result)
+        self.notice = self._cropify(self.build_notice())
         self.clamp_stats()
 
         if self.health < 38:
@@ -530,7 +530,7 @@ class FarmSimulator:
             lines.append("조금씩 알 것 같기도 하다.")
         else:
             lines.append("이 일의 무게가 느껴진다.")
-        game_state.journal_entries.append("\n".join(lines))
+        game_state.journal_entries.append("\n".join(self._cropify(line) for line in lines))
 
     def is_good_turn(self):
         return (
@@ -769,6 +769,6 @@ class FarmSimulator:
         game_state.understanding = max(0, game_state.understanding - 8)
         warn = ("이대로면 밭을 잃는다. 한 번만 더 시들면 손쓸 수 없다."
                 if self.withers == 2 else "다시 흙부터 천천히 다독여야 한다.")
-        self.message = "당근이 크게 시들어 버렸다. " + warn
+        self.message = self._cropify("당근이 크게 시들어 버렸다. ") + warn
         self.push_thought("처음부터, 천천히.")
         farm_scene.rebuild_buttons()

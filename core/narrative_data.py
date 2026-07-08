@@ -8,7 +8,7 @@ UNDERSTANDING_STAGES = [
     (16, "물 주는 이유", 1),
     (31, "기다림의 무게", 2),
     (46, "손등의 온기", 3),
-    (56, "한 조각 of 시간", 4),
+    (56, "한 조각의 시간", 4),
 ]
 
 EPIPHANY_THRESHOLDS = {
@@ -439,7 +439,7 @@ def get_attitude_ending():
     m = game_state.farm_mistakes
 
     # 진엔딩: 솜씨·이해·인내·공감이 모두 무르익고 실수도 적음
-    if u >= 40 and e >= 2 and p >= 3 and h >= 55 and m < 3:
+    if u >= 40 and e >= 1 and p >= 1 and h >= 55 and m < 5:
         return "true"
     if h >= 45 and u >= 15:
         return "normal"
@@ -453,5 +453,8 @@ def append_ending_journal():
     key = "wither" if game_state.crop_failed else game_state.last_ending
     text = ENDING_JOURNAL_CLOSINGS.get(key)
     if text:
+        from core.crops import swap_crop_word, current_crop
+        food = current_crop()["food"]
+        text = swap_crop_word(text, food)
         game_state.journal_entries.append(text)
         game_state.journal_closed = True

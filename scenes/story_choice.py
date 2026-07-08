@@ -636,7 +636,7 @@ class StoryChoiceScene:
 
         # 텍스트 출력
         y = 145
-        for line in self.printed_text.split("\n"):
+        for line in self.typewriter.printed_text.split("\n"):
             surf = self.font.render(line, True, TEXT_DARK)
             screen.blit(surf, (100, y))
             y += 28
@@ -644,7 +644,7 @@ class StoryChoiceScene:
         if self.choice_made:
             r_surf = self.font.render(self.result_text, True, (140, 90, 20))
             screen.blit(r_surf, (400 - r_surf.get_width() // 2, 410))
-        elif self.finished:
+        elif self.typewriter.finished:
             self._draw_btn(screen, self.btn_a, "A. " + self.choice_a[0], self.hover_a)
             self._draw_btn(screen, self.btn_b, "B. " + self.choice_b[0], self.hover_b)
             prompt = self.font_small.render("선택하세요", True, TEXT_MUTED)
