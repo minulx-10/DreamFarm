@@ -182,7 +182,7 @@ class StarConnectScene:
         w = 220
         pygame.draw.rect(screen, (40, 44, 60), (28, 56, w, 6), border_radius=3)
         pygame.draw.rect(screen, (210, 190, 120),
-                         (28, 56, int(w * max(0.0, self.timer / self.DURATION)), 6), border_radius=3)
+                         (28, 56, int(w * (self.idx / self.total)), 6), border_radius=3)
         if self.done:
             msg = "다 이었다…" if self.idx >= self.total else "별이 흐려진다…"
             tip = self.font.render(msg, True, GOLD_DIM)

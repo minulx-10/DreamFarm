@@ -213,6 +213,12 @@ class GalleryScene:
         else:
             self._draw_stories_tab(screen)
             
+        # 하단 중앙 저작권(Copyright) 표시
+        cr_font = get_font(13)
+        cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
+        cr_surf = cr_font.render("© Gamizm", True, cr_col)
+        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 568))
+
         # 5. 모달 팝업 그리기 (오버레이)
         if self.reading_title:
             self._draw_modal_popup(screen)
@@ -474,7 +480,7 @@ class GalleryScene:
                 rk = get_font(11).render(rank, True, (190, 48, 48))
                 screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
                 
-                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 62, max_lines=2)):
+                for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 74, max_lines=2)):
                     ds = self.font_small.render(line, True, (120, 80, 80))
                     screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))
             else:
@@ -493,6 +499,6 @@ class GalleryScene:
                 screen.blit(title, (cell.x + 52, cell.y + 7))
                 
                 lock_desc = "비밀스러운 농가 공적을 세우면 드러납니다."
-                for j, line in enumerate(wrap_text(lock_desc, self.font_small, col_w - 62, max_lines=2)):
+                for j, line in enumerate(wrap_text(lock_desc, self.font_small, col_w - 74, max_lines=2)):
                     ds = self.font_small.render(line, True, (148, 140, 130))
                     screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))

@@ -160,3 +160,9 @@ class TitleScene:
             
         draw_button(screen, self.settings_btn, "소리 및 설정", self.font_button, hovered=self.hovered_settings)
         draw_button(screen, self.quit_btn, "게임 끝내기", self.font_button, hovered=self.hovered_quit)
+
+        # 5. 저작권 표시 추가
+        cr_font = get_font(13)
+        cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
+        cr_surf = cr_font.render("© Gamizm", True, cr_col)
+        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 568))
