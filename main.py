@@ -27,6 +27,32 @@ from scenes.story_choice import StoryChoiceScene
 from scenes.father_day import FatherDayScene
 
 
+def setup_window_icon():
+    # 윈도우 창 아이콘 설정 (exe로 묶였을 때도 찾도록 resource_path 사용)
+    try:
+        from core.assets import resource_path
+        icon_path = resource_path("logo.png")
+        if os.path.exists(icon_path):
+            raw_icon = pygame.image.load(icon_path).convert_alpha()
+            # 원본 logo.png는 원형 그림 둘레에 투명 여백이 넓어, 작업표시줄에 넣으면
+            # 다른 앱 아이콘보다 작아 보인다. 실제 그림의 경계만 잘라 정사각 캔버스에
+            # 꽉 채워 넣으면 작업표시줄 칸을 다른 아이콘만큼 채운다.
+            bb = raw_icon.get_bounding_rect(min_alpha=8)
+            if bb.width > 0 and bb.height > 0:
+                cropped = raw_icon.subsurface(bb).copy()
+                side = max(bb.width, bb.height)
+                canvas = pygame.Surface((side, side), pygame.SRCALPHA)
+                canvas.blit(cropped, ((side - bb.width) // 2, (side - bb.height) // 2))
+            else:
+                canvas = raw_icon
+            # 작업표시줄/제목표시줄은 아이콘을 32~48px로 줄여 쓴다. OS의 거친 축소를
+            # 피하려고 미리 256px로 다듬어 넘긴다.
+            icon_surf = pygame.transform.smoothscale(canvas, (256, 256))
+            pygame.display.set_icon(icon_surf)
+    except Exception:
+        pass
+
+
 def main():
     pygame.init()
 
@@ -86,29 +112,8 @@ def main():
     update_display_mode()
     pygame.display.set_caption("몽중농원")
     
-    # 윈도우 창 아이콘 설정 (exe로 묶였을 때도 찾도록 resource_path 사용)
-    try:
-        from core.assets import resource_path
-        icon_path = resource_path("logo.png")
-        if os.path.exists(icon_path):
-            raw_icon = pygame.image.load(icon_path).convert_alpha()
-            # 원본 logo.png는 원형 그림 둘레에 투명 여백이 넓어, 작업표시줄에 넣으면
-            # 다른 앱 아이콘보다 작아 보인다. 실제 그림의 경계만 잘라 정사각 캔버스에
-            # 꽉 채워 넣으면 작업표시줄 칸을 다른 아이콘만큼 채운다.
-            bb = raw_icon.get_bounding_rect(min_alpha=8)
-            if bb.width > 0 and bb.height > 0:
-                cropped = raw_icon.subsurface(bb).copy()
-                side = max(bb.width, bb.height)
-                canvas = pygame.Surface((side, side), pygame.SRCALPHA)
-                canvas.blit(cropped, ((side - bb.width) // 2, (side - bb.height) // 2))
-            else:
-                canvas = raw_icon
-            # 작업표시줄/제목표시줄은 아이콘을 32~48px로 줄여 쓴다. OS의 거친 축소를
-            # 피하려고 미리 256px로 다듬어 넘긴다.
-            icon_surf = pygame.transform.smoothscale(canvas, (256, 256))
-            pygame.display.set_icon(icon_surf)
-    except Exception as e:
-        pass
+    # 윈도우 창 아이콘 설정
+    setup_window_icon()
         
     clock = pygame.time.Clock()
     
@@ -122,13 +127,17 @@ def main():
     # 가상 화면 800x600 버퍼 생성
     virtual_screen = pygame.Surface((800, 600))
 
-    # 마우스 좌표 역계산(역배율 스케일링)을 위한 get_pos 재정의 (종횡비 보정 반영)
+    # 마우스 좌표 역계산(역배율 스케일링)을 위한 변환 함수 및 get_pos 재정의 (종횡비 보정 반영)
+    def to_virtual_pos(pos):
+        mx = pos[0] - offset_x
+        my = pos[1] - offset_y
+        vx = int(mx * 800.0 / target_w)
+        vy = int(my * 600.0 / target_h)
+        return max(0, min(799, vx)), max(0, min(599, vy))
+
     orig_get_pos = pygame.mouse.get_pos
     def mapped_get_pos():
-        ax, ay = orig_get_pos()
-        vx = int((ax - offset_x) * 800.0 / target_w)
-        vy = int((ay - offset_y) * 600.0 / target_h)
-        return (max(0, min(799, vx)), max(0, min(599, vy)))
+        return to_virtual_pos(orig_get_pos())
     pygame.mouse.get_pos = mapped_get_pos
 
     BGM_BY_SCENE = {
@@ -167,16 +176,17 @@ def main():
         "stage4", "star_connect", "ending",
     }
 
-    scenes = {name: factory() for name, factory in SCENE_FACTORIES.items()}
+    # 씬 지연 초기화 (Lazy Initialization) 적용
+    scenes = {}
+    current_key = game_state.current_scene
+    scenes[current_key] = SCENE_FACTORIES[current_key]()
+    current_scene_obj = scenes[current_key]
 
     settings_overlay = SettingsOverlay()
     from core.quit_overlay import QuitOverlay
     quit_overlay = QuitOverlay()
     from core.dev_overlay import DevOverlay
     dev_overlay = DevOverlay()   # F9로 여는 개발자/테스트 모드
-
-    current_key = game_state.current_scene
-    current_scene_obj = scenes[current_key]
 
     while game_state.running:
         dt = clock.tick(60) / 1000.0
@@ -191,7 +201,7 @@ def main():
         if target_scene != current_key:
             if target_scene == "intro":
                 scenes["farm"] = SCENE_FACTORIES["farm"]()
-            if target_scene in FRESH_ON_ENTER:
+            if target_scene in FRESH_ON_ENTER or target_scene not in scenes:
                 scenes[target_scene] = SCENE_FACTORIES[target_scene]()
             current_scene_obj = scenes[target_scene]
             current_key = target_scene
@@ -207,6 +217,8 @@ def main():
             from core import save_system
             data = save_system.load_slot()
             if data:
+                if "farm" not in scenes:
+                    scenes["farm"] = SCENE_FACTORIES["farm"]()
                 save_system.restore(data, scenes["farm"])
                 game_state.current_scene = "farm"
                 current_scene_obj = scenes["farm"]
@@ -247,21 +259,11 @@ def main():
             
             # 마우스 입력 좌표 역배율 보정 (레터박스/필러박스 여백 감산 및 가변 배율 적용)
             if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
-                mx = event.pos[0] - offset_x
-                my = event.pos[1] - offset_y
-                vx = int(mx * 800.0 / target_w)
-                vy = int(my * 600.0 / target_h)
-                vx = max(0, min(799, vx))
-                vy = max(0, min(599, vy))
+                vx, vy = to_virtual_pos(event.pos)
                 mapped_event = pygame.event.Event(event.type, pos=(vx, vy), button=event.button)
                 mapped_events.append(mapped_event)
             elif event.type == pygame.MOUSEMOTION:
-                mx = event.pos[0] - offset_x
-                my = event.pos[1] - offset_y
-                vx = int(mx * 800.0 / target_w)
-                vy = int(my * 600.0 / target_h)
-                vx = max(0, min(799, vx))
-                vy = max(0, min(599, vy))
+                vx, vy = to_virtual_pos(event.pos)
                 vrx = int(event.rel[0] * 800.0 / target_w)
                 vry = int(event.rel[1] * 600.0 / target_h)
                 mapped_event = pygame.event.Event(event.type, pos=(vx, vy), rel=(vrx, vry), buttons=event.buttons)

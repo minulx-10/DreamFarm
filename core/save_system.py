@@ -18,11 +18,21 @@ from core.game_state import game_state
 
 def _save_dir():
     """저장 파일을 둘 폴더.
-    - exe(PyInstaller)로 실행 중이면 exe가 있는 폴더 (임시 _MEIPASS는 종료 시 사라지므로 안 됨)
-    - 개발 중이면 core/ 폴더
+    - 스팀 출시 및 권한 문제를 방지하기 위해 사용자 AppData 폴더(Windows) 또는 홈 디렉토리를 사용합니다.
+    - 개발 중(frozen이 아닌 경우)에는 이전과 동일하게 core/ 폴더를 사용합니다.
     """
     if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
+        appdata = os.environ.get('APPDATA')
+        if appdata:
+            path = os.path.join(appdata, 'MongjungNongwon')
+        else:
+            path = os.path.join(os.path.expanduser('~'), '.mongjungnongwon')
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            # 폴더 생성 실패 시 안전 장치로 exe 폴더 반환
+            return os.path.dirname(sys.executable)
     return os.path.dirname(__file__)
 
 

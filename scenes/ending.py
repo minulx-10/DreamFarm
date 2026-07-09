@@ -239,6 +239,19 @@ class EndingScene:
                 lines.append(item["title"])
                 lines.append(item["impact"])
 
+        lines.extend([
+            "",
+            "---------------------------------------",
+            "",
+            "기획 / 개발",
+            "삼광 (Samgwang)",
+            "",
+            "사용 폰트",
+            "갈무리11 (Galmuri11) - 제작자 달고나(Dalgona) 배포",
+            "Copyright (c) 2019-2025 Lee Minseo",
+            "(SIL Open Font License 1.1)",
+        ])
+
         return lines
 
     def _credit_content_height(self):
@@ -872,7 +885,7 @@ class EndingScene:
                 continue
 
             is_title = line == "몽중농원"
-            is_section = line in ("이번 꿈에서 남은 기록", "남겨진 일들", "이어진 일들")
+            is_section = line in ("이번 꿈에서 남은 기록", "남겨진 일들", "이어진 일들", "기획 / 개발", "사용 폰트")
             is_narrator = line == "«어둠 속의 목소리»"
             
             if is_narrator:
