@@ -275,8 +275,10 @@ class StoryChoiceScene:
                     else:
                         # 떼거나 벗어나면 서서히 풀린다 (끝까지 눌러야 함)
                         self.qte_progress = max(0.0, self.qte_progress - dt * 0.6)
-                if self.qte_targets and all(t["done"] for t in self.qte_targets):
-                    self._resolve_qte(success=True)
+            
+            # 모든 QTE 종류에 대해 완료 여부 체크 (tap, trail, rub, hold 공통)
+            if self.qte_targets and all(t["done"] for t in self.qte_targets):
+                self._resolve_qte(success=True)
             return
 
         if self.choice_made:

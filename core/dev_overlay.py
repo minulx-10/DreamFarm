@@ -60,14 +60,14 @@ class DevOverlay:
 
     def _grow(self, amount):
         def act(farm):
-            if farm is not None:
-                farm.growth = max(0, min(farm.growth_goal, farm.growth + amount))
-                self.msg = f"성장 {farm.growth}/{farm.growth_goal}"
+            if farm is not None and getattr(farm, "sim", None) is not None:
+                farm.sim.growth = max(0, min(farm.sim.growth_goal, farm.sim.growth + amount))
+                self.msg = f"성장 {farm.sim.growth}/{farm.sim.growth_goal}"
         return act
 
     def _harvest_ready(self, farm):
-        if farm is not None:
-            farm.growth = farm.growth_goal
+        if farm is not None and getattr(farm, "sim", None) is not None:
+            farm.sim.growth = farm.sim.growth_goal
             self.msg = "수확 가능 상태로"
 
     def _und(self, amount):
