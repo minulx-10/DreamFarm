@@ -73,9 +73,9 @@ jobs:
             .buildozer
             .buildozer_global
             ~/.gradle
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-v3-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
-            buildozer-${{ runner.os }}-
+            buildozer-v3-${{ runner.os }}-
 
       - name: 의존성 패키지 설치
         run: |
