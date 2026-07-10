@@ -16,7 +16,7 @@ source.include_exts = py,png,jpg,ttf
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,pygame-ce,numpy
+requirements = python3,pygame-ce,numpy==1.26.4
 
 # (str) Application versioning (method 1)
 version = 2.2.2
