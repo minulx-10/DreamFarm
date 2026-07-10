@@ -31,6 +31,12 @@ fullscreen = 1
 # (list) Permissions
 android.permissions = INTERNET
 
+# (int) Minimum API your APK will support.
+android.minapi = 24
+
+# (int) Target API your APK will support.
+android.api = 33
+
 # (list) Supported architectures
 android.archs = arm64-v8a, armeabi-v7a
 

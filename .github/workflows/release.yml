@@ -54,25 +54,55 @@ jobs:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
 
-      # Buildozer 캐시 설정으로 빌드 속도 개선
-      - name: Cache Buildozer global directory
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Java 17 설정
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Buildozer NDK/SDK 및 캐시 폴더들 캐싱하여 속도 최적화
+      - name: Cache Buildozer directories
         uses: actions/cache@v4
         with:
-          path: .buildozer_global
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+          path: |
+            .buildozer
+            .buildozer_global
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: buildozer android debug
-          buildozer_version: master
+      - name: 의존성 패키지 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libsqlite3-dev libgdbm-dev libssl-dev libffi-dev uuid-dev alsa-utils libasound2-dev libtinfo5 cmake
+
+      - name: Buildozer 및 Cython 설치
+        run: |
+          pip install --upgrade pip
+          pip install "Cython<3.0" buildozer
+
+      - name: Build APK with Buildozer
+        run: |
+          yes | buildozer android debug
+
+      # 빌드된 APK 파일 위치 찾기 (보통 bin/ 하위에 생성됨)
+      - name: APK 파일명 확인
+        id: apk_find
+        run: |
+          APK_PATH=$(find bin/ -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: 빌드 산출물 업로드 (아티팩트)
         uses: actions/upload-artifact@v4
         with:
           name: DreamFarm-android
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: ${{ steps.apk_find.outputs.apk_path }}
 
   release:
     needs: [build-windows, build-android]
