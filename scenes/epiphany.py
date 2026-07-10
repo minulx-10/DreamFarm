@@ -26,17 +26,22 @@ class EpiphanyScene:
                     self.phase = "fade_out"
 
     def update(self, dt):
-        self.glow_timer += dt
+        fast_ff = getattr(game_state, "fast_forward", False)
+        effective_dt = dt * 6.0 if fast_ff else dt
+        self.glow_timer += effective_dt
 
         if self.phase == "fade_in":
-            self.alpha = min(255, self.alpha + 120 * dt)
+            self.alpha = min(255, self.alpha + 120 * effective_dt)
             if self.alpha >= 255:
                 self.alpha = 255
                 self.phase = "hold"
         elif self.phase == "hold":
-            self.hold_timer += dt
+            self.hold_timer += effective_dt
+            # 배속 상태에서 꾹 누르고 있으면 대기시간을 바로 스킵하고 페이드아웃 페이즈로 전환
+            if fast_ff and self.hold_timer > 0.4:
+                self.phase = "fade_out"
         elif self.phase == "fade_out":
-            self.alpha = max(0, self.alpha - 200 * dt)
+            self.alpha = max(0, self.alpha - 200 * effective_dt)
             if self.alpha <= 0:
                 game_state.pending_epiphany = None
                 game_state.current_scene = "farm"

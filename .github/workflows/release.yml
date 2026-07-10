@@ -1,7 +1,7 @@
-name: Build & Release (Windows EXE)
+name: Build & Release (Windows EXE & Android APK)
 
-# 태그를 push하면 exe를 빌드해 GitHub 릴리스로 올린다.
-#  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시, 반 친구들이 받는 것)
+# 태그를 push하면 Windows EXE와 Android APK를 빌드해 GitHub 릴리스로 올린다.
+#  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시)
 #  - 개발 태그   (예: v1.0.5-dev.1)  → 프리릴리스 (테스터용, 'Latest' 아님)
 # Actions 탭에서 수동 실행(workflow_dispatch)도 가능.
 on:
@@ -31,8 +31,7 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # exe 파일명은 ASCII로 (GitHub 릴리스가 한글 자산명을 default.exe로 바꿔버림).
-      # 창 제목은 코드에서 "몽중농원"으로 표시된다.
+      # exe 파일명은 ASCII로.
       - name: EXE 빌드 (PyInstaller onefile)
         run: >
           pyinstaller --noconfirm --clean --onefile --windowed
@@ -49,7 +48,58 @@ jobs:
           name: DreamFarm-windows
           path: dist/DreamFarm.exe
 
-      # 태그 이름에 -dev / -beta / -rc 가 들어가면 프리릴리스로 취급한다.
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      # Buildozer 캐시 설정으로 빌드 속도 개선
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: buildozer android debug
+          buildozer_version: master
+
+      - name: 빌드 산출물 업로드 (아티팩트)
+        uses: actions/upload-artifact@v4
+        with:
+          name: DreamFarm-android
+          path: ${{ steps.buildozer.outputs.filename }}
+
+  release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 빌드 다운로드 (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-windows
+          path: dist
+
+      - name: 빌드 다운로드 (Android)
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-android
+          path: dist
+
+      - name: 파일 이름 찾기 및 정리
+        id: files
+        shell: bash
+        run: |
+          APK_FILE=$(find dist -name "*.apk" | head -n 1)
+          echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
+
       - name: 릴리스 채널 판별
         id: channel
         shell: bash
@@ -62,11 +112,13 @@ jobs:
             echo "make_latest=true"  >> "$GITHUB_OUTPUT"
           fi
 
-      - name: GitHub 릴리스에 EXE 첨부
+      - name: GitHub 릴리스 생성 및 자산 첨부
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/DreamFarm.exe
+          files: |
+            dist/DreamFarm.exe
+            ${{ steps.files.outputs.apk_file }}
           generate_release_notes: true
           prerelease: ${{ steps.channel.outputs.prerelease }}
           make_latest: ${{ steps.channel.outputs.make_latest }}

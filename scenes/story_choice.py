@@ -296,7 +296,7 @@ class StoryChoiceScene:
         if self.typewriter.finished:
             return
  
-        self.typewriter.update(dt)
+        self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def _draw_qte(self, screen):
         # 상단 프롬프트

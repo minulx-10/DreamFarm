@@ -18,9 +18,18 @@ from core.game_state import game_state
 
 def _save_dir():
     """저장 파일을 둘 폴더.
+    - Android 환경(ANDROID_PRIVATE 환경변수 감지)에서는 Android 내부 전용 앱 저장 공간을 사용합니다.
     - 스팀 출시 및 권한 문제를 방지하기 위해 사용자 AppData 폴더(Windows) 또는 홈 디렉토리를 사용합니다.
     - 개발 중(frozen이 아닌 경우)에는 이전과 동일하게 core/ 폴더를 사용합니다.
     """
+    if 'ANDROID_PRIVATE' in os.environ:
+        path = os.path.join(os.environ['ANDROID_PRIVATE'], 'save_data')
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            pass
+
     if getattr(sys, "frozen", False):
         appdata = os.environ.get('APPDATA')
         if appdata:

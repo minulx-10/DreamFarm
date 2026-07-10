@@ -455,20 +455,46 @@ _BGM_BUILDERS = {
 # ----------------------------------------------------------------------------
 # 초기화 / 공개 API
 # ----------------------------------------------------------------------------
-def _build_all():
-    for name, builder in _SFX_BUILDERS.items():
-        try:
-            _sfx[name] = builder()
-            _sfx[name].set_volume(_sfx_volume)
-        except Exception as e:
-            print("SFX build failed:", name, e)
-    for name, builder in _BGM_BUILDERS.items():
-        try:
-            # 배경음 빌더는 numpy 파형을 돌려주므로 반드시 Sound로 변환해야 한다.
-            # (이 변환이 빠져 있어 play_bgm의 set_volume에서 조용히 실패, 배경음이 안 나오던 버그)
-            _bgm_sounds[name] = _to_sound(builder(), 0.9)
-        except Exception as e:
-            print("BGM build failed:", name, e)
+_INSTANT_SFX = {"click", "hover", "type"}
+
+
+def _build_instant_only():
+    """즉각 반응이 필요한 기본 효과음만 시작 시점에 먼저 합성한다."""
+    for name in _INSTANT_SFX:
+        if name in _SFX_BUILDERS:
+            try:
+                _sfx[name] = _SFX_BUILDERS[name]()
+                _sfx[name].set_volume(_sfx_volume)
+            except Exception as e:
+                print("Instant SFX build failed:", name, e)
+
+
+def get_or_create_sfx(name):
+    """효과음 지연 합성 및 캐싱 래퍼"""
+    if name not in _sfx:
+        builder = _SFX_BUILDERS.get(name)
+        if builder:
+            try:
+                snd = builder()
+                snd.set_volume(_sfx_volume)
+                _sfx[name] = snd
+            except Exception as e:
+                print("SFX lazy build failed:", name, e)
+                return None
+    return _sfx.get(name)
+
+
+def get_or_create_bgm(name):
+    """배경음 지연 합성 및 캐싱 래퍼"""
+    if name not in _bgm_sounds:
+        builder = _BGM_BUILDERS.get(name)
+        if builder:
+            try:
+                _bgm_sounds[name] = _to_sound(builder(), 0.9)
+            except Exception as e:
+                print("BGM lazy build failed:", name, e)
+                return None
+    return _bgm_sounds.get(name)
 
 
 def init():
@@ -481,7 +507,7 @@ def init():
         pygame.mixer.init()
         pygame.mixer.set_num_channels(16)
         _bgm_channel = pygame.mixer.Channel(0)
-        _build_all()
+        _build_instant_only()
         _enabled = True
     except Exception as e:
         print("오디오 비활성화 (장치 없음 또는 초기화 실패):", e)
@@ -489,10 +515,10 @@ def init():
 
 
 def play(name):
-    """효과음 재생."""
+    """효과음 재생 (지연 합성 반영)."""
     if not _enabled or _muted:
         return
-    snd = _sfx.get(name)
+    snd = get_or_create_sfx(name)
     if snd is None:
         return
     try:
@@ -512,13 +538,13 @@ def type_tick(ch):
 
 
 def play_bgm(name, fade_ms=600):
-    """배경음 루프 재생. 같은 트랙이면 무시."""
+    """배경음 루프 재생 (지연 합성 반영)."""
     global _current_bgm
     if not _enabled:
         return
     if _current_bgm == name:
         return
-    snd = _bgm_sounds.get(name)
+    snd = get_or_create_bgm(name)
     if snd is None or _bgm_channel is None:
         return
     try:

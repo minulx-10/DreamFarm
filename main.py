@@ -188,9 +188,19 @@ def main():
     from core.dev_overlay import DevOverlay
     dev_overlay = DevOverlay()   # F9로 여는 개발자/테스트 모드
 
+    # 전역 상태에 포커스/배속 플래그 초기화
+    game_state.paused = False
+    game_state.fast_forward = False
+    fullscreen_cooldown = 0.0
+
     while game_state.running:
         dt = clock.tick(60) / 1000.0
+        # dt가 튀는 것을 방지하기 위해 최대 0.1초로 클램핑
+        dt = min(0.1, dt)
         game_state.play_time += dt
+
+        if fullscreen_cooldown > 0:
+            fullscreen_cooldown = max(0.0, fullscreen_cooldown - dt)
 
         target_scene = game_state.current_scene
 
@@ -246,6 +256,9 @@ def main():
         if desired_bgm:
             audio.play_bgm(desired_bgm)
 
+        # Space key 홀드 상태 또는 배속 토글 버튼 활성화 상태에 따른 배속 전역 감지
+        game_state.fast_forward = pygame.key.get_pressed()[pygame.K_SPACE] or getattr(game_state, "fast_forward_toggle", False)
+
         events = pygame.event.get()
         
         # 1. F11 전체화면 감지 및 마우스 좌표 가상 해상도로 역배율 보정 (종횡비 고려)
@@ -256,6 +269,11 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 is_fullscreen = not is_fullscreen
                 update_display_mode()
+                fullscreen_cooldown = 0.6  # 전체화면 시 포커스 감지 쿨타임 작동
+            elif event.type == pygame.ACTIVEEVENT:
+                # 윈도우 포커스 분실 감지 (gain이 0이고, 전체화면 쿨다운이 없을 때만 발동)
+                if getattr(event, "gain", 1) == 0 and fullscreen_cooldown <= 0:
+                    game_state.paused = True
             
             # 마우스 입력 좌표 역배율 보정 (레터박스/필러박스 여백 감산 및 가변 배율 적용)
             if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
@@ -272,29 +290,69 @@ def main():
                 mapped_events.append(event)
 
         # 2. 모든 입력을 가상 좌표 이벤트로 흘려보냄
-        # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
-        if not quit_overlay.handle_events(mapped_events):
-            if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")) \
-                    and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
+        # 일시정지 상태일 때 이벤트 감지 분리 처리
+        if game_state.paused:
+            for event in mapped_events:
+                # 마우스 클릭 혹은 임의의 키(ESC 등) 입력 시 해제
+                if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                    game_state.paused = False
+                    audio.play("click")
+        else:
+            # 배속 버튼 터치 선처리 (설정창이나 종료창이 닫혀 있을 때만 작동)
+            if not game_state.request_quit and not settings_overlay.open:
+                ff_btn = pygame.Rect(708, 27, 28, 28)
+                filtered_events = []
                 for event in mapped_events:
-                    if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
-                        audio.toggle_mute()
-                # ESC로 설정 오버레이 열기 — 여기까지 왔다는 건 설정이 닫혀 있다는 뜻(열려 있으면
-                # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면은 예외.
-                esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
-                                  for e in mapped_events)
-                if esc_pressed and current_key not in ("crop_select", "name_input"):
-                    settings_overlay.open = True
-                else:
-                    current_scene_obj.handle_events(mapped_events)
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and ff_btn.collidepoint(event.pos):
+                        game_state.fast_forward_toggle = not getattr(game_state, "fast_forward_toggle", False)
+                        audio.play("click")
+                    else:
+                        filtered_events.append(event)
+                mapped_events = filtered_events
 
-        current_scene_obj.update(dt)
-        settings_overlay.update(dt)
-        from core import achievements
-        achievements.update(dt)
+            # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
+            if not quit_overlay.handle_events(mapped_events):
+                if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")) \
+                        and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
+                    for event in mapped_events:
+                        if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                            audio.toggle_mute()
+                    # ESC로 설정 오버레이 열기 — 여기까지 왔다는 건 설정이 닫혀 있다는 뜻(열려 있으면
+                    # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면은 예외.
+                    esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
+                                      for e in mapped_events)
+                    if esc_pressed and current_key not in ("crop_select", "name_input"):
+                        settings_overlay.open = True
+                    else:
+                        current_scene_obj.handle_events(mapped_events)
+
+        if not game_state.paused:
+            current_scene_obj.update(dt)
+            settings_overlay.update(dt)
+            from core import achievements
+            achievements.update(dt)
 
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
+        
+        # 배속 토글 버튼 그리기 (설정창이나 종료창이 닫혀 있을 때만 활성화)
+        if not game_state.request_quit and not settings_overlay.open:
+            ff_btn = pygame.Rect(708, 27, 28, 28)
+            hovered_ff = ff_btn.collidepoint(pygame.mouse.get_pos())
+            ff_active = getattr(game_state, "fast_forward_toggle", False)
+            bg_ff = (96, 120, 110) if ff_active else (60, 74, 74)
+            if hovered_ff:
+                from core.ui import mix_color
+                bg_ff = mix_color(bg_ff, (250, 246, 231), 0.2)
+            pygame.draw.rect(virtual_screen, bg_ff, ff_btn, border_radius=7)
+            pygame.draw.rect(virtual_screen, (229, 192, 124), ff_btn, 1, border_radius=7)
+            
+            # 화살표 기호 '>>' 렌더링
+            from core.assets import get_font
+            font_ver = get_font(12)
+            symbol = ">>" if ff_active else ">"
+            text_surf = font_ver.render(symbol, True, (250, 246, 231))
+            virtual_screen.blit(text_surf, (ff_btn.centerx - text_surf.get_width() // 2, ff_btn.centery - text_surf.get_height() // 2))
         
         # 좌상단 디버그 버전 표시 (회색 소형 텍스트) — core/version.py 한 곳에서 관리
         try:
@@ -317,6 +375,20 @@ def main():
         quit_overlay.draw(virtual_screen)
         dev_overlay.draw(virtual_screen)
         achievements.draw(virtual_screen)   # 업적 토스트는 항상 맨 위에
+
+        # 창 포커스 분실 일시정지 오버레이 반사
+        if game_state.paused:
+            pause_veil = pygame.Surface((800, 600), pygame.SRCALPHA)
+            pause_veil.fill((12, 14, 20, 195))
+            pygame.draw.rect(pause_veil, (130, 105, 75, 230), (198, 248, 404, 104), 2, border_radius=12)
+            from core.assets import get_font
+            font_pause = get_font(23)
+            font_sub = get_font(16)
+            txt_pause = font_pause.render("게임이 일시정지되었습니다", True, (244, 236, 214))
+            txt_sub = font_sub.render("화면을 클릭하거나 아무 키를 눌러 재개", True, (168, 150, 130))
+            pause_veil.blit(txt_pause, (400 - txt_pause.get_width() // 2, 276))
+            pause_veil.blit(txt_sub, (400 - txt_sub.get_width() // 2, 318))
+            virtual_screen.blit(pause_veil, (0, 0))
 
         # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사 (종횡비 유지 검은 띠 적용)
         scaled_screen = pygame.transform.scale(virtual_screen, (target_w, target_h))

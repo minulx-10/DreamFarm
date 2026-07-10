@@ -287,6 +287,15 @@ class WeedPull(MiniGameBase):
 
     def _update_game(self, dt):
         self.timer -= dt
+        
+        # 마우스 포인터의 가상 좌표상 호버 여부 확인
+        mx, my = pygame.mouse.get_pos()
+        for w in self.items:
+            if not w["pulled"] and abs(mx - w["x"]) < 22 and abs(my - w["y"]) < 28:
+                w["hovered"] = True
+            else:
+                w["hovered"] = False
+
         for p in self.puffs:
             p[2] -= dt
         self.puffs = [p for p in self.puffs if p[2] > 0]
@@ -317,11 +326,20 @@ class WeedPull(MiniGameBase):
         wsp = sprites["weed_nm"] if game_state.nightmare else sprites["weed"]
         is_apple = (game_state.crop == "apple")
         
+        import math
         for w in self.items:
             if w["pulled"]:
                 continue
             ox, oy = int(w["ox"]), int(w["oy"])
-            gx2, gy2 = w["x"] + ox, w["y"] + oy
+            
+            # 호버 시 진동 연출 (드래그하는 개체는 제외)
+            shake_x, shake_y = 0, 0
+            if w.get("hovered", False) and self.grabbed is not w:
+                ticks = pygame.time.get_ticks() * 0.05
+                shake_x = int(math.sin(ticks) * 3)
+                shake_y = int(math.cos(ticks * 0.7) * 2)
+                
+            gx2, gy2 = w["x"] + ox + shake_x, w["y"] + oy + shake_y
 
             if is_apple:
                 # 나무 밑동(anchor)에서 가지가 뻗어 나온 것처럼 굵은 곁가지를 그린다.

@@ -61,7 +61,7 @@ class MemoryScene:
                 game_state.current_scene = game_state.memory_next
             return
 
-        self.typewriter.update(dt)
+        self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")

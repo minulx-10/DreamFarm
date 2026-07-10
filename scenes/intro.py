@@ -106,7 +106,7 @@ class IntroScene:
         game_state.current_scene = "transition"
 
     def update(self, dt):
-        self.typewriter.update(dt)
+        self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")

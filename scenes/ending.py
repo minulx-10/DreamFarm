@@ -360,6 +360,7 @@ class EndingScene:
 
     # 게임이 끝난 화면에서 보이는 '메인으로' 버튼 (앱을 끄지 않고 타이틀로 돌아간다)
     EXIT_BUTTON = pygame.Rect(632, 550, 146, 40)
+    RETRY_BUTTON = pygame.Rect(476, 550, 146, 40)
 
     def _exit_visible(self):
         return self.phase == "journal" or (self.phase == "result" and self.result_done)
@@ -368,6 +369,11 @@ class EndingScene:
         hovered = self.EXIT_BUTTON.collidepoint(pygame.mouse.get_pos())
         label = "갤러리로" if self.from_gallery else "메인으로"
         draw_button(screen, self.EXIT_BUTTON, label, self.font_small, hovered=hovered)
+        
+        # 갤러리 감상이 아닐 때만 '다시 시작' 버튼 표시
+        if not self.from_gallery:
+            hovered_retry = self.RETRY_BUTTON.collidepoint(pygame.mouse.get_pos())
+            draw_button(screen, self.RETRY_BUTTON, "다시 시작", self.font_small, hovered=hovered_retry)
 
     def _to_title(self):
         """엔딩을 마치고 타이틀(또는 갤러리 감상 중이면 갤러리)로 돌아간다."""
@@ -381,11 +387,14 @@ class EndingScene:
 
     def handle_events(self, events):
         for event in events:
-            # 끝난 화면에서는 '메인으로' 버튼으로 타이틀 화면에 돌아간다 (다른 클릭 처리보다 먼저)
-            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                    and self._exit_visible() and self.EXIT_BUTTON.collidepoint(event.pos)):
-                self._to_title()
-                return
+            # 끝난 화면에서는 '메인으로' 또는 '다시 시작' 버튼 처리 (다른 클릭 처리보다 먼저)
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._exit_visible():
+                if self.EXIT_BUTTON.collidepoint(event.pos):
+                    self._to_title()
+                    return
+                elif not self.from_gallery and self.RETRY_BUTTON.collidepoint(event.pos):
+                    self.retry()
+                    return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
@@ -443,35 +452,37 @@ class EndingScene:
 
     def update(self, dt):
         self.carrot_pulse += dt
+        fast_ff = getattr(game_state, "fast_forward", False)
+        effective_dt = dt * 6.0 if fast_ff else dt
 
         if self.phase == "narration":
-            self.typewriter.update(dt)
+            self.typewriter.update(dt, fast_ff)
 
         elif self.phase == "table":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.table_alpha = min(255, int(self.phase_timer * 120))
             if self.phase_timer > 2.5:
                 self.phase = "carrot"
                 self.phase_timer = 0
 
         elif self.phase == "carrot":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
 
         elif self.phase == "golden":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.golden_alpha = min(255, int(self.phase_timer * 200))
             if self.phase_timer > 1.8:
                 self.phase = "dad_voice"
                 self.phase_timer = 0
 
         elif self.phase == "dad_voice":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.dad_text_alpha = min(255, int(self.phase_timer * 150))
 
         elif self.phase == "result":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             if self.result_y > 260:
-                self.result_y -= 55 * dt
+                self.result_y -= 55 * effective_dt
             else:
                 self.result_y = 260
                 self.result_done = True
