@@ -21,3 +21,6 @@ test_log.txt
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Buildozer
+!buildozer.spec
