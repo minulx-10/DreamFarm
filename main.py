@@ -8,10 +8,20 @@ try:
         game_main.main()
 except Exception as e:
     tb = traceback.format_exc()
-    # Write to crash log file in android private sandbox if available
+    # Write to crash log file in multiple locations (including user-accessible external storage via USB)
+    paths_to_try = [
+        f"/sdcard/Android/data/mongjung.nongwon.dreamfarm/files/crash.txt",
+        f"/storage/emulated/0/Android/data/mongjung.nongwon.dreamfarm/files/crash.txt",
+        f"/sdcard/DreamFarm_crash.txt",
+        f"/storage/emulated/0/DreamFarm_crash.txt"
+    ]
     if 'ANDROID_PRIVATE' in os.environ:
+        paths_to_try.append(os.path.join(os.environ['ANDROID_PRIVATE'], 'crash.txt'))
+        
+    for path in paths_to_try:
         try:
-            with open(os.path.join(os.environ['ANDROID_PRIVATE'], 'crash.txt'), 'w', encoding='utf-8') as f:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
                 f.write(tb)
         except Exception:
             pass
