@@ -80,7 +80,7 @@ jobs:
       - name: 의존성 패키지 설치
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libsqlite3-dev libgdbm-dev libssl-dev libffi-dev uuid-dev alsa-utils libasound2-dev libtinfo5 cmake
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses-dev libsqlite3-dev libgdbm-dev libssl-dev libffi-dev uuid-dev alsa-utils libasound2-dev cmake
 
       - name: Buildozer 및 Cython 설치
         run: |
