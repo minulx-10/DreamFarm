@@ -100,6 +100,19 @@ jobs:
           APK_FILE=$(find dist -name "*.apk" | head -n 1)
           echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
 
+      - name: CHANGELOG에서 릴리스 노트 추출
+        id: notes
+        shell: bash
+        run: |
+          python -c "
+          import re
+          content = open('CHANGELOG.md', encoding='utf-8').read()
+          match = re.search(r'## v[^\n]+.*?(?=\n## v|$)', content, re.S)
+          if match:
+              with open('release_notes.md', 'w', encoding='utf-8') as f:
+                  f.write(match.group(0))
+          "
+
       - name: 릴리스 채널 판별
         id: channel
         shell: bash
@@ -119,6 +132,6 @@ jobs:
           files: |
             dist/DreamFarm.exe
             ${{ steps.files.outputs.apk_file }}
-          generate_release_notes: true
+          body_path: release_notes.md
           prerelease: ${{ steps.channel.outputs.prerelease }}
           make_latest: ${{ steps.channel.outputs.make_latest }}
