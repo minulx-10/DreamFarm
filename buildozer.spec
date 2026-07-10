@@ -46,6 +46,9 @@ android.private_storage = True
 # (str) Android NDK version to use
 android.ndk = 25b
 
+# (str) python-for-android branch to use
+p4a.branch = develop
+
 # (str) Android NDK directory (if empty, it will be automatically downloaded)
 #android.ndk_path =
 
