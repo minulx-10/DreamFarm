@@ -43,6 +43,9 @@ android.archs = arm64-v8a, armeabi-v7a
 # (bool) Use private storage for data (set to True for default behaviour)
 android.private_storage = True
 
+# (str) Android NDK version to use
+android.ndk = 25b
+
 # (str) Android NDK directory (if empty, it will be automatically downloaded)
 #android.ndk_path =
 
