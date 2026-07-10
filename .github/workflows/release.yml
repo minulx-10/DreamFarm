@@ -167,13 +167,16 @@ jobs:
             echo "make_latest=true"  >> "$GITHUB_OUTPUT"
           fi
 
-      - name: GitHub 릴리스 생성 및 자산 첨부
+      - name: GitHub 릴리스 생성/갱신 및 자산 첨부
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release_notes.md
           files: |
             dist/DreamFarm.exe
             ${{ steps.files.outputs.apk_file }}
-          body_path: release_notes.md
           prerelease: ${{ steps.channel.outputs.prerelease }}
-          make_latest: ${{ steps.channel.outputs.make_latest }}
+          makeLatest: ${{ steps.channel.outputs.make_latest }}
+          allowUpdates: true
