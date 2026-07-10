@@ -16,7 +16,7 @@ source.include_exts = py,png,jpg,ttf
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,pygame-ce,numpy==1.24.3
+requirements = python3,pygame-ce,numpy
 
 # (str) Application versioning (method 1)
 version = 2.2.2
@@ -44,7 +44,7 @@ android.archs = arm64-v8a, armeabi-v7a
 android.private_storage = True
 
 # (str) Android NDK version to use
-android.ndk = 25b
+#android.ndk = 25b
 
 # (str) python-for-android branch to use
 p4a.branch = develop
