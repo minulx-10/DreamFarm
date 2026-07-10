@@ -94,6 +94,13 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
+          # Unset pre-installed runner Android SDK/NDK variables to let Buildozer manage them cleanly in the workspace
+          unset ANDROID_HOME
+          unset ANDROID_SDK_ROOT
+          unset ANDROID_NDK
+          unset ANDROID_NDK_HOME
+          unset ANDROID_NDK_ROOT
+          unset ANDROID_NDK_LATEST_HOME
           yes | buildozer android debug
 
       # 빌드된 APK 파일 위치 찾기 (보통 bin/ 하위에 생성됨)
