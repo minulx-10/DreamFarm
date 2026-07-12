@@ -1,14 +1,40 @@
 """몽중농원 절차적 오디오 엔진.
 
-모든 효과음과 배경음을 numpy로 런타임에 합성한다 — 외부 음원 파일 불필요.
-오디오 장치가 없거나 mixer 초기화에 실패해도 모든 함수가 조용히 no-op으로
-동작하도록 설계되어 게임 진행을 막지 않는다.
+효과음과 배경음은 원래 numpy로 런타임에 합성했다. 그러나 numpy는
+python-for-android(안드로이드 빌드)에서 매번 소스 컴파일돼 빌드를 몇 배 느리게
+하고 자주 깨뜨린다. 그래서 배포 파이프라인은 빌드 시점에 `tools/bake_audio.py`로
+모든 소리를 미리 .ogg로 구워(core/sound/**) APK/EXE에 실어 보내고, 런타임에는
+그 파일을 불러 재생한다 — numpy 없이도 동작한다.
+
+데스크톱 개발 환경에서 .ogg가 아직 없으면 그때만 numpy를 지연 로드해 즉석
+합성한다(기존과 동일한 폴백). 오디오 장치가 없거나 mixer 초기화에 실패해도 모든
+함수가 조용히 no-op으로 동작하도록 설계되어 게임 진행을 막지 않는다.
 """
 
-import numpy as np
+import os
 import pygame
 
+from core.assets import resource_path
+
 SAMPLE_RATE = 44100
+
+# numpy는 '합성'에만 필요하다. 미리 구운 .ogg를 쓰는 정상 경로에서는 import하지
+# 않는다(안드로이드엔 numpy가 없으므로 최상단 import는 곧 크래시다). 합성이 실제로
+# 필요한 순간에만 아래 _ensure_np()로 지연 로드한다.
+np = None
+
+
+def _ensure_np():
+    """합성이 필요할 때만 numpy를 지연 로드한다. 성공하면 True."""
+    global np
+    if np is None:
+        try:
+            import numpy as _np
+            np = _np
+        except Exception as e:
+            print("numpy 없음 — 즉석 오디오 합성 불가(구운 .ogg만 재생):", e)
+            return False
+    return True
 
 _enabled = False
 _muted = False
@@ -459,41 +485,59 @@ _INSTANT_SFX = {"click", "hover", "type"}
 
 
 def _build_instant_only():
-    """즉각 반응이 필요한 기본 효과음만 시작 시점에 먼저 합성한다."""
+    """즉각 반응이 필요한 기본 효과음만 시작 시점에 먼저 준비한다(로드 또는 합성)."""
     for name in _INSTANT_SFX:
-        if name in _SFX_BUILDERS:
-            try:
-                _sfx[name] = _SFX_BUILDERS[name]()
-                _sfx[name].set_volume(_sfx_volume)
-            except Exception as e:
-                print("Instant SFX build failed:", name, e)
+        try:
+            get_or_create_sfx(name)
+        except Exception as e:
+            print("Instant SFX prepare failed:", name, e)
+
+
+def _load_baked(category, name):
+    """미리 구워둔 core/sound/<category>/<name>.ogg 를 불러온다(있으면)."""
+    path = resource_path(os.path.join("sound", category, name + ".ogg"))
+    if os.path.exists(path):
+        try:
+            return pygame.mixer.Sound(path)
+        except Exception as e:
+            print("구운 사운드 로드 실패:", path, e)
+    return None
 
 
 def get_or_create_sfx(name):
-    """효과음 지연 합성 및 캐싱 래퍼"""
+    """효과음 준비 래퍼 — 구운 .ogg를 우선 불러오고, 없으면 numpy로 즉석 합성."""
     if name not in _sfx:
-        builder = _SFX_BUILDERS.get(name)
-        if builder:
-            try:
-                snd = builder()
-                snd.set_volume(_sfx_volume)
-                _sfx[name] = snd
-            except Exception as e:
-                print("SFX lazy build failed:", name, e)
-                return None
+        snd = _load_baked("sfx", name)
+        if snd is None:
+            builder = _SFX_BUILDERS.get(name)
+            if builder and _ensure_np():
+                try:
+                    snd = builder()
+                except Exception as e:
+                    print("SFX lazy build failed:", name, e)
+                    return None
+        if snd is None:
+            return None
+        snd.set_volume(_sfx_volume)
+        _sfx[name] = snd
     return _sfx.get(name)
 
 
 def get_or_create_bgm(name):
-    """배경음 지연 합성 및 캐싱 래퍼"""
+    """배경음 준비 래퍼 — 구운 .ogg를 우선 불러오고, 없으면 numpy로 즉석 합성."""
     if name not in _bgm_sounds:
-        builder = _BGM_BUILDERS.get(name)
-        if builder:
-            try:
-                _bgm_sounds[name] = _to_sound(builder(), 0.9)
-            except Exception as e:
-                print("BGM lazy build failed:", name, e)
-                return None
+        snd = _load_baked("bgm", name)
+        if snd is None:
+            builder = _BGM_BUILDERS.get(name)
+            if builder and _ensure_np():
+                try:
+                    snd = _to_sound(builder(), 0.9)
+                except Exception as e:
+                    print("BGM lazy build failed:", name, e)
+                    return None
+        if snd is None:
+            return None
+        _bgm_sounds[name] = snd
     return _bgm_sounds.get(name)
 
 
@@ -503,7 +547,10 @@ def init():
     if _enabled:
         return
     try:
-        pygame.mixer.pre_init(SAMPLE_RATE, -16, 2, 512)
+        # 안드로이드는 오디오 지연/언더런이 잦아 버퍼를 조금 키운다(512→1024).
+        from core.platform import IS_ANDROID
+        buffer = 1024 if IS_ANDROID else 512
+        pygame.mixer.pre_init(SAMPLE_RATE, -16, 2, buffer)
         pygame.mixer.init()
         pygame.mixer.set_num_channels(16)
         _bgm_channel = pygame.mixer.Channel(0)
@@ -624,3 +671,25 @@ def set_bgm_volume(v):
 
 def is_enabled():
     return _enabled
+
+
+def pause_all():
+    """앱이 백그라운드로 갈 때 — 모든 채널(효과음+배경음)을 일시정지.
+    안드로이드에서 재생을 켠 채 백그라운드로 가면 복귀 시 크래시/멈춤이 알려져 있어
+    반드시 멈춰야 한다."""
+    if not _enabled:
+        return
+    try:
+        pygame.mixer.pause()
+    except Exception:
+        pass
+
+
+def resume_all():
+    """앱이 포그라운드로 복귀할 때 — 일시정지했던 채널을 다시 재생."""
+    if not _enabled:
+        return
+    try:
+        pygame.mixer.unpause()
+    except Exception:
+        pass

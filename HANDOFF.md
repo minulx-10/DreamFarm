@@ -9,7 +9,7 @@
 Pygame으로 제작한 감성 내러티브 농사 시뮬레이션 게임입니다. 식탁에서 반찬을 밀어낸 주인공 아이가 꿈속의 밭에서 여러 작물을 기르는 밭일을 겪으며, 흙 묻은 아버지의 노동과 다정한 사랑을 천천히 이해해 나가는 과정을 그립니다. 
 
 - **가상 해상도**: 기본 800×600 (지옥/악몽 모드는 960×720) 캔버스에 렌더링 후, 사용자 창 크기에 맞춰 레터박스를 동적 연산하는 스케일링을 수행합니다.
-- **디자인 철학**: 픽셀아트 기반 그래픽과 numpy를 이용한 런타임 신디사이저 효과음/배경음만으로 구성되어, 외부 미디어 소스(음원/이미지)에 의존하지 않고 패키징 볼륨을 극대화합니다.
+- **디자인 철학**: 픽셀아트 기반 그래픽과 절차적 신디사이저 효과음/배경음으로 구성됩니다. 소리는 개발/빌드 시점에 numpy로 합성하되(`tools/bake_audio.py`), 배포 산출물에는 `.ogg`로 미리 구워 실어 **런타임에는 numpy가 필요 없습니다**(안드로이드 빌드 안정화의 핵심).
 
 ---
 
@@ -38,7 +38,12 @@ main.py                게임 메인 엔트리 및 프레임 루프. 씬 전환 
 core/
   game_state.py        게임 전역 상태 관리, 엔딩 판정 로직, 한글 조사 결합 헬퍼 및 내러티브 리디렉션 매핑
   narrative_data.py    게임 내 스토리 이벤트, 깨달음 및 대사 텍스트 테이블 격리 관리
-  audio.py             Numpy 기반 절차적 오디오 합성 엔진 (외부 음원 파일 없음)
+  audio.py             오디오 API. 구운 core/sound/**.ogg 우선 로드, 없으면 numpy 지연합성 폴백
+  platform.py          플랫폼 감지(IS_ANDROID) — p4a의 ANDROID_ARGUMENT 환경변수로 판별
+tools/
+  bake_audio.py        빌드 시 numpy로 소리를 core/sound/**.ogg 로 굽는 도구(런타임 numpy 제거용)
+p4a-recipes/
+  pygame-ce/           python-for-android용 pygame-ce 로컬 레시피(PR #2971, v2.4.0 고정)
   assets.py            픽셀아트 스프라이트 생성, 폰트 드로잉 및 계절별 렌더링 모듈
   save_system.py       게임 세이브 및 메타데이터(업적/엔딩 기록)의 메모리 캐시 및 원자적 쓰기(Atomic Write) 구현
   achievements.py      업적 조건 검사 및 업적 달성 토스트 알림 연출
@@ -72,8 +77,10 @@ scenes/
      ```
 2. **알파 블렌딩 투명도 처리**:
    - Pygame의 `pygame.draw` 함수들은 기본적으로 투명도(Alpha)를 덮어쓰므로 반투명 겹침을 표현할 때는 반드시 `pygame.SRCALPHA` 속성을 가진 독립 서피스를 생성하여 그 위에 드로잉한 후 메인 캔버스에 `blit` 해야 합니다.
-3. **절차적 오디오 연산**:
-   - 효과음과 배경음은 numpy 배열 연산을 활용하여 ADSR 볼륨 엔벨로프와 오디오 톤을 합성하고, 최종적으로 `_to_sound` 함수를 사용해 int16 스테레오 형식으로 안전 변환하여 재생합니다.
+3. **절차적 오디오 연산 (구워서 배포)**:
+   - 효과음과 배경음은 numpy 배열 연산으로 ADSR 엔벨로프·톤을 합성하고 `_to_sound`로 int16 스테레오로 변환합니다.
+   - **런타임에는 numpy를 쓰지 않습니다.** 빌드 시 `python tools/bake_audio.py`가 이 합성 결과를 `core/sound/{sfx,bgm}/*.ogg`로 굽고(길이가 긴 BGM은 libsndfile 크래시 회피를 위해 블록 단위로 인코딩), `core/audio.py`는 그 파일을 우선 로드합니다. `.ogg`가 없을 때만 numpy를 지연 로드해 즉석 합성합니다.
+   - **안드로이드**: `SDL_ANDROID_TRAP_BACK_BUTTON`으로 뒤로가기(K_AC_BACK→ESC)를 가로채고, `APP_WILLENTERBACKGROUND/DIDENTERFOREGROUND`로 백그라운드 시 오디오·렌더를 멈춥니다. p4a에 pygame-ce 레시피가 없어 `p4a-recipes/`의 로컬 레시피로 빌드합니다. `requirements`에서 numpy를 뺀 것이 빌드 속도·안정성의 핵심입니다.
 4. **글자 래핑 및 넘침 방지**:
    - 해상도나 레이아웃 영역에 따라 글씨가 잘리는 현상을 막기 위해, 카드나 컨테이너의 내부 너비보다 충분히 좁은 가로 폭 제약(`col_w - 74` 등)을 주어 `wrap_text`가 개행을 수행하게 유도합니다.
 

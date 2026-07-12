@@ -12,51 +12,57 @@ package.domain = mongjung.nongwon
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,ttf
+# ogg = 미리 구운 효과음/배경음(core/sound/**). 이게 있어야 런타임에 numpy 없이 소리가 난다.
+source.include_exts = py,png,jpg,ttf,ogg
 
 # (list) Application requirements
-# comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,pygame-ce,numpy
+# numpy 는 뺐다 — 소리는 빌드 시 tools/bake_audio.py 로 .ogg 로 미리 구워 싣는다.
+# numpy 를 p4a 로 매번 소스 컴파일하는 게 빌드를 느리고 취약하게 만든 주범이었다.
+# pygame-ce 는 p4a 에 병합된 레시피가 없어(아래 p4a.local_recipes) 로컬 레시피로 빌드한다.
+requirements = python3,pygame-ce
+
+# (str) python-for-android 로컬 레시피 폴더 — pygame-ce 레시피(PR #2971)를 여기 담아 쓴다.
+p4a.local_recipes = ./p4a-recipes
 
 # (str) Application versioning (method 1)
 version = 2.2.2
 
+# (str) 앱 아이콘 / 스플래시 (동그란 로고 재사용)
+icon.filename = %(source.dir)s/core/logo.png
+presplash.filename = %(source.dir)s/core/logo.png
+
+# (str) 스플래시 배경색 (게임 밤하늘 톤)
+android.presplash_color = #14121E
+
 # (list) Supported orientations
-# Valid values are: landscape, portrait, portrait-upsidedown, landscape-left, landscape-right
 orientation = landscape
 
 # (bool) Indicate if the application should be fullscreen or not
 fullscreen = 1
 
 # (list) Permissions
-android.permissions = INTERNET
+# 인터넷/저장소 권한 불필요 — 폰트·소리·이미지 모두 앱에 내장, 세이브는 앱 전용 공간 사용.
+android.permissions =
 
 # (int) Minimum API your APK will support.
 android.minapi = 24
 
-# (int) Target API your APK will support.
-android.api = 33
+# (int) Target API — 구글 플레이 정책상 34 이상 필요.
+android.api = 34
+
+# (str) Android NDK version — p4a 툴체인이 검증한 25b 로 고정(그 이상은 종종 깨진다).
+android.ndk = 25b
 
 # (list) Supported architectures
-android.archs = arm64-v8a, armeabi-v7a
+# arm64-v8a 단일 — 근래(약 2019년 이후) 모든 안드로이드폰이 arm64다. armeabi-v7a 를 빼면
+# 빌드 시간이 거의 절반으로 준다. 구형 32비트 기기 지원이 필요하면 아래에 armeabi-v7a 를 더한다.
+android.archs = arm64-v8a
 
 # (bool) Use private storage for data (set to True for default behaviour)
 android.private_storage = True
 
-# (str) Android NDK version to use
-#android.ndk = 25b
-
-# (str) python-for-android branch to use
+# (str) python-for-android branch — 로컬 pygame-ce 레시피가 쓰는 최신 API 를 위해 develop.
 p4a.branch = develop
-
-# (str) Android NDK directory (if empty, it will be automatically downloaded)
-#android.ndk_path =
-
-# (str) Android SDK directory (if empty, it will be automatically downloaded)
-#android.sdk_path =
-
-# (str) ANT directory (if empty, it will be automatically downloaded)
-#android.ant_path =
 
 [buildozer]
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))

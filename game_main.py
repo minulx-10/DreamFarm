@@ -5,6 +5,7 @@ import math
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from core.platform import IS_ANDROID
 from core.game_state import game_state, apply_second_run
 from core import audio
 from core.settings_overlay import SettingsOverlay
@@ -67,7 +68,9 @@ def main():
         pass
 
     # 디스플레이 초기화 변수
-    is_fullscreen = False
+    # 안드로이드는 창 개념이 없고 항상 전체화면이므로, 시작부터 전체화면 스케일 모드로 둔다.
+    # (800x600 가상 캔버스를 기기 해상도에 4:3 레터박스로 맞춰 그린다.)
+    is_fullscreen = IS_ANDROID
     current_nightmare = False
     screen = None
     offset_x, offset_y = 0, 0
@@ -193,6 +196,13 @@ def main():
     game_state.fast_forward = False
     fullscreen_cooldown = 0.0
 
+    # 안드로이드 생명주기/뒤로가기 상수. 데스크톱 pygame-ce 에도 존재하나 발생하지 않으며,
+    # 구버전 classic pygame 폴백을 대비해 getattr 로 안전하게 얻는다.
+    APP_BG = getattr(pygame, "APP_WILLENTERBACKGROUND", None)
+    APP_FG = getattr(pygame, "APP_DIDENTERFOREGROUND", None)
+    KEY_BACK = getattr(pygame, "K_AC_BACK", None)
+    app_backgrounded = False
+
     while game_state.running:
         dt = clock.tick(60) / 1000.0
         # dt가 튀는 것을 방지하기 위해 최대 0.1초로 클램핑
@@ -260,7 +270,39 @@ def main():
         game_state.fast_forward = pygame.key.get_pressed()[pygame.K_SPACE] or getattr(game_state, "fast_forward_toggle", False)
 
         events = pygame.event.get()
-        
+
+        # --- 안드로이드 생명주기: 백그라운드 진입 시 오디오·렌더를 즉시 멈춘다 ---
+        # (재생/그리기를 켠 채 백그라운드로 가면 복귀 시 크래시/멈춤이 알려져 있다.)
+        for event in events:
+            if APP_BG is not None and event.type == APP_BG:
+                audio.pause_all()
+                app_backgrounded = True
+                # 밀려날 때 진행 중인 밭을 자동 저장(자동저장이 켜져 있으면)
+                if current_key == "farm" and scenes.get("farm") is not None:
+                    from core import save_system
+                    if save_system.get_setting("autosave"):
+                        try:
+                            save_system.save_game(scenes["farm"])
+                        except Exception:
+                            pass
+            elif APP_FG is not None and event.type == APP_FG:
+                audio.resume_all()
+                app_backgrounded = False
+        if app_backgrounded:
+            # GL 컨텍스트가 백업된 상태 → 그리기/flip 금지. 이벤트 큐만 돌리며 대기.
+            pygame.time.wait(120)
+            continue
+
+        # 안드로이드 하드웨어 '뒤로가기'(K_AC_BACK)를 ESC 로 치환 →
+        # 오버레이 닫기·뒤로가기·설정 열기 등 기존 ESC 로직을 그대로 재사용한다.
+        if KEY_BACK is not None:
+            events = [
+                pygame.event.Event(e.type, key=pygame.K_ESCAPE, mod=0,
+                                   unicode=("\x1b" if e.type == pygame.KEYDOWN else ""))
+                if e.type in (pygame.KEYDOWN, pygame.KEYUP) and e.key == KEY_BACK else e
+                for e in events
+            ]
+
         # 1. F11 전체화면 감지 및 마우스 좌표 가상 해상도로 역배율 보정 (종횡비 고려)
         mapped_events = []
         for event in events:
@@ -270,8 +312,9 @@ def main():
                 is_fullscreen = not is_fullscreen
                 update_display_mode()
                 fullscreen_cooldown = 0.6  # 전체화면 시 포커스 감지 쿨타임 작동
-            elif event.type == pygame.ACTIVEEVENT:
+            elif not IS_ANDROID and event.type == pygame.ACTIVEEVENT:
                 # 윈도우 포커스 분실 감지 (gain이 0이고, 전체화면 쿨다운이 없을 때만 발동)
+                # 안드로이드에서는 ACTIVEEVENT 가 부정확해 APP_* 생명주기 이벤트로 대체한다.
                 if getattr(event, "gain", 1) == 0 and fullscreen_cooldown <= 0:
                     game_state.paused = True
             

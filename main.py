@@ -2,6 +2,12 @@ import os
 import sys
 import traceback
 
+# 안드로이드 하드웨어/제스처 '뒤로가기' 버튼을 SDL 이 삼켜 앱을 곧장 종료해 버리지
+# 않도록, pygame 이 임포트/초기화되기 '전에' 트랩 힌트를 켜 둔다. 이렇게 하면 뒤로가기가
+# pygame.K_AC_BACK 키 이벤트로 우리 쪽에 전달돼 '한 단계 뒤로'로 쓸 수 있다.
+# (데스크톱에서는 이 환경변수가 무시되므로 무해하다.)
+os.environ.setdefault("SDL_ANDROID_TRAP_BACK_BUTTON", "1")
+
 try:
     import game_main
     if __name__ == "__main__":

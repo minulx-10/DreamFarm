@@ -4,6 +4,9 @@ name: Build & Release (Windows EXE & Android APK)
 #  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시)
 #  - 개발 태그   (예: v1.0.5-dev.1)  → 프리릴리스 (테스터용, 'Latest' 아님)
 # Actions 탭에서 수동 실행(workflow_dispatch)도 가능.
+#
+# 소리는 두 잡 모두 tools/bake_audio.py 로 .ogg 를 미리 구워 싣는다. 그래서 안드로이드
+# APK 에는 numpy 가 필요 없다(numpy 소스 컴파일이 빌드를 느리고 취약하게 만들던 주범).
 on:
   push:
     tags:
@@ -28,8 +31,10 @@ jobs:
       - name: 의존성 설치
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install -r requirements.txt soundfile pyinstaller
+
+      - name: 소리 굽기 (numpy → .ogg)
+        run: python tools/bake_audio.py
 
       # exe 파일명은 ASCII로.
       - name: EXE 빌드 (PyInstaller onefile)
@@ -40,6 +45,7 @@ jobs:
           --add-data "core/dad.png;core"
           --add-data "core/field_bed.jpg;core"
           --add-data "core/logo.png;core"
+          --add-data "core/sound;core/sound"
           main.py
 
       - name: 빌드 산출물 업로드 (아티팩트)
@@ -50,6 +56,8 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
+    # 안드로이드 빌드가 실패해도 Windows 릴리스는 막지 않는다(아직 안정화 중).
+    continue-on-error: true
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
@@ -65,52 +73,49 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Buildozer NDK/SDK 및 캐시 폴더들 캐싱하여 속도 최적화
+      # Buildozer NDK/SDK 및 캐시 폴더 캐싱. numpy 를 뺀 뒤로는 캐시가 잘 재사용된다.
+      # 키는 buildozer.spec + 로컬 레시피 해시에만 의존 → 이 둘이 안 바뀌면 캐시 히트.
       - name: Cache Buildozer directories
         uses: actions/cache@v4
         with:
           path: |
             .buildozer
-            .buildozer_global
+            ~/.buildozer
             ~/.gradle
-          key: buildozer-v3-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-v4-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'p4a-recipes/**') }}
           restore-keys: |
-            buildozer-v3-${{ runner.os }}-
+            buildozer-v4-${{ runner.os }}-
 
-      - name: 의존성 패키지 설치
+      - name: 시스템 빌드 의존성 설치
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             git zip unzip openjdk-17-jdk \
             autoconf automake libtool libtool-bin libltdl-dev m4 autotools-dev autoconf-archive \
             pkg-config zlib1g-dev libncurses-dev libsqlite3-dev libgdbm-dev libssl-dev libffi-dev \
-            uuid-dev alsa-utils libasound2-dev libbz2-dev libreadline-dev liblzma-dev tk-dev \
-            gettext cmake
+            libbz2-dev libreadline-dev liblzma-dev gettext cmake
 
-      - name: Buildozer 및 Cython 설치
+      - name: 파이썬 빌드 도구 설치 (Cython<3, buildozer 고정)
         run: |
           pip install --upgrade pip
-          pip install "Cython<3.0" buildozer
+          pip install "Cython==0.29.36" "buildozer==1.5.0" numpy soundfile pygame-ce
 
-      - name: Build APK with Buildozer
+      - name: 소리 굽기 (numpy → .ogg)
+        run: python tools/bake_audio.py
+
+      - name: APK 빌드 (Buildozer)
         run: |
-          # Unset pre-installed runner Android SDK/NDK variables to let Buildozer manage them cleanly in the workspace
-          unset ANDROID_HOME
-          unset ANDROID_SDK_ROOT
-          unset ANDROID_NDK
-          unset ANDROID_NDK_HOME
-          unset ANDROID_NDK_ROOT
-          unset ANDROID_NDK_LATEST_HOME
+          # 러너에 미리 깔린 Android SDK/NDK 환경변수를 지워 Buildozer 가 워크스페이스에서
+          # 자체 관리하도록 격리한다(과거 NDK 충돌 회피).
+          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           yes | buildozer android debug
 
-      # 빌드된 APK 파일 위치 찾기 (보통 bin/ 하위에 생성됨)
-      - name: APK 파일명 확인
+      - name: APK 파일 경로 확인
         id: apk_find
-        run: |
-          APK_PATH=$(find bin/ -name "*.apk" | head -n 1)
-          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+        run: echo "apk_path=$(find bin/ -name '*.apk' | head -n 1)" >> "$GITHUB_OUTPUT"
 
       - name: 빌드 산출물 업로드 (아티팩트)
+        if: steps.apk_find.outputs.apk_path != ''
         uses: actions/upload-artifact@v4
         with:
           name: DreamFarm-android
@@ -129,18 +134,25 @@ jobs:
           name: DreamFarm-windows
           path: dist
 
+      # 안드로이드 아티팩트는 없을 수도 있으므로(빌드 실패 시) 실패해도 넘어간다.
       - name: 빌드 다운로드 (Android)
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: DreamFarm-android
           path: dist
 
-      - name: 파일 이름 찾기 및 정리
+      - name: 릴리스 자산 목록 구성
         id: files
         shell: bash
         run: |
-          APK_FILE=$(find dist -name "*.apk" | head -n 1)
-          echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
+          {
+            echo "assets<<EOF"
+            echo "dist/DreamFarm.exe"
+            APK_FILE=$(find dist -name "*.apk" | head -n 1)
+            if [ -n "$APK_FILE" ]; then echo "$APK_FILE"; fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: CHANGELOG에서 릴리스 노트 추출
         id: notes
@@ -174,9 +186,7 @@ jobs:
           tag: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           body_path: release_notes.md
-          files: |
-            dist/DreamFarm.exe
-            ${{ steps.files.outputs.apk_file }}
+          files: ${{ steps.files.outputs.assets }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
           makeLatest: ${{ steps.channel.outputs.make_latest }}
           allowUpdates: true

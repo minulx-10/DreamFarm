@@ -3,6 +3,22 @@
 이 파일은 배포마다 갱신한다. 태그 이름 규칙: 안정 `vX.Y.Z`, 개발/테스터 `vX.Y.Z-dev.N`.
 최신이 위로 온다.
 
+## v2.2.2-dev.1 (2026-07-12) — 프리릴리스 (Android 빌드 재정비: numpy 제거·pygame-ce 레시피·터치 대응)
+- **⚡ 빌드 근본 개편 — 런타임에서 numpy 제거 (빌드 속도·안정성 대폭 개선)**:
+  - 모든 효과음/배경음은 원래 `core/audio.py`가 numpy로 런타임 합성했는데, numpy는 python-for-android에서 아키텍처마다 소스 컴파일돼(Meson/Cython/C) APK 빌드를 몇 배 느리게 하고 NDK/Cython 충돌로 자주 깨뜨리던 주범이었습니다.
+  - 빌드 시 `tools/bake_audio.py`가 numpy로 소리를 미리 합성해 `core/sound/**.ogg`(총 23개, 약 1.1MB)로 굽고, 런타임에는 그 파일만 불러 재생하도록 `core/audio.py`를 재설계했습니다. 이제 **안드로이드 APK에 numpy가 아예 들어가지 않습니다**.
+  - numpy는 지연 로드로 바뀌어, 데스크톱에서 아직 굽지 않은 소리는 예전처럼 즉석 합성하는 폴백을 유지합니다(개발 편의 유지, 동작 동일).
+- **pygame-ce python-for-android 레시피 추가**:
+  - p4a에는 아직 병합된 pygame-ce 레시피가 없어 `requirements = pygame-ce`만으로는 빌드가 실패했습니다(기존 빌드가 깨지던 핵심 원인). PR #2971의 레시피를 `p4a-recipes/pygame-ce/`에 로컬로 담고 `buildozer.spec`의 `p4a.local_recipes`로 연결했습니다(버전 2.4.0 고정 — 2.5.x는 meson 전환으로 이 레시피와 비호환).
+- **안드로이드 입력·생명주기 대응**:
+  - 하드웨어/제스처 **'뒤로가기' 버튼**을 SDL이 삼켜 앱을 강제 종료하지 않도록 `SDL_ANDROID_TRAP_BACK_BUTTON`을 켜고, `K_AC_BACK`을 ESC로 치환해 '오버레이 닫기·뒤로가기·설정 열기' 기존 로직을 그대로 쓰도록 했습니다.
+  - 앱이 백그라운드로 갈 때(`APP_WILLENTERBACKGROUND`) 오디오와 렌더링을 즉시 멈추고(복귀 시 크래시 방지), 진행 중인 밭을 자동 저장하며, 포그라운드 복귀 시(`APP_DIDENTERFOREGROUND`) 재개하도록 `game_main.py` 이벤트 루프를 보강했습니다.
+  - 안드로이드에서 시작부터 전체화면 스케일 모드로 두고(창 개념 없음), 부정확한 `ACTIVEEVENT` 포커스 감지는 데스크톱에서만 쓰도록 분리했습니다. 오디오 버퍼도 안드로이드에서 1024로 키워 언더런을 줄였습니다.
+- **빌드 파이프라인 정비 (`.github/workflows/release.yml`, `buildozer.spec`)**:
+  - CI가 buildozer 전에 소리를 굽고, numpy를 요구사항에서 제거했으며, 캐시 키를 안정화(spec+레시피 해시 기반)해 재빌드가 캐시를 재사용하도록 했습니다.
+  - 아키텍처를 `arm64-v8a` 단일로(빌드 시간 ≈절반), 타깃 API 34(플레이 정책), NDK 25b 고정, 아이콘/스플래시(로고) 지정, 불필요한 권한(INTERNET) 제거.
+  - 안드로이드 잡이 실패해도 Windows EXE 릴리스는 막지 않도록 분리했습니다.
+
 ## v2.2.2-dev.0 (2026-07-10) — 프리릴리스 (Android 지원 확장 빌드)
 - **Android 플랫폼 지원 및 Buildozer 빌드 자동화**:
   - Android 환경 배포용 APK 빌드를 자동화하기 위해 프로젝트 루트에 `buildozer.spec` 설정 파일을 추가하고, GitHub Actions 워크플로우를 보완하여 태그 push 시 Windows EXE와 Android APK가 동시에 빌드 및 GitHub Releases에 배포되도록 구축했습니다.
