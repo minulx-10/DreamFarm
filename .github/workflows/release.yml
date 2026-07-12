@@ -127,6 +127,46 @@ jobs:
           name: DreamFarm-android
           path: ${{ steps.apk_find.outputs.apk_path }}
 
+      # ── 플레이스토어용 서명된 AAB ──────────────────────────────────────────
+      # keystore 시크릿이 등록돼 있을 때만 동작한다. 없으면 위 디버그 APK만 나온다.
+      # 등록 방법은 저장소의 RELEASING.md 참고.
+      - name: 서명 시크릿 존재 확인
+        id: signcheck
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; else echo "signed=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 릴리스 서명 빌드 (AAB, 플레이스토어용)
+        if: steps.signcheck.outputs.signed == 'true'
+        env:
+          SETUPTOOLS_USE_DISTUTILS: stdlib
+          P4A_RELEASE_KEYSTORE: ${{ github.workspace }}/release.keystore
+          P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KS_B64" | base64 -d > "$P4A_RELEASE_KEYSTORE"
+          # release 산출물은 AAB로(플레이스토어 요구). 커밋된 spec은 안 건드려 캐시를 보존하려고
+          # 여기서만 덧붙인다.
+          echo "android.release_artifact = aab" >> buildozer.spec
+          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
+          yes | buildozer android release
+          rm -f "$P4A_RELEASE_KEYSTORE"
+
+      - name: AAB 파일 경로 확인
+        id: aab_find
+        if: steps.signcheck.outputs.signed == 'true'
+        run: echo "aab_path=$(find bin/ -name '*.aab' | head -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: 서명 AAB 업로드 (아티팩트)
+        if: steps.signcheck.outputs.signed == 'true' && steps.aab_find.outputs.aab_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DreamFarm-android-aab
+          path: ${{ steps.aab_find.outputs.aab_path }}
+
   release:
     needs: [build-windows, build-android]
     runs-on: ubuntu-latest
@@ -141,11 +181,19 @@ jobs:
           path: dist
 
       # 안드로이드 아티팩트는 없을 수도 있으므로(빌드 실패 시) 실패해도 넘어간다.
-      - name: 빌드 다운로드 (Android)
+      - name: 빌드 다운로드 (Android APK)
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: DreamFarm-android
+          path: dist
+
+      # 서명된 AAB는 keystore 시크릿이 있을 때만 존재한다.
+      - name: 빌드 다운로드 (Android AAB)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-android-aab
           path: dist
 
       - name: 릴리스 자산 목록 구성
@@ -156,6 +204,8 @@ jobs:
           ASSETS="dist/DreamFarm.exe"
           APK_FILE=$(find dist -name "*.apk" | head -n 1)
           if [ -n "$APK_FILE" ]; then ASSETS="$ASSETS,$APK_FILE"; fi
+          AAB_FILE=$(find dist -name "*.aab" | head -n 1)
+          if [ -n "$AAB_FILE" ]; then ASSETS="$ASSETS,$AAB_FILE"; fi
           echo "assets=$ASSETS" >> "$GITHUB_OUTPUT"
 
       - name: CHANGELOG에서 릴리스 노트 추출

@@ -24,3 +24,10 @@ desktop.ini
 
 # Buildozer
 !buildozer.spec
+.buildozer/
+bin/
+
+# 안드로이드 서명 키 — 절대 커밋 금지 (분실 시 앱 업데이트 불가)
+*.keystore
+*.jks
+release.keystore
