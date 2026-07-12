@@ -3,6 +3,11 @@
 이 파일은 배포마다 갱신한다. 태그 이름 규칙: 안정 `vX.Y.Z`, 개발/테스터 `vX.Y.Z-dev.N`.
 최신이 위로 온다.
 
+## v2.2.2-dev.2 (2026-07-12) — 프리릴리스 (Android 빌드 파이프라인 수정)
+- **Android APK 빌드 실패 수정 (p4a/파이썬/setuptools 버전 정합)**:
+  - dev.1 CI에서 Android 빌드가 pygame-ce 컴파일 중 `AttributeError: module 'distutils.ccompiler' has no attribute 'spawn'`로 실패했습니다. 원인은 p4a `develop`이 파이썬 3.14를 빌드하고, 최신 setuptools(79/83)가 distutils를 현대화하며 `ccompiler.spawn`을 제거했는데 pygame-ce 2.4.0의 구식 빌드가 그 API를 호출하기 때문이었습니다.
+  - `buildozer.spec`의 `p4a.branch`를 **`v2024.01.21`**(파이썬 3.11.5 빌드)로 고정하고, CI 빌드 단계에 `SETUPTOOLS_USE_DISTUTILS=stdlib`를 넣어 3.11의 stdlib distutils(`ccompiler.spawn` 존재)를 쓰도록 했습니다.
+
 ## v2.2.2-dev.1 (2026-07-12) — 프리릴리스 (Android 빌드 재정비: numpy 제거·pygame-ce 레시피·터치 대응)
 - **⚡ 빌드 근본 개편 — 런타임에서 numpy 제거 (빌드 속도·안정성 대폭 개선)**:
   - 모든 효과음/배경음은 원래 `core/audio.py`가 numpy로 런타임 합성했는데, numpy는 python-for-android에서 아키텍처마다 소스 컴파일돼(Meson/Cython/C) APK 빌드를 몇 배 느리게 하고 NDK/Cython 충돌로 자주 깨뜨리던 주범이었습니다.

@@ -104,6 +104,10 @@ jobs:
         run: python tools/bake_audio.py
 
       - name: APK 빌드 (Buildozer)
+        env:
+          # setuptools 가 벤더링한 현대화 distutils(ccompiler.spawn 제거됨) 대신, 파이썬 3.11 의
+          # stdlib distutils 를 쓰게 강제한다 → pygame-ce 2.4.0 의 구식 빌드가 컴파일된다.
+          SETUPTOOLS_USE_DISTUTILS: stdlib
         run: |
           # 러너에 미리 깔린 Android SDK/NDK 환경변수를 지워 Buildozer 가 워크스페이스에서
           # 자체 관리하도록 격리한다(과거 NDK 충돌 회피).

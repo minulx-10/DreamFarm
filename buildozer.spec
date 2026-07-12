@@ -61,8 +61,12 @@ android.archs = arm64-v8a
 # (bool) Use private storage for data (set to True for default behaviour)
 android.private_storage = True
 
-# (str) python-for-android branch — 로컬 pygame-ce 레시피가 쓰는 최신 API 를 위해 develop.
-p4a.branch = develop
+# (str) python-for-android 버전 고정 — v2024.01.21 은 파이썬 3.11.5 를 빌드한다.
+# develop 은 파이썬 3.14 를 빌드하는데, 그 조합에서는 setuptools 가 distutils 를 현대화하며
+# distutils.ccompiler.spawn 을 없애 pygame-ce 2.4.0 의 구식 빌드가 깨진다(AttributeError).
+# 3.11 은 stdlib distutils(ccompiler.spawn 존재)를 갖고 있어, 아래 SETUPTOOLS_USE_DISTUTILS=stdlib
+# 와 함께 pygame-ce 가 정상 컴파일된다. 이 태그는 레시피가 쓰는 최신 p4a API 도 모두 포함한다.
+p4a.branch = v2024.01.21
 
 [buildozer]
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
