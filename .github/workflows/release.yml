@@ -152,13 +152,11 @@ jobs:
         id: files
         shell: bash
         run: |
-          {
-            echo "assets<<EOF"
-            echo "dist/DreamFarm.exe"
-            APK_FILE=$(find dist -name "*.apk" | head -n 1)
-            if [ -n "$APK_FILE" ]; then echo "$APK_FILE"; fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          # ncipollo/release-action 의 artifacts 는 콤마 구분 목록이다.
+          ASSETS="dist/DreamFarm.exe"
+          APK_FILE=$(find dist -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then ASSETS="$ASSETS,$APK_FILE"; fi
+          echo "assets=$ASSETS" >> "$GITHUB_OUTPUT"
 
       - name: CHANGELOG에서 릴리스 노트 추출
         id: notes
@@ -191,8 +189,10 @@ jobs:
         with:
           tag: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          body_path: release_notes.md
-          files: ${{ steps.files.outputs.assets }}
+          # ncipollo 입력 이름은 bodyFile/artifacts 다(body_path/files 아님 — 예전 워크플로우가
+          # softprops→ncipollo 로 갈아타며 옛 입력명을 그대로 둬 자산이 조용히 안 붙던 버그).
+          bodyFile: release_notes.md
+          artifacts: ${{ steps.files.outputs.assets }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
           makeLatest: ${{ steps.channel.outputs.make_latest }}
           allowUpdates: true
