@@ -3,10 +3,13 @@
 이 파일은 배포마다 갱신한다. 태그 이름 규칙: 안정 `vX.Y.Z`, 개발/테스터 `vX.Y.Z-dev.N`.
 최신이 위로 온다.
 
-## v2.2.2-dev.2 (2026-07-12) — 프리릴리스 (Android 빌드 파이프라인 수정)
-- **Android APK 빌드 실패 수정 (p4a/파이썬/setuptools 버전 정합)**:
-  - dev.1 CI에서 Android 빌드가 pygame-ce 컴파일 중 `AttributeError: module 'distutils.ccompiler' has no attribute 'spawn'`로 실패했습니다. 원인은 p4a `develop`이 파이썬 3.14를 빌드하고, 최신 setuptools(79/83)가 distutils를 현대화하며 `ccompiler.spawn`을 제거했는데 pygame-ce 2.4.0의 구식 빌드가 그 API를 호출하기 때문이었습니다.
-  - `buildozer.spec`의 `p4a.branch`를 **`v2024.01.21`**(파이썬 3.11.5 빌드)로 고정하고, CI 빌드 단계에 `SETUPTOOLS_USE_DISTUTILS=stdlib`를 넣어 3.11의 stdlib distutils(`ccompiler.spawn` 존재)를 쓰도록 했습니다.
+## v2.2.2-dev.3 (2026-07-12) — 프리릴리스 (✅ Android APK 빌드 성공)
+- **Android APK가 실제로 빌드됩니다** — CI에서 arm64-v8a APK(약 21MB) 산출 확인. numpy 0개(완전 제거), 구운 소리 23개·게임 코드·pygame-ce·libpython3.11 정상 포함. dev.1→dev.3으로 빌드를 한 겹씩 뚫어 마무리한 결과입니다.
+- **빌드 실패 원인 3종 해결**:
+  1. `distutils.ccompiler.spawn` 없음 — p4a `develop`이 파이썬 3.14를 빌드하고 최신 setuptools(79/83)가 distutils를 현대화하며 해당 API를 제거한 탓. → `p4a.branch`를 **`v2024.01.21`**(파이썬 3.11.5)로 고정하고 CI에 `SETUPTOOLS_USE_DISTUTILS=stdlib`를 넣어 3.11 stdlib distutils를 쓰게 함.
+  2. `SDL_image.h not found` — pygame-ce 레시피가 SDL2_image 헤더 경로를 base로 하드코딩(2.6+는 `include/` 하위로 이동). → sdl2_mixer처럼 `get_include_dirs()`를 쓰도록 레시피 수정.
+  3. `requirements=pygame-ce` 미해결 — p4a에 pygame-ce 레시피 없음. → PR #2971 레시피를 `p4a-recipes/`에 로컬로 담아 해결(아래 dev.1 참조).
+- **CI 캐시 최적화**: 캐시 키를 `buildozer.spec`만 해시하도록 바꿔, 레시피 소규모 수정 때 NDK/CPython/SDL2 툴체인을 재사용하고 pygame-ce만 다시 컴파일하도록 함(반복 빌드 가속).
 
 ## v2.2.2-dev.1 (2026-07-12) — 프리릴리스 (Android 빌드 재정비: numpy 제거·pygame-ce 레시피·터치 대응)
 - **⚡ 빌드 근본 개편 — 런타임에서 numpy 제거 (빌드 속도·안정성 대폭 개선)**:
