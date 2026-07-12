@@ -11,6 +11,7 @@ from core import audio
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core.ui import draw_panel, mix_color
 from core.game_state import game_state
+from core.platform import IS_ANDROID
 from core import save_system
 
 
@@ -52,8 +53,9 @@ class SettingsOverlay:
 
         # 확인 모달 상태 ("delete_save" | "go_main" | "reset_all" | ... | None)
         self._confirm_action = None
-        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력(확정된 글자)
+        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력(확정된 글자) — 데스크톱
         self._reset_ime = ""            # 한글 조합 중인 미확정 글자
+        self._reset_armed = False       # 안드로이드: '예'를 한 번 눌러 무장된 상태(두 번째 눌러야 실행)
         self._confirm_yes = pygame.Rect(self.panel.centerx - 80, self.panel.y + 350, 65, 32)
         self._confirm_no = pygame.Rect(self.panel.centerx + 15, self.panel.y + 350, 65, 32)
 
@@ -82,37 +84,43 @@ class SettingsOverlay:
 
             # 확인 모달이 뜬 상태에서는 확인/취소만 처리
             if self._confirm_action is not None:
-                # 완전 초기화는 실수 방지를 위해 '초기화'라고 직접 입력해야 확정된다.
+                # 완전 초기화는 실수 방지 장치가 있다.
+                #  - 데스크톱: '초기화'라고 직접 입력해야 확정.
+                #  - 안드로이드: 키보드가 화면을 가려 타이핑이 불편하므로, '예'를 두 번 눌러 확정
+                #    (첫 탭=무장, 둘째 탭=실행). 키보드 없이도 같은 수준의 실수 방지.
                 need_type = (self._confirm_action == "reset_all")
                 type_ok = (self._reset_confirm_text.strip() == "초기화")
-                if event.type == pygame.TEXTEDITING and need_type:
+
+                def _yes():
+                    if need_type and not IS_ANDROID and not type_ok:
+                        audio.play("break")
+                    elif need_type and IS_ANDROID and not self._reset_armed:
+                        self._reset_armed = True
+                        audio.play("break")   # 경고음 — 한 번 더 눌러야 실행
+                    else:
+                        audio.play("click")
+                        self._execute_confirm(farm_scene)
+
+                if event.type == pygame.TEXTEDITING and need_type and not IS_ANDROID:
                     # 한글은 조합이 끝나야 TEXTINPUT으로 확정된다. 조합 중(미확정) 글자를
                     # 실시간으로 보여줘야 '초'가 안 뜨고 한 글자씩 밀려 보이던 문제가 사라진다.
                     self._reset_ime = event.text
-                elif event.type == pygame.TEXTINPUT and need_type:
+                elif event.type == pygame.TEXTINPUT and need_type and not IS_ANDROID:
                     if len(self._reset_confirm_text) < 8:
                         self._reset_confirm_text += event.text
                     self._reset_ime = ""
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._confirm_yes.collidepoint(event.pos):
-                        if need_type and not type_ok:
-                            audio.play("break")
-                        else:
-                            audio.play("click")
-                            self._execute_confirm(farm_scene)
+                        _yes()
                     elif self._confirm_no.collidepoint(event.pos):
                         audio.play("click")
                         self._close_confirm()
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self._close_confirm()
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE and need_type:
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE and need_type and not IS_ANDROID:
                     self._reset_confirm_text = self._reset_confirm_text[:-1]
                 elif event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    if need_type and not type_ok:
-                        audio.play("break")
-                    else:
-                        audio.play("click")
-                        self._execute_confirm(farm_scene)
+                    _yes()
                 continue
 
             if event.type == pygame.KEYDOWN:
@@ -136,6 +144,7 @@ class SettingsOverlay:
         self._confirm_action = None
         self._reset_confirm_text = ""
         self._reset_ime = ""
+        self._reset_armed = False
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -181,6 +190,7 @@ class SettingsOverlay:
         self._confirm_action = None
         self._reset_confirm_text = ""
         self._reset_ime = ""
+        self._reset_armed = False
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -228,10 +238,13 @@ class SettingsOverlay:
         elif self._reset_all_btn.collidepoint(pos):
             self._confirm_action = "reset_all"
             self._reset_confirm_text = ""
-            try:
-                pygame.key.start_text_input()
-            except Exception:
-                pass
+            self._reset_armed = False
+            # 안드로이드는 소프트 키보드 없이 '예 두 번'으로 확정하므로 텍스트 입력을 켜지 않는다.
+            if not IS_ANDROID:
+                try:
+                    pygame.key.start_text_input()
+                except Exception:
+                    pass
         elif self._version_btn.collidepoint(pos):
             current_show = save_system.get_setting("show_version")
             save_system.set_setting("show_version", not current_show)
@@ -406,8 +419,17 @@ class SettingsOverlay:
         screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 20))
 
         yes_disabled = False
-        if self._confirm_action == "reset_all":
-            # 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
+        yes_label = "예"
+        if self._confirm_action == "reset_all" and IS_ANDROID:
+            # 안드로이드: 키보드 없이 '예'를 두 번 눌러 확정한다.
+            if self._reset_armed:
+                warn = get_font(13).render("다시 '예'를 누르면 모두 삭제됩니다", True, (200, 70, 60))
+                yes_label = "정말 삭제"
+            else:
+                warn = get_font(13).render("'예'를 두 번 눌러 확정하세요", True, TEXT_MUTED)
+            screen.blit(warn, (modal.centerx - warn.get_width() // 2, modal.y + 50))
+        elif self._confirm_action == "reset_all":
+            # 데스크톱: 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
             ok = (self._reset_confirm_text.strip() == "초기화")   # 판정은 확정된 글자만
             typed = self._reset_confirm_text + self._reset_ime    # 표시는 조합 중 글자까지
             label = get_font(13).render("확인하려면 '초기화' 입력:", True, TEXT_MUTED)
@@ -425,7 +447,8 @@ class SettingsOverlay:
             sub_surf = get_font(12).render(sub, True, TEXT_MUTED)
             screen.blit(sub_surf, (modal.centerx - sub_surf.get_width() // 2, modal.y + 48))
 
-        self._draw_text_button(screen, self._confirm_yes, "예", active=False, disabled=yes_disabled)
+        self._draw_text_button(screen, self._confirm_yes, yes_label, active=False, disabled=yes_disabled,
+                               danger=(self._confirm_action == "reset_all" and self._reset_armed))
         self._draw_text_button(screen, self._confirm_no, "아니오", active=False)
 
     def _draw_slider_row(self, screen, label, track, value):

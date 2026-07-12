@@ -99,8 +99,13 @@ def main():
         else:
             screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
             
+        _apply_scaling(*screen.get_size())
+
+    def _apply_scaling(actual_w, actual_h):
         # 4:3 종횡비를 유지하며 화면을 스케일링하기 위한 해상도 및 검은 띠 여백 계산
-        actual_w, actual_h = screen.get_size()
+        nonlocal offset_x, offset_y, target_w, target_h
+        if actual_h <= 0:
+            return
         if actual_w / actual_h > 4.0 / 3.0:
             target_h = actual_h
             target_w = int(actual_h * 4.0 / 3.0)
@@ -111,7 +116,16 @@ def main():
             target_h = int(actual_w * 3.0 / 4.0)
             offset_x = 0
             offset_y = (actual_h - target_h) // 2
-        
+
+    def recompute_layout():
+        # 폴더블 접기/펼치기 등으로 창 크기가 바뀌면 실제 화면 크기에 맞춰 레터박스를 다시 계산한다.
+        # set_mode 를 다시 부르지 않고(안드로이드에서 위험) 현재 표면 크기만 읽어 반영한다.
+        nonlocal screen
+        surf = pygame.display.get_surface()
+        if surf is not None:
+            screen = surf
+            _apply_scaling(*surf.get_size())
+
     update_display_mode()
     pygame.display.set_caption("몽중농원")
     
@@ -202,6 +216,12 @@ def main():
     APP_FG = getattr(pygame, "APP_DIDENTERFOREGROUND", None)
     KEY_BACK = getattr(pygame, "K_AC_BACK", None)
     app_backgrounded = False
+    # 창 크기 변경(폴더블 접기/펼치기·회전) 이벤트 — 버전에 따라 상수명이 달라 getattr로 모은다.
+    RESIZE_EVENTS = {e for e in (
+        getattr(pygame, "WINDOWRESIZED", None),
+        getattr(pygame, "WINDOWSIZECHANGED", None),
+        getattr(pygame, "VIDEORESIZE", None),
+    ) if e is not None}
 
     while game_state.running:
         dt = clock.tick(60) / 1000.0
@@ -292,6 +312,10 @@ def main():
             # GL 컨텍스트가 백업된 상태 → 그리기/flip 금지. 이벤트 큐만 돌리며 대기.
             pygame.time.wait(120)
             continue
+
+        # 창 크기 변경(폴더블 접기/펼치기·회전) → 레터박스 스케일을 새 화면 크기에 맞춰 재계산.
+        if RESIZE_EVENTS and any(e.type in RESIZE_EVENTS for e in events):
+            recompute_layout()
 
         # 안드로이드 하드웨어 '뒤로가기'(K_AC_BACK)를 ESC 로 치환 →
         # 오버레이 닫기·뒤로가기·설정 열기 등 기존 ESC 로직을 그대로 재사용한다.

@@ -52,6 +52,7 @@ class EndingScene:
         self.is_happy = False
         self.journal_scroll = 0
         self.journal_max_scroll = 0
+        self._journal_drag = None   # 모바일 드래그 스크롤 상태: (시작 y, 시작 scroll) 또는 None
         self.show_journal = False
         self.carrot_pulse = 0
         self.letter_written = False
@@ -361,6 +362,8 @@ class EndingScene:
     # 게임이 끝난 화면에서 보이는 '메인으로' 버튼 (앱을 끄지 않고 타이틀로 돌아간다)
     EXIT_BUTTON = pygame.Rect(632, 550, 146, 40)
     RETRY_BUTTON = pygame.Rect(476, 550, 146, 40)
+    # 일지 본문(스크롤) 영역 — _draw_journal 의 view 와 일치. 모바일 드래그 스크롤 판정에 쓴다.
+    JOURNAL_VIEW = pygame.Rect(100, 108, 600, 404)
 
     def _exit_visible(self):
         return self.phase == "journal" or (self.phase == "result" and self.result_done)
@@ -445,10 +448,21 @@ class EndingScene:
                 if event.type == pygame.MOUSEWHEEL:
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll - event.y * 30))
+                    self._journal_drag = None
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
                     delta = -30 if event.button == 4 else 30
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll + delta))
+                # 모바일: 휠이 없으므로 본문을 손가락으로 끌어 스크롤한다.
+                elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                        and self.JOURNAL_VIEW.collidepoint(event.pos)):
+                    self._journal_drag = (event.pos[1], self.journal_scroll)
+                elif event.type == pygame.MOUSEMOTION and self._journal_drag is not None:
+                    start_y, start_scroll = self._journal_drag
+                    self.journal_scroll = max(0, min(self.journal_max_scroll,
+                                                     start_scroll - (event.pos[1] - start_y)))
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self._journal_drag = None
 
     def update(self, dt):
         self.carrot_pulse += dt
@@ -996,7 +1010,8 @@ class EndingScene:
         if self.journal_scroll > self.journal_max_scroll:
             self.journal_scroll = self.journal_max_scroll
         if self.journal_max_scroll > 0:
-            sh = retro_font.render("휠로 스크롤", True, (172, 152, 112))
+            from core.platform import IS_ANDROID
+            sh = retro_font.render("드래그로 스크롤" if IS_ANDROID else "휠·드래그로 스크롤", True, (172, 152, 112))
             screen.blit(sh, (672 - sh.get_width(), 110))
 
         prompt = self.font_small.render("오른쪽 아래 버튼으로 나가기  ·  R: 다시하기", True, (214, 204, 178))
