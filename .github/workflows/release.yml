@@ -82,7 +82,9 @@ jobs:
             .buildozer
             ~/.buildozer
             ~/.gradle
-          key: buildozer-v4-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'p4a-recipes/**') }}
+          # 키는 buildozer.spec 만 해시한다(레시피 include 경로 등 소규모 수정 때 NDK/CPython/SDL2
+          # 툴체인 캐시를 버리지 않도록). 레시피가 바뀌면 pygame-ce 만 다시 컴파일된다.
+          key: buildozer-v4-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
             buildozer-v4-${{ runner.os }}-
 

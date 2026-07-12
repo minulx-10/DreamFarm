@@ -50,13 +50,21 @@ class Pygame2Recipe(CompiledComponentsPythonRecipe):
             for include_dir in sdl2_mixer_recipe.get_include_dirs(arch):
                 sdl_mixer_includes += f"-I{include_dir} "
 
+            # SDL2_image 2.6+ 는 헤더(SDL_image.h)를 include/ 하위로 옮겼다. 원본 레시피가 base
+            # 경로만 하드코딩해 'SDL_image.h file not found' 로 깨졌다 → mixer 처럼 get_include_dirs
+            # (jni/SDL2_image/include 반환)를 쓰고, 안전하게 base 경로도 함께 넘긴다.
+            sdl_image_includes = "-I" + join(self.ctx.bootstrap.build_dir, 'jni', 'SDL2_image') + " "
+            sdl2_image_recipe = self.get_recipe('sdl2_image', self.ctx)
+            for include_dir in sdl2_image_recipe.get_include_dirs(arch):
+                sdl_image_includes += f"-I{include_dir} "
+
             setup_file = setup_template.format(
                 sdl_includes=(
                     " -I" + join(self.ctx.bootstrap.build_dir, 'jni', 'SDL', 'include') +
                     " -L" + join(self.ctx.bootstrap.build_dir, "libs", str(arch)) +
                     " -L" + png_lib_dir + " -L" + jpeg_lib_dir + " -L" + arch.ndk_lib_dir_versioned),
                 sdl_ttf_includes="-I"+join(self.ctx.bootstrap.build_dir, 'jni', 'SDL2_ttf'),
-                sdl_image_includes="-I"+join(self.ctx.bootstrap.build_dir, 'jni', 'SDL2_image'),
+                sdl_image_includes=sdl_image_includes,
                 sdl_mixer_includes=sdl_mixer_includes,
                 jpeg_includes="-I"+jpeg_inc_dir,
                 png_includes="-I"+png_inc_dir,
