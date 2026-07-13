@@ -518,6 +518,15 @@ def _mix_color(a, b, ratio):
     )
 
 
+# 배경 그라데이션 밴딩(P4) — 하늘·잔디를 계단식 '띠'로 그려 도트 톤에 맞춘다.
+# (core.ui 와 같은 개념이지만 assets는 ui를 import 하면 순환이라 여기 로컬로 둠.)
+_BG_BAND = 10
+
+
+def _bg_quant(color, step=10):
+    return tuple(min(255, ((c + step // 2) // step) * step) for c in color[:3])
+
+
 # 황혼 하늘 다단 그라데이션 — 위에서 지평선으로 갈수록 남보라→자주→장미→노을빛
 _SKY_STOPS = [
     (0.00, (30, 20, 56)),    # 깊은 남보라 (천정)
@@ -579,9 +588,10 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         dd = dirt_dk or DIRT_DARK
     horizon = 166
 
-    # --- 하늘: 다단 황혼 그라데이션 ---
-    for y in range(horizon):
-        pygame.draw.line(screen, _sky_color(y / horizon), (0, y), (w, y))
+    # --- 하늘: 다단 황혼 그라데이션 (계단식 밴딩) ---
+    for y in range(0, horizon, _BG_BAND):
+        pygame.draw.rect(screen, _bg_quant(_sky_color((y + _BG_BAND * 0.5) / horizon)),
+                         (0, y, w, min(_BG_BAND, horizon - y)))
 
     # --- 별 (윗하늘, 태양에서 먼 쪽일수록 또렷하게) ---
     for sx, sy, sb in _STARS:
@@ -638,10 +648,10 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         pygame.draw.line(haze, col, (0, i * 2), (w, i * 2))
     screen.blit(haze, (0, horizon - 20))
 
-    # --- 잔디: 세로 그라데이션 + 결 ---
-    for i in range(h - horizon):
+    # --- 잔디: 세로 그라데이션(계단식 밴딩) + 결 ---
+    for i in range(0, h - horizon, _BG_BAND):
         c = _mix_color(_mix_color(gc, (255, 200, 150) if not game_state.nightmare else (100, 40, 40), 0.12), gd, min(1.0, i / 150.0))
-        pygame.draw.line(screen, c, (0, horizon + i), (w, horizon + i))
+        pygame.draw.rect(screen, _bg_quant(c), (0, horizon + i, w, min(_BG_BAND, h - horizon - i)))
     for y in range(horizon, h, 34):
         c = _mix_color(gc, gd, 0.30 if (y // 34) % 2 == 0 else 0.50)
         pygame.draw.line(screen, c, (0, y), (w, y + 16), 2)
