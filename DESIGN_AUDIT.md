@@ -45,9 +45,13 @@
     (`core/assets.py` `food_apple`/`food_potato`/`food_rice`, `draw_crop_food`은 정수 배율로만 확대).
   - **정수 배율 스케일링(선별 적용)**: 2배 이상이 들어가는 고해상도(1440p·4K)에서만 정수 배율로 스냅해
     픽셀을 또렷하게(`game_main.py` `_apply_scaling`). 720p·1080p는 기존처럼 꽉 채워 **작아지는 리그레션 없음**.
-- **P2 — 아이콘·색 일관화**
-  - 날씨·톱니·메달·별 아이콘을 **하나의 스타일**(픽셀 권장)로 통일.
-  - **팔레트 모듈화**: 흩어진 RGB 리터럴을 공용 팔레트 상수로 모아 색 통일(코드 그림도 팔레트 안에서만).
+- **P2 — 아이콘·색 일관화  ✅ 완료 (dev.8)**
+  - **아이콘 픽셀 통일**: 날씨 5종·톱니바퀴·메달을 벡터 → **픽셀 스프라이트**로 교체해 작물·UI와 톤 일치
+    (`core/assets.py` `icon_*`/`draw_weather_icon`, `settings_overlay._draw_gear_icon`,
+    `achievements._draw_medal`은 절반해상도→2배 최근접으로 등급색 유지한 도트 메달).
+  - **팔레트 모듈 신설**: `core/palette.py`를 '색 단일 소스'로 만들고 `core/assets.py`가 re-export
+    (기존 `from core.assets import GOLD ...` 그대로 동작). 새 코드·아이콘 색은 팔레트 이름을 우선 사용.
+    (흩어진 리터럴 1000여 개의 전면 치환은 리스크가 커 점진 이관 — 모듈·의미색은 확보함.)
 - **P3 — 래스터 에셋 정합**
   - `dad.png`·`field_bed.jpg`를 픽셀 아트로 교체하거나, 최소한 도트 톤에 맞게 처리(포스터라이즈·다운스케일).
 - **P4 — UI 크롬 규칙화**

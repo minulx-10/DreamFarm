@@ -132,18 +132,26 @@ def update(dt):
 
 
 def _draw_medal(screen, cx, cy, tier, r=17):
-    col = TIER_COLORS.get(tier, (176, 168, 150))
-    pygame.draw.circle(screen, (30, 26, 22), (cx, cy + 1), r + 1)
-    pygame.draw.circle(screen, col, (cx, cy), r)
-    pygame.draw.circle(screen, WHITE, (cx, cy), r, 2)
-    # 가운데 작은 별
+    """등급 메달 — 절반 해상도로 그린 뒤 최근접 2배 확대해 '도트' 느낌을 준다(등급색 유지,
+    날씨·톱니 등 픽셀 아이콘과 톤 통일)."""
     import math
+    col = TIER_COLORS.get(tier, (176, 168, 150))
+    px = 2
+    rr = max(3, r // px)
+    pad = 2
+    surf = pygame.Surface(((rr + pad) * 2, (rr + pad) * 2 + 1), pygame.SRCALPHA)
+    scx, scy = surf.get_width() // 2, rr + pad
+    pygame.draw.circle(surf, (30, 26, 22, 255), (scx, scy + 1), rr + 1)   # 그림자
+    pygame.draw.circle(surf, col, (scx, scy), rr)                          # 원판
+    pygame.draw.circle(surf, WHITE, (scx, scy), rr, 1)                     # 테두리
     pts = []
     for i in range(10):
         ang = -math.pi / 2 + i * math.pi / 5
-        rr = r * 0.55 if i % 2 == 0 else r * 0.24
-        pts.append((cx + rr * math.cos(ang), cy + rr * math.sin(ang)))
-    pygame.draw.polygon(screen, (255, 244, 214), pts)
+        rad = rr * 0.6 if i % 2 == 0 else rr * 0.26
+        pts.append((scx + rad * math.cos(ang), scy + rad * math.sin(ang)))
+    pygame.draw.polygon(surf, (255, 244, 214), pts)                        # 가운데 별
+    scaled = pygame.transform.scale(surf, (surf.get_width() * px, surf.get_height() * px))
+    screen.blit(scaled, (cx - scaled.get_width() // 2, cy - (rr + pad) * px))
 
 
 def draw(screen):

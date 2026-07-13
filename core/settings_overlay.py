@@ -295,43 +295,14 @@ class SettingsOverlay:
 
     @staticmethod
     def _draw_gear_icon(screen, cx, cy, bg_color):
-        """뚜렷하고 두꺼운 톱니바퀴 아이콘을 그린다."""
-        col = (220, 226, 218)
-        hi  = (245, 248, 240)
-        
-        # 6개의 톱니 — 각 톱니를 사다리꼴(Polygon)로 묘사
-        teeth = 6
-        r_body = 7
-        r_tooth = 10
-        tooth_half_w = math.pi / (teeth * 2.5)
-        
-        pts = []
-        for i in range(teeth):
-            a = i * (2 * math.pi / teeth)
-            # 톱니 바깥쪽 두 점
-            pts.append((cx + int(r_tooth * math.cos(a - tooth_half_w)),
-                        cy + int(r_tooth * math.sin(a - tooth_half_w))))
-            pts.append((cx + int(r_tooth * math.cos(a + tooth_half_w)),
-                        cy + int(r_tooth * math.sin(a + tooth_half_w))))
-            # 톱니 사이 안쪽 두 점 (다음 톱니 방향)
-            mid_a = a + math.pi / teeth
-            pts.append((cx + int(r_body * math.cos(mid_a - tooth_half_w * 0.7)),
-                        cy + int(r_body * math.sin(mid_a - tooth_half_w * 0.7))))
-            pts.append((cx + int(r_body * math.cos(mid_a + tooth_half_w * 0.7)),
-                        cy + int(r_body * math.sin(mid_a + tooth_half_w * 0.7))))
-
-        # 그림자
-        shadow_pts = [(px, py + 1) for px, py in pts]
-        pygame.draw.polygon(screen, (40, 50, 50), shadow_pts)
-        # 본체
-        pygame.draw.polygon(screen, col, pts)
-        # 본체 하이라이트 테두리
-        pygame.draw.polygon(screen, hi, pts, 1)
-        
-        # 중앙 축 원판 및 안쪽 구멍 (뒷배경색)
-        pygame.draw.circle(screen, col, (cx, cy), 4)
-        pygame.draw.circle(screen, hi, (cx, cy), 4, 1)
-        pygame.draw.circle(screen, bg_color, (cx, cy), 2)
+        """톱니바퀴 아이콘 — 픽셀 스프라이트(작물·날씨 아이콘과 톤 통일)."""
+        from core.assets import sprites
+        spr = sprites.get('icon_gear')
+        if spr is None:
+            return
+        s = 22
+        scaled = pygame.transform.scale(spr, (s, s))
+        screen.blit(scaled, (cx - s // 2, cy - s // 2))
 
     def _draw_panel(self, screen):
         # 뒤를 살짝 어둡게

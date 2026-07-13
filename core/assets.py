@@ -1,36 +1,8 @@
 import pygame
 
-BLACK = (13, 16, 20)
-WHITE = (250, 246, 231)
-DARK_GRAY = (42, 46, 48)
-YELLOW = (245, 200, 88)
-GREEN = (54, 142, 94)
-BROWN = (132, 83, 48)
-RED = (190, 70, 58)
-BLUE = (72, 122, 170)
-GOLD = (232, 178, 84)
-GRAY = (142, 146, 138)
-ORANGE = (232, 132, 58)
-
-# Dream-farm palette
-DIRT_COLOR = (136, 88, 56)
-DIRT_DARK = (92, 60, 43)
-DIRT_WET = (88, 72, 58)
-GRASS_COLOR = (84, 148, 91)
-GRASS_DARK = (48, 104, 73)
-WOOD_COLOR = (177, 123, 72)
-WOOD_DARK = (75, 57, 45)
-WOOD_LIGHT = (238, 201, 137)
-TEXT_BROWN = (75, 52, 34)
-TEXT_DARK = (38, 35, 30)
-TEXT_MUTED = (102, 91, 75)
-PANEL_PALE = (248, 232, 196)
-PANEL_WARM = (255, 242, 213)
-PANEL_DEEP = (55, 61, 58)
-PANEL_EDGE = (121, 94, 68)
-ACCENT_BLUE = (74, 131, 151)
-ACCENT_MINT = (104, 164, 118)
-ACCENT_CORAL = (213, 104, 72)
+# 색은 공용 팔레트(core/palette.py)를 단일 소스로 쓴다. 여기서 re-export 해 기존
+# `from core.assets import GOLD, TEXT_DARK ...` 임포트를 그대로 유지한다.
+from core.palette import *  # noqa: F401,F403
 
 import os
 import sys
@@ -154,6 +126,18 @@ def create_sprite_from_string(sprite_str, scale=4):
         'c': (96, 140, 192, 255), # Bowl blue band
         'v': (255, 255, 255, 255),# Rice grain highlight
         'j': (206, 210, 218, 255),# Rice grain shade
+        # 아이콘 통일용 (날씨·톱니·메달) — 팔레트와 톤 일치
+        'Q': (255, 208, 70, 255), # Sun body
+        'T': (236, 176, 40, 255), # Sun edge / ray
+        'C': (206, 212, 224, 255),# Cloud body
+        'P': (150, 158, 172, 255),# Cloud shade
+        'J': (96, 156, 226, 255), # Rain drop
+        'F': (232, 146, 46, 255), # Drought orange
+        'f': (196, 104, 24, 255), # Drought shade / crack
+        'V': (150, 176, 152, 255),# Wind stroke
+        'Z': (208, 216, 210, 255),# Gear body (steel, 밝게)
+        'z': (140, 150, 148, 255),# Gear shade
+        'E': (242, 248, 242, 255),# Gear highlight
     }
     
     for y, line in enumerate(lines):
@@ -412,6 +396,69 @@ XuuuuuuuuuX
 ...XXXXX...
 ''', 8)
 
+    # 아이콘 픽셀 통일 (날씨·톱니) — 벡터 대신 도트로 그려 작물·UI와 톤을 맞춘다. scale 1(원본=격자px),
+    # draw_weather_icon 등에서 목표 size로 확대해 쓴다.
+    sprites['icon_clear'] = create_sprite_from_string('''
+.....T.....
+...T.Q.T...
+....QQQ....
+.T.QQQQQ.T.
+T.QQQQQQQ.T
+.T.QQQQQ.T.
+....QQQ....
+...T.Q.T...
+.....T.....
+''', 1)
+    sprites['icon_cloudy'] = create_sprite_from_string('''
+....CCC....
+..CCCCCCC..
+.CCCCCCCCC.
+CCCCCCCCCCC
+PPPPPPPPPPP
+''', 1)
+    sprites['icon_rain'] = create_sprite_from_string('''
+...CCC.....
+.CCCCCCC...
+CCCCCCCCC..
+PPPPPPPPP..
+.J..J..J...
+J..J..J....
+.J..J..J...
+''', 1)
+    sprites['icon_drought'] = create_sprite_from_string('''
+.....F.....
+...F.F.F...
+....FFF....
+.F.FFFFF.F.
+F.FFFFFFF.F
+.F.FFFFF.F.
+....FFF....
+...........
+.f..f.f..f.
+''', 1)
+    sprites['icon_wind'] = create_sprite_from_string('''
+...........
+.VVVVVV.V..
+V.....VVVV.
+...VVVVV...
+VVVV....V..
+.V.VVVVVVV.
+...........
+''', 1)
+    sprites['icon_gear'] = create_sprite_from_string('''
+...Z.Z.Z...
+.ZZZZZZZZZ.
+.ZZEEEEEZZ.
+ZZEz...zEZZ
+.ZE.....EZ.
+ZZE..z..EZZ
+.ZE.....EZ.
+ZZEz...zEZZ
+.ZZEEEEEZZ.
+.ZZZZZZZZZ.
+...Z.Z.Z...
+''', 1)
+
     # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
     field_bed_path = resource_path("field_bed.jpg")
     if os.path.exists(field_bed_path):
@@ -659,37 +706,18 @@ def draw_crop_seed(screen, cx, cy, crop_key):
 
 
 
+_WEATHER_ICON = {'맑음': 'icon_clear', '흐림': 'icon_cloudy', '비': 'icon_rain',
+                 '가뭄': 'icon_drought', '강풍': 'icon_wind'}
+
+
 def draw_weather_icon(screen, weather, x, y, size=20):
-    import math
-    cx, cy = x + size // 2, y + size // 2
-    r = size // 2
-    if weather == '맑음':
-        pygame.draw.circle(screen, (255, 210, 60), (cx, cy), r - 2)
-        pygame.draw.circle(screen, (240, 180, 30), (cx, cy), r - 2, 2)
-        for angle in range(0, 360, 45):
-            dx = int(math.cos(math.radians(angle)) * (r + 1))
-            dy = int(math.sin(math.radians(angle)) * (r + 1))
-            pygame.draw.line(screen, (255, 200, 50), (cx + dx, cy + dy),
-                             (cx + int(dx * 1.4), cy + int(dy * 1.4)), 2)
-    elif weather == '흐림':
-        pygame.draw.ellipse(screen, (180, 180, 190), (x, y + 4, size, size - 6))
-        pygame.draw.ellipse(screen, (160, 160, 170), (x + 4, y, size - 6, size - 4))
-        pygame.draw.ellipse(screen, (200, 200, 210), (x + 2, y + 2, size - 2, size - 6))
-    elif weather == '비':
-        pygame.draw.ellipse(screen, (140, 150, 165), (x, y, size, size // 2))
-        for i in range(3):
-            lx = x + 4 + i * (size // 3)
-            pygame.draw.line(screen, (100, 160, 230), (lx, y + size // 2 + 2),
-                             (lx - 2, y + size - 2), 2)
-    elif weather == '가뭄':
-        pygame.draw.circle(screen, (230, 140, 40), (cx, cy - 2), r - 3)
-        pygame.draw.circle(screen, (200, 100, 20), (cx, cy - 2), r - 3, 2)
-        for i in range(3):
-            wx = x + 2 + i * (size // 3)
-            pygame.draw.line(screen, (180, 80, 20), (wx, y + size - 5),
-                             (wx + 4, y + size - 2), 2)
-    elif weather == '강풍':
-        for i in range(3):
-            ly = y + 3 + i * 6
-            pygame.draw.arc(screen, (120, 150, 130),
-                            (x, ly, size - 4, 8), 0.3, 2.8, 2)
+    """날씨 아이콘을 (x, y) 좌상단, size 정사각 박스 안에 픽셀 스프라이트로 그린다.
+    (예전엔 벡터 pygame.draw였는데 도트로 통일해 작물·UI와 톤을 맞춤.)"""
+    spr = sprites.get(_WEATHER_ICON.get(weather))
+    if spr is None:
+        return
+    sw, sh = spr.get_size()
+    scale = size / max(sw, sh)
+    w, h = max(1, int(round(sw * scale))), max(1, int(round(sh * scale)))
+    scaled = pygame.transform.scale(spr, (w, h))
+    screen.blit(scaled, (x + (size - w) // 2, y + (size - h) // 2))
