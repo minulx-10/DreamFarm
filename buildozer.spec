@@ -13,7 +13,7 @@ source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
 # ogg = 미리 구운 효과음/배경음(core/sound/**). 이게 있어야 런타임에 numpy 없이 소리가 난다.
-source.include_exts = py,png,jpg,ttf,ogg
+source.include_exts = py,png,jpg,ttf,ogg,json
 
 # (list) Application requirements
 # numpy 는 뺐다 — 소리는 빌드 시 tools/bake_audio.py 로 .ogg 로 미리 구워 싣는다.

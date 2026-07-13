@@ -46,6 +46,7 @@ jobs:
           --add-data "core/field_bed.jpg;core"
           --add-data "core/logo.png;core"
           --add-data "core/sound;core/sound"
+          --add-data "core/locales;core/locales"
           main.py
 
       - name: 빌드 산출물 업로드 (아티팩트)

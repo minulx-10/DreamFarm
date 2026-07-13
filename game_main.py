@@ -99,24 +99,27 @@ def main():
                     is_fullscreen = False
         else:
             screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
-            
+
+        # 설정창의 '전체화면' 토글 라벨이 실제 상태를 반영하도록 game_state에 동기화한다.
+        game_state.is_fullscreen = is_fullscreen
         _apply_scaling(*screen.get_size())
 
     def _apply_scaling(actual_w, actual_h):
-        # 4:3 종횡비를 유지하며 화면을 스케일링하기 위한 해상도 및 검은 띠 여백 계산
+        # 4:3 종횡비를 유지하며 스케일. '정수 배율'이 꽉 채우는 배율에 충분히 가까우면(≥80%)
+        # 정수로 스냅해 픽셀이 또렷하게 보이게 한다(1440p·4K 등에서 효과). 정수 배율이 너무 작아지는
+        # 해상도(1080p·720p 등)에서는 기존처럼 꽉 채우는 배율을 써서 화면이 작아지지 않게 한다.
         nonlocal offset_x, offset_y, target_w, target_h
         if actual_h <= 0:
             return
-        if actual_w / actual_h > 4.0 / 3.0:
-            target_h = actual_h
-            target_w = int(actual_h * 4.0 / 3.0)
-            offset_x = (actual_w - target_w) // 2
-            offset_y = 0
-        else:
-            target_w = actual_w
-            target_h = int(actual_w * 3.0 / 4.0)
-            offset_x = 0
-            offset_y = (actual_h - target_h) // 2
+        fit = min(actual_w / 800.0, actual_h / 600.0)   # 레터박스로 꽉 채우는 배율
+        isc = int(fit)                                   # 가장 큰 정수 배율
+        # 2배 이상이 들어가는 고해상도(1440p·4K 등)에서만 정수로 스냅해 픽셀을 또렷하게.
+        # 720p·1080p처럼 정수 배율이 1배뿐인 해상도는 기존처럼 꽉 채워 작아지지 않게 한다.
+        scale = isc if (isc >= 2 and isc >= fit * 0.8) else fit
+        target_w = int(800 * scale)
+        target_h = int(600 * scale)
+        offset_x = (actual_w - target_w) // 2
+        offset_y = (actual_h - target_h) // 2
 
     def recompute_layout():
         # 폴더블 접기/펼치기 등으로 창 크기가 바뀌면 실제 화면 크기에 맞춰 레터박스를 다시 계산한다.
@@ -138,6 +141,14 @@ def main():
     from core.assets import init_sprites
     init_sprites()
     audio.init()
+
+    # 언어(현지화) 초기화 — 저장된 언어 설정을 불러와 적용 (렌더 전에 세팅)
+    from core import i18n, save_system as _ss
+    i18n.init(_ss.get_setting("language"))
+
+    # 스팀 연동 초기화 (steam_api64.dll + App ID가 있을 때만 활성화, 없으면 무해한 no-op).
+    from core import steam
+    steam.init()
 
     # #14 Check for 2nd playthrough
     apply_second_run()
@@ -252,6 +263,14 @@ def main():
         if game_state.request_settings:
             game_state.request_settings = False
             settings_overlay.open = True
+
+        # 설정창의 '전체화면' 토글 요청 처리 (F11과 동일한 경로) — 안드로이드는 항상 전체화면이라 무시
+        if game_state.request_fullscreen_toggle:
+            game_state.request_fullscreen_toggle = False
+            if not IS_ANDROID:
+                is_fullscreen = not is_fullscreen
+                update_display_mode()
+                fullscreen_cooldown = 0.6
 
         # 설정 오버레이에서 이어하기 로드 요청 시 처리
         if game_state.request_load:
@@ -401,6 +420,9 @@ def main():
             from core import achievements
             achievements.update(dt)
 
+        # 스팀 콜백 처리 (연동 없으면 no-op) — 도전과제 해제 오버레이 알림 등에 필요
+        steam.run_callbacks()
+
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
         
@@ -466,6 +488,7 @@ def main():
 
         pygame.display.flip()
 
+    steam.shutdown()
     pygame.quit()
     sys.exit()
 

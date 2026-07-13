@@ -31,3 +31,6 @@ bin/
 *.keystore
 *.jks
 release.keystore
+
+# 스팀 로컬 테스트용 App ID 파일 — 커밋 금지 (앱마다 다름, 개발자 로컬에만)
+steam_appid.txt

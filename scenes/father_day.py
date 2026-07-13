@@ -4,6 +4,7 @@ from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
 from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
 from core import audio
+from core import i18n
 from core.ui_utils import Typewriter
 
 
@@ -126,7 +127,7 @@ class FatherDayScene:
             # Prompt
             if self.typewriter.finished:
                 label = "다음으로" if self.page_index < len(self.pages) - 1 else "아버지의 밭으로"
-                prompt = self.font_small.render(f"{label} ▸ 클릭하거나 스페이스바", True, (172, 148, 106))
+                prompt = self.font_small.render(i18n.tf("{label} ▸ 클릭하거나 스페이스바", label=i18n.t(label)), True, (172, 148, 106))
                 screen.blit(prompt, (400 - prompt.get_width() // 2, 520))
 
         # Fade overlay

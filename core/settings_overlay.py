@@ -23,8 +23,8 @@ class SettingsOverlay:
         # 오른쪽 위 고정 버튼
         self.button = pygame.Rect(746, 27, 28, 28)
 
-        # 가운데 모달 패널 (크기 확장: 360x490)
-        self.panel = pygame.Rect(220, 55, 360, 490)
+        # 가운데 모달 패널 (전체화면·언어 토글 행이 들어가 세로로 늘림: 360x500)
+        self.panel = pygame.Rect(220, 46, 360, 500)
         pad = 26
         self._track_w = 160
         track_x = self.panel.x + pad + 72
@@ -44,9 +44,11 @@ class SettingsOverlay:
         # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
         self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
 
-        # 닫기 버튼과 버전 표시 버튼을 나란히 대칭 배치
-        self._close_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 404, 140, 36)
-        self._version_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 404, 140, 36)
+        # 하단 2×2 토글 그리드: [전체화면][언어] / [버전 표시][닫기]
+        self._fullscreen_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 388, 140, 36)
+        self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 388, 140, 36)
+        self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 432, 140, 36)
+        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
 
         self.show_message = ""
         self.message_timer = 0.0
@@ -245,6 +247,15 @@ class SettingsOverlay:
                     pygame.key.start_text_input()
                 except Exception:
                     pass
+        elif not IS_ANDROID and self._fullscreen_btn.collidepoint(pos):
+            # 실제 전환은 game_main 루프가 처리(F11과 동일 경로). 설정창은 열어 둔 채 즉시 반영.
+            game_state.request_fullscreen_toggle = True
+            audio.play("click")
+        elif self._lang_btn.collidepoint(pos):
+            from core import i18n
+            new_lang = i18n.toggle()
+            save_system.set_setting("language", new_lang)
+            audio.play("click")
         elif self._version_btn.collidepoint(pos):
             current_show = save_system.get_setting("show_version")
             save_system.set_setting("show_version", not current_show)
@@ -374,21 +385,29 @@ class SettingsOverlay:
         # 완전 초기화 (되돌릴 수 없는 파괴적 동작 → danger 스타일)
         self._draw_text_button(screen, self._reset_all_btn, "완전 초기화 (태초부터)", active=False, danger=True)
 
-        # 닫기
-        self._draw_text_button(screen, self._close_btn, "닫기", active=False)
+        # 하단 2×2 토글: [전체화면][언어] / [버전 표시][닫기]
+        if not IS_ANDROID:
+            fs = game_state.is_fullscreen
+            self._draw_text_button(screen, self._fullscreen_btn,
+                                   f"전체화면: {'ON' if fs else 'OFF'}", active=fs)
+        # 언어 토글 — 현재 언어를 그 언어로 표기 (누르면 다른 언어로 전환)
+        from core import i18n
+        is_en = (i18n.get_language() == "en")
+        lang_label = "Language: English" if is_en else "언어: 한국어"
+        self._draw_text_button(screen, self._lang_btn, lang_label, active=is_en)
 
-        # 버전 표시 토글 버튼 그리기
         show_ver = save_system.get_setting("show_version")
         self._draw_text_button(screen, self._version_btn, f"버전 표시: {'ON' if show_ver else 'OFF'}", active=show_ver)
+        self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
         # 알림 메시지 출력
         if self.show_message:
             msg_surf = get_font(14).render(self.show_message, True, (139, 69, 19))
-            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 450))
+            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 476))
 
         if not audio.is_enabled():
             warn = get_font(13).render("(이 기기에서는 소리를 낼 수 없어요)", True, TEXT_MUTED)
-            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.bottom - 26))
+            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.bottom - 20))
 
         # 확인 모달 (세이브 삭제 / 메인 이동)
         if self._confirm_action is not None:

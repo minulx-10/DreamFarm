@@ -4,6 +4,7 @@ import math
 from core.game_state import game_state
 from core.assets import *
 from core import audio
+from core import i18n
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 class Stage2Scene:
@@ -53,11 +54,9 @@ class Stage2Scene:
             if self.clear_timer <= 0:
                 bonus = 15
                 game_state.understanding += bonus
-                game_state.transition_text = (
-                    "물 주기 완료!\n\n"
-                    "모든 흙이 충분히 물을 흡수했습니다.\n"
-                    f"생명의 근원을 전했습니다. 이해도 +{bonus}"
-                )
+                game_state.transition_text = i18n.tf(
+                    "물 주기 완료!\n\n모든 흙이 충분히 물을 흡수했습니다.\n생명의 근원을 전했습니다. 이해도 +{bonus}",
+                    bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -187,7 +186,7 @@ class Stage2Scene:
             panel_clear = pygame.Rect(400 - 150, 210, 300, 60)
             draw_wood_panel(screen, panel_clear)
             screen.blit(clear_text, (400 - clear_text.get_width()//2, 220))
-            draw_bottom_bar(screen, "결과", f"얻은 점수: {game_state.score}")
+            draw_bottom_bar(screen, "결과", i18n.tf("얻은 점수: {score}", score=game_state.score))
         else:
             status_desc = "마우스 클릭/드래그하여 물뿌리개로 흙 두둑을 100% 듬뿍 젖게 하세요."
             draw_bottom_bar(screen, "물 주기", status_desc)

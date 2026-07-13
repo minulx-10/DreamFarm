@@ -49,32 +49,61 @@ def resource_path(rel):
 FONT_PATH = resource_path("Galmuri11.ttf")
 FONT_URL = "https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.ttf"
 
-fonts = {}
+
+class _I18nFont:
+    """폰트 래퍼 — render()/size() 시 문자열을 현재 언어로 번역해 그린다.
+
+    로직은 원문(한국어)을 그대로 쓰고 '표시'만 번역되도록, 렌더 계층에서만 개입한다.
+    render/size 외의 메서드(get_height 등)는 __getattr__로 실제 폰트에 그대로 위임한다."""
+
+    __slots__ = ("_f",)
+
+    def __init__(self, font):
+        self._f = font
+
+    def render(self, text, *args, **kwargs):
+        from core import i18n
+        return self._f.render(i18n.t(text), *args, **kwargs)
+
+    def size(self, text, *args, **kwargs):
+        from core import i18n
+        return self._f.size(i18n.t(text), *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+
+fonts = {}          # size -> _I18nFont (번역 래퍼, 게임 코드가 받는 것)
+
+
+def _make_raw_font(size):
+    """실제 pygame Font 하나를 만든다 (폰트 파일 없으면 다운로드 시도 후 시스템 폰트 폴백)."""
+    if not os.path.exists(FONT_PATH):
+        try:
+            print("Downloading Galmuri11 pixel font...")
+            req = urllib.request.Request(FONT_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response, open(FONT_PATH, 'wb') as out_file:
+                out_file.write(response.read())
+            print("Download complete!")
+        except Exception as e:
+            print("Failed to download font, falling back to system font:", e)
+            try:
+                return pygame.font.SysFont("malgungothic", size)
+            except Exception:
+                return pygame.font.Font(None, size)
+    try:
+        return pygame.font.Font(FONT_PATH, size)
+    except Exception:
+        try:
+            return pygame.font.SysFont("malgungothic", size)
+        except Exception:
+            return pygame.font.Font(None, size)
+
 
 def get_font(size):
+    """번역 래퍼(_I18nFont)로 감싼 폰트를 돌려준다 (사이즈별 캐시)."""
     if size not in fonts:
-        if not os.path.exists(FONT_PATH):
-            try:
-                print("Downloading Galmuri11 pixel font...")
-                req = urllib.request.Request(FONT_URL, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req) as response, open(FONT_PATH, 'wb') as out_file:
-                    out_file.write(response.read())
-                print("Download complete!")
-            except Exception as e:
-                print("Failed to download font, falling back to system font:", e)
-                try:
-                    fonts[size] = pygame.font.SysFont("malgungothic", size)
-                except:
-                    fonts[size] = pygame.font.Font(None, size)
-                return fonts[size]
-                
-        try:
-            fonts[size] = pygame.font.Font(FONT_PATH, size)
-        except:
-            try:
-                fonts[size] = pygame.font.SysFont("malgungothic", size)
-            except:
-                fonts[size] = pygame.font.Font(None, size)
+        fonts[size] = _I18nFont(_make_raw_font(size))
     return fonts[size]
 
 def create_sprite_from_string(sprite_str, scale=4):
@@ -116,6 +145,15 @@ def create_sprite_from_string(sprite_str, scale=4):
         'd': (87, 51, 25, 255),   # Pit base brown
         'D': (56, 33, 15, 255),   # Pit dark shadow
         'l': (110, 65, 30, 255),  # Pit light brown speckle
+        # 작물 '먹는 것' 픽셀 통일용 (사과·감자·쌀밥)
+        'A': (216, 58, 54, 255),  # Apple red
+        'a': (150, 34, 34, 255),  # Apple red shade
+        'h': (245, 138, 128, 255),# Apple highlight
+        'u': (242, 244, 248, 255),# Bowl/rice white
+        'U': (198, 206, 216, 255),# Bowl shade
+        'c': (96, 140, 192, 255), # Bowl blue band
+        'v': (255, 255, 255, 255),# Rice grain highlight
+        'j': (206, 210, 218, 255),# Rice grain shade
     }
     
     for y, line in enumerate(lines):
@@ -336,6 +374,44 @@ XYbDDDDDDDDDDbYX
 .....XXXXXXX......
 ''', 5)
 
+    # 작물 '먹는 것' 픽셀 스프라이트 — 당근(픽셀)과 톤·질감을 맞춰 사과·감자·쌀밥도 도트로 통일.
+    # (예전엔 사과·감자·쌀밥이 벡터 도형이라 당근만 픽셀이라 이질감이 컸다.)
+    sprites['food_apple'] = create_sprite_from_string('''
+....gg....
+...gGb....
+....Xb....
+..XAAAAX..
+.XhhAAAaX.
+XhAAAAAaaX
+XAAAAAAaaX
+XAAAAAAaaX
+XAAAAAAaaX
+.XAAAaaaX.
+..XaaaaX..
+...XXX....
+''', 6)
+    sprites['food_potato'] = create_sprite_from_string('''
+..XXXXX...
+.XBYBBBX..
+XBYBbBBBX.
+XBBBBBbBX.
+XBbBBBBBX.
+XBBBBBBbX.
+.XBBBBBX..
+..XXXXX...
+''', 8)
+    sprites['food_rice'] = create_sprite_from_string('''
+...uvuvu...
+..uuvuuvu..
+.uuuuuuuuu.
+XUUUUUUUUUX
+XucccccccuX
+XuuuuuuuuuX
+.XuuuuuuuX.
+..XUUUUUX..
+...XXXXX...
+''', 8)
+
     # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
     field_bed_path = resource_path("field_bed.jpg")
     if os.path.exists(field_bed_path):
@@ -535,52 +611,23 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
 
 
+_FOOD_SPRITE = {"apple": "food_apple", "potato": "food_potato", "rice": "food_rice"}
+
+
 def draw_crop_food(screen, cx, cy, crop_key, r=26):
-    """작물별 '먹는 것'을 (cx, cy) 중심에 그린다 — 엔딩·수확 연출에서 공용으로 사용.
-    당근은 기존 픽셀 스프라이트를, 나머지는 벡터 도형(사과·감자·쌀밥)을 그린다."""
-    if crop_key == "apple":
-        pygame.draw.circle(screen, (60, 16, 16), (cx, cy + 3), r)                 # 그림자
-        pygame.draw.circle(screen, (200, 48, 44), (cx, cy), r)                    # 몸통
-        # 아랫 음영 — 몸통 안쪽에 머무는 채워진 원(밖으로 삐져나오지 않게)
-        pygame.draw.circle(screen, (168, 32, 32), (cx + r // 6, cy + r // 6), int(r * 0.48))
-        pygame.draw.circle(screen, (240, 120, 105), (cx - r // 3, cy - r // 3), max(3, r // 3))  # 하이라이트
-        pygame.draw.rect(screen, (96, 62, 36), (cx - 2, cy - r - 4, 4, 8), border_radius=2)  # 꼭지
-        pygame.draw.ellipse(screen, (86, 168, 84), (cx + 1, cy - r - 2, 12, 7))   # 잎
+    """작물별 '먹는 것'을 (cx, cy) 중심에 픽셀 스프라이트로 그린다 (엔딩·수확 연출 공용).
+
+    당근·사과·감자·쌀밥 모두 도트 스프라이트로 통일했다(예전엔 사과·감자·쌀밥만 벡터라 이질감).
+    r에 맞춰 **정수 배율**로만 확대해 픽셀이 뭉개지지 않게 한다."""
+    spr = sprites.get(_FOOD_SPRITE.get(crop_key, "carrot"))
+    if not spr:
         return
-    if crop_key == "potato":
-        pygame.draw.ellipse(screen, (78, 52, 32), (cx - r, cy - int(r * 0.7) + 3, 2 * r, int(1.4 * r)))  # 그림자
-        pygame.draw.ellipse(screen, (150, 108, 66), (cx - r, cy - int(r * 0.7), 2 * r, int(1.4 * r)))    # 몸통
-        pygame.draw.ellipse(screen, (182, 142, 92), (cx - int(r * 0.8), cy - int(r * 0.55), int(1.5 * r), int(1.0 * r)))  # 윗빛
-        for ex, ey in [(-r // 2, -3), (r // 3, r // 4), (0, r // 2), (r // 2, -r // 4)]:
-            pygame.draw.circle(screen, (96, 62, 38), (cx + ex, cy + ey), 2)       # 싹눈
-        return
-    if crop_key == "rice":
-        # 밥공기 — 흰 사기그릇에 소복이 담긴 쌀밥 (찻잔처럼 보이지 않게 넓고 낮은 공기 모양)
-        tw, bw = int(r * 2.2), int(r * 1.2)
-        ty, by = cy + int(r * 0.12), cy + int(r * 0.98)
-        shadow = pygame.Surface((tw + 12, 14), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 70), shadow.get_rect())
-        screen.blit(shadow, (cx - (tw + 12) // 2, by - 7))
-        # 그릇 몸통 (아래로 좁아지는 사기 공기)
-        body = [(cx - tw // 2, ty), (cx + tw // 2, ty), (cx + bw // 2, by), (cx - bw // 2, by)]
-        pygame.draw.polygon(screen, (240, 242, 247), body)
-        pygame.draw.polygon(screen, (196, 204, 215), body, 2)
-        pygame.draw.line(screen, (96, 140, 192), (cx - tw // 2 + 5, ty + 10), (cx + tw // 2 - 5, ty + 10), 3)  # 청화 띠
-        # 소복한 쌀밥 봉우리
-        pygame.draw.ellipse(screen, (249, 249, 245), (cx - int(r * 1.0), ty - int(r * 0.72), int(r * 2.0), int(r * 1.05)))
-        pygame.draw.ellipse(screen, (255, 255, 255), (cx - int(r * 0.62), ty - int(r * 0.66), int(r * 0.8), int(r * 0.42)))  # 하이라이트
-        for gx, gy in [(-int(r * 0.5), -int(r * 0.26)), (0, -int(r * 0.34)), (int(r * 0.5), -int(r * 0.18)),
-                       (-int(r * 0.24), -int(r * 0.04)), (int(r * 0.28), -int(r * 0.1)),
-                       (-int(r * 0.42), -int(r * 0.02)), (int(r * 0.14), -int(r * 0.24)), (-int(r * 0.06), -int(r * 0.14))]:
-            px_, py_ = cx + gx, ty - int(r * 0.18) + gy
-            pygame.draw.ellipse(screen, (198, 196, 186), (px_ + 1, py_ + 1, 4, 3))   # 낟알 그늘 (또렷하게)
-            pygame.draw.ellipse(screen, (255, 255, 255), (px_, py_, 4, 3))            # 낟알
-        pygame.draw.ellipse(screen, (214, 220, 230), (cx - tw // 2, ty - 5, tw, 12), 2)  # 그릇 앞 테두리
-        return
-    # carrot (기본): 픽셀 당근 스프라이트
-    spr = sprites.get("carrot")
-    if spr:
-        screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
+    # 목표 높이 ≈ 2.7*r 에 가장 가까운 정수 배율(최소 1배)로 확대 → 픽셀 유지
+    target_h = max(1, int(r * 2.7))
+    factor = max(1, round(target_h / spr.get_height()))
+    if factor != 1:
+        spr = pygame.transform.scale(spr, (spr.get_width() * factor, spr.get_height() * factor))
+    screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
 
 
 def draw_crop_seed(screen, cx, cy, crop_key):

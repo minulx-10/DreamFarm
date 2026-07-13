@@ -8,6 +8,7 @@ main 루프가 settings_overlay와 같은 방식으로 handle_events/draw를 불
 import pygame
 
 from core import audio
+from core import i18n
 from core.assets import get_font, WHITE, TEXT_DARK
 from core.ui import draw_panel, mix_color
 from core.game_state import game_state, STORY_EVENTS
@@ -47,7 +48,7 @@ class DevOverlay:
         def act(farm):
             game_state.crop = crop
             game_state.dev_new_farm = True   # main이 밭을 새로 만들고 farm으로 이동
-            self.msg = f"작물 → {crop} (새 밭)"
+            self.msg = i18n.tf("작물 → {crop} (새 밭)", crop=crop)
         return act
 
     def _goto(self, scene, setup=None):
@@ -55,14 +56,14 @@ class DevOverlay:
             if setup:
                 setup(farm)
             game_state.current_scene = scene
-            self.msg = f"이동 → {scene}"
+            self.msg = i18n.tf("이동 → {scene}", scene=scene)
         return act
 
     def _grow(self, amount):
         def act(farm):
             if farm is not None and getattr(farm, "sim", None) is not None:
                 farm.sim.growth = max(0, min(farm.sim.growth_goal, farm.sim.growth + amount))
-                self.msg = f"성장 {farm.sim.growth}/{farm.sim.growth_goal}"
+                self.msg = i18n.tf("성장 {a}/{b}", a=farm.sim.growth, b=farm.sim.growth_goal)
         return act
 
     def _harvest_ready(self, farm):
@@ -73,12 +74,12 @@ class DevOverlay:
     def _und(self, amount):
         def act(farm):
             game_state.understanding = max(0, game_state.understanding + amount)
-            self.msg = f"이해도 {game_state.understanding}"
+            self.msg = i18n.tf("이해도 {n}", n=game_state.understanding)
         return act
 
     def _toggle_nightmare(self, farm):
         game_state.nightmare = not game_state.nightmare
-        self.msg = f"악몽 {'ON' if game_state.nightmare else 'OFF'}"
+        self.msg = i18n.tf("악몽 {state}", state='ON' if game_state.nightmare else 'OFF')
 
     def _force_story(self, farm):
         import random

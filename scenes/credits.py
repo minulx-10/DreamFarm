@@ -40,16 +40,16 @@ class CreditsScene:
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         draw_button(screen, self.back_btn, "돌아가기", self.font_body, hovered=self.hovered_back)
 
-        panel = pygame.Rect(170, 90, 460, 430)
+        panel = pygame.Rect(160, 66, 480, 476)
         draw_light_panel(screen, panel)
         cx = panel.centerx
 
         def centered(surf, yy):
             screen.blit(surf, (cx - surf.get_width() // 2, yy))
 
-        y = panel.y + 34
-        centered(self.font_title.render("몽중농원", True, GOLD), y); y += 58
-        centered(self.font_small.render("당근 한 뿌리의 시간", True, TEXT_MUTED), y); y += 46
+        y = panel.y + 26
+        centered(self.font_title.render("몽중농원", True, GOLD), y); y += 54
+        centered(self.font_small.render("당근 한 뿌리의 시간", True, TEXT_MUTED), y); y += 40
 
         def head(txt, yy):
             centered(self.font_head.render(txt, True, (150, 110, 60)), yy)
@@ -59,15 +59,27 @@ class CreditsScene:
             centered(self.font_body.render(txt, True, col), yy)
             return yy + 26
 
-        y = head("기획 · 개발", y)
-        y = body("삼광 (Samgwang)", y)
+        # 만든 사람들 — 삼광(三光) 팀. 학번+이름은 중앙 거터 왼쪽, 역할은 오른쪽으로 정렬해
+        # 세 사람이 표처럼 가지런히 읽히게 한다.
+        def roster(who, role, yy):
+            name_surf = self.font_body.render(who, True, TEXT_DARK)
+            role_surf = self.font_body.render(role, True, TEXT_MUTED)
+            screen.blit(name_surf, (cx - 14 - name_surf.get_width(), yy))
+            screen.blit(role_surf, (cx + 14, yy))
+            return yy + 28
+
+        y = head("삼광 (三光)", y)
+        y = roster("1302 김민욱", "팀장 · 개발", y)
+        y = roster("1303 박서현", "기획 · 스토리", y)
+        y = roster("1305 서태양", "기획 · 디자인", y)
         y += 22
+
         y = head("사용 폰트", y)
         y = body("갈무리11 (Galmuri11) — 달고나(Dalgona)", y)
         y = body("SIL Open Font License 1.1", y, TEXT_MUTED)
-        y += 24
+        y += 22
         y = body("함께 해 주셔서 고맙습니다.", y, TEXT_MUTED)
 
-        # 저작권 (연도·제작사 명시)
-        centered(self.font_small.render("© 2026 삼광 (Samgwang). All Rights Reserved.", True, TEXT_MUTED),
-                 panel.bottom - 34)
+        # 저작권 (연도·제작팀 명시)
+        centered(self.font_small.render("© 2026 삼광 (三光). All Rights Reserved.", True, TEXT_MUTED),
+                 panel.bottom - 32)

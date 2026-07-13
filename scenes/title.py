@@ -13,22 +13,31 @@ class TitleScene:
         self.font_title = get_font(44)
         self.font_subtitle = get_font(20)
         self.font_button = get_font(20)
-        
+        self.font_util = get_font(16)   # 하단 보조 버튼(설정·제작진·끝내기)용 작은 폰트
+
         # 엔딩 해금 여부에 따라 갤러리 노출 여부 결정
         self.show_gallery = save_system.crops_unlocked()
-        
-        button_y = 240
-        self.start_btn = pygame.Rect(280, button_y, 240, 40)
-        self.load_btn = pygame.Rect(280, button_y + 50, 240, 40)
-        
-        current_y = button_y + 100
+
+        # 위쪽: 실제 '플레이' 동작만 큰 버튼으로 (새 게임 · 이어 하기 · 갤러리)
+        play_w = 240
+        play_x = (800 - play_w) // 2
+        button_y = 250
+        self.start_btn = pygame.Rect(play_x, button_y, play_w, 44)
+        self.load_btn = pygame.Rect(play_x, button_y + 54, play_w, 44)
+
+        current_y = button_y + 108
         if self.show_gallery:
-            self.gallery_btn = pygame.Rect(280, current_y, 240, 40)
-            current_y += 50
-            
-        self.settings_btn = pygame.Rect(280, current_y, 240, 40)
-        self.credits_btn = pygame.Rect(280, current_y + 50, 240, 40)
-        self.quit_btn = pygame.Rect(280, current_y + 100, 240, 40)
+            self.gallery_btn = pygame.Rect(play_x, current_y, play_w, 44)
+            current_y += 54
+
+        # 아래쪽: 보조 기능(설정·제작진·끝내기)은 작은 버튼 한 줄로 묶어 정리
+        util_w, util_h, gap = 148, 36, 16
+        row_w = util_w * 3 + gap * 2
+        util_x = (800 - row_w) // 2
+        util_y = current_y + 22
+        self.settings_btn = pygame.Rect(util_x, util_y, util_w, util_h)
+        self.credits_btn = pygame.Rect(util_x + util_w + gap, util_y, util_w, util_h)
+        self.quit_btn = pygame.Rect(util_x + 2 * (util_w + gap), util_y, util_w, util_h)
 
         self.hovered_start = False
         self.hovered_load = False
@@ -166,13 +175,14 @@ class TitleScene:
             
         if self.show_gallery:
             draw_button(screen, self.gallery_btn, "추억 갤러리", self.font_button, hovered=self.hovered_gallery)
-            
-        draw_button(screen, self.settings_btn, "소리 및 설정", self.font_button, hovered=self.hovered_settings)
-        draw_button(screen, self.credits_btn, "제작진", self.font_button, hovered=self.hovered_credits)
-        draw_button(screen, self.quit_btn, "게임 끝내기", self.font_button, hovered=self.hovered_quit)
 
-        # 5. 저작권 표시 — 연도·제작사 명시
+        # 보조 기능은 작은 버튼 한 줄로 (설정 · 제작진 · 끝내기)
+        draw_button(screen, self.settings_btn, "설정", self.font_util, hovered=self.hovered_settings)
+        draw_button(screen, self.credits_btn, "제작진", self.font_util, hovered=self.hovered_credits)
+        draw_button(screen, self.quit_btn, "끝내기", self.font_util, hovered=self.hovered_quit)
+
+        # 5. 저작권 표시 — 연도·제작팀 명시
         cr_font = get_font(13)
         cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© 2026 삼광 (Samgwang). All Rights Reserved.", True, cr_col)
+        cr_surf = cr_font.render("© 2026 삼광 (三光). All Rights Reserved.", True, cr_col)
         screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 574))

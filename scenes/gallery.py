@@ -4,6 +4,7 @@ from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE, GOLD, PANEL_WARM
 from core.ui import draw_light_panel, draw_story_backdrop, draw_button, wrap_text, mix_color, draw_panel
 from core import audio
 from core import save_system
+from core import i18n
 
 class GalleryScene:
     def __init__(self):
@@ -216,7 +217,7 @@ class GalleryScene:
         # 하단 중앙 저작권(Copyright) 표시 — '별 잇기 다시 하기' 버튼 아래에 배치(겹침 방지)
         cr_font = get_font(13)
         cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© 2026 삼광 (Samgwang)", True, cr_col)
+        cr_surf = cr_font.render("© 2026 삼광 (三光)", True, cr_col)
         screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 580))
 
         # 5. 모달 팝업 그리기 (오버레이)
@@ -277,7 +278,7 @@ class GalleryScene:
 
         area = pygame.Rect(80, 160, 640, 372)
         draw_light_panel(screen, area)
-        header = self.font_section.render(f"업적  {got} / {len(items)}", True, TEXT_DARK)
+        header = self.font_section.render(i18n.tf("업적  {got} / {total}", got=got, total=len(items)), True, TEXT_DARK)
         screen.blit(header, (area.x + 20, area.y + 12))
         pygame.draw.line(screen, (200, 180, 150), (area.x + 20, area.y + 44),
                          (area.right - 20, area.y + 44), 1)
@@ -450,7 +451,7 @@ class GalleryScene:
         area = pygame.Rect(80, 160, 640, 372)
         # 일반 판넬보다 살짝 더 신비롭고 어두운 틴트 얹어주기
         draw_light_panel(screen, area)
-        header = self.font_section.render(f"히든 업적  {got} / {len(items)}", True, (139, 38, 38))
+        header = self.font_section.render(i18n.tf("히든 업적  {got} / {total}", got=got, total=len(items)), True, (139, 38, 38))
         screen.blit(header, (area.x + 20, area.y + 12))
         pygame.draw.line(screen, (200, 150, 150), (area.x + 20, area.y + 44),
                          (area.right - 20, area.y + 44), 1)

@@ -1,0 +1,23 @@
+# Crowdin 설정 — 몽중농원 현지화
+#
+# 소스 언어: 한국어(ko).  소스 파일 core/locales/ko.json 의 값(=한국어 원문)을 번역한다.
+# 번역 결과는 core/locales/<언어코드>.json 으로 내려받으며, 게임이 실행 시 자동으로 읽는다.
+#
+# 자격 증명은 커밋하지 말 것 — 환경변수로 준다:
+#   CROWDIN_PROJECT_ID, CROWDIN_PERSONAL_TOKEN
+#
+# 흐름:
+#   python tools/i18n_export.py            # core/i18n_data.py → core/locales/{ko,en}.json 생성
+#   crowdin upload sources                 # ko.json(원문) 업로드
+#   crowdin upload translations -l en      # (선택) 기존 en.json 번역 선반영
+#   crowdin download                       # 번역된 <lang>.json 내려받기 → 그대로 게임에 반영
+
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+base_path: "."
+preserve_hierarchy: true
+
+files:
+  - source: /core/locales/ko.json
+    translation: /core/locales/%two_letters_code%.json
+    type: json

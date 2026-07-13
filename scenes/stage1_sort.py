@@ -3,6 +3,7 @@ import random
 from core.game_state import game_state
 from core.assets import *
 from core import audio
+from core import i18n
 from core.ui import draw_top_bar, draw_bottom_bar, draw_light_panel, draw_wood_panel, mix_color
 from core.crops import current_crop, swap_crop_word
 
@@ -154,7 +155,7 @@ class Stage1Scene:
                 elif game_state.score >= 100: bonus = 5
                 
                 game_state.understanding += bonus
-                game_state.transition_text = f"밭 정리 완료!\n\n획득 점수: {game_state.score}점\n흙을 보는 눈이 깊어졌습니다. 이해도 +{bonus}"
+                game_state.transition_text = i18n.tf("밭 정리 완료!\n\n획득 점수: {score}점\n흙을 보는 눈이 깊어졌습니다. 이해도 +{bonus}", score=game_state.score, bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -181,7 +182,7 @@ class Stage1Scene:
             panel = pygame.Rect(400 - 100, 300 - 30, 200, 60)
             draw_wood_panel(screen, panel)
             screen.blit(clear_text, (400 - clear_text.get_width()//2, 300 - clear_text.get_height()//2))
-            draw_bottom_bar(screen, "결과", f"얻은 점수: {game_state.score}")
+            draw_bottom_bar(screen, "결과", i18n.tf("얻은 점수: {score}", score=game_state.score))
         else:
             if self.dragged_item:
                 draw_bottom_bar(screen, self.dragged_item.name, "알맞은 위치로 끌어다 놓으세요.")

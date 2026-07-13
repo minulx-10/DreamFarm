@@ -12,6 +12,7 @@ from core.ui import (
     wrap_text, mix_color,
 )
 from core.crops import current_crop
+from core import i18n
 
 TEXT_DARK = (48, 38, 28)
 TEXT_MUTED = (123, 106, 92)
@@ -72,7 +73,7 @@ class FarmRenderer:
         title_font = get_font(20)
         
         crop_name = current_crop()["name"]
-        title_text = f"밭 상태 ({crop_name})"
+        title_text = i18n.tf("밭 상태 ({crop})", crop=i18n.t(crop_name))
         
         title = title_font.render(title_text, True, TEXT_DARK)
         screen.blit(title, (450, 96))
@@ -81,7 +82,7 @@ class FarmRenderer:
         draw_understanding_badge(screen, 600, 123, 130)
 
         status_font = get_font(16)
-        health_text = status_font.render(f"건강 {sim.grade_text(sim.health)}", True, TEXT_DARK)
+        health_text = status_font.render(i18n.tf("건강 {grade}", grade=i18n.t(sim.grade_text(sim.health))), True, TEXT_DARK)
         screen.blit(health_text, (450, 162))
 
         if sim.is_harvest_ready():
@@ -531,12 +532,13 @@ class FarmRenderer:
         title_font = get_font(20)
         season_name = get_season(sim.growth, sim.growth_goal)
         if game_state.dad_mode:
-            prefix = f"[{season_name}] 아버지의 밭 "
+            prefix = i18n.tf("[{season}] 아버지의 밭 ", season=i18n.t(season_name))
         else:
-            prefix = f"[{season_name}] {sim.day}일째 "
-            
+            prefix = i18n.tf("[{season}] {day}일째 ", season=i18n.t(season_name), day=sim.day)
+
         prefix_surf = title_font.render(prefix, True, TEXT_DARK)
-        weather_text = f"{game_state.weather} ({game_state.weather_turns_left}일간)"
+        weather_text = i18n.tf("{weather} ({turns}일간)", weather=i18n.t(game_state.weather),
+                               turns=game_state.weather_turns_left)
         weather_surf = title_font.render(weather_text, True, TEXT_DARK)
         
         title_rect = pygame.Rect(50, 82, 350, 48)
@@ -560,7 +562,8 @@ class FarmRenderer:
         screen.blit(action_title, (450, 306))
 
         forecast_font = get_font(14)
-        fc_text = f"예보: {game_state.next_weather} ({game_state.weather_turns_left}일 뒤)"
+        fc_text = i18n.tf("예보: {weather} ({turns}일 뒤)", weather=i18n.t(game_state.next_weather),
+                          turns=game_state.weather_turns_left)
         fc = forecast_font.render(fc_text, True, TEXT_MUTED)
         fc_x = 738 - fc.get_width()
         screen.blit(fc, (fc_x, 308))
@@ -601,7 +604,7 @@ class FarmRenderer:
             draw_panel(screen, timer_box, fill=(255, 230, 230), border=(200, 50, 50))
             
             timer_font = get_font(16)
-            timer_text = f"돌발 상황 해결 중! 남은 시간: {farm_scene.forced_wait_timer:.1f}초"
+            timer_text = i18n.tf("돌발 상황 해결 중! 남은 시간: {t}초", t=f"{farm_scene.forced_wait_timer:.1f}")
             ts = timer_font.render(timer_text, True, (200, 30, 30))
             screen.blit(ts, (400 - ts.get_width() // 2, 31))
 
@@ -634,6 +637,7 @@ class FarmRenderer:
             screen.blit(ls, (card.x + 28, y))
             y += body_font.get_height() + 7
 
-        step_txt = f"{farm_scene.tutorial_step + 1} / {len(farm_scene.TUTORIAL_PAGES)}   ·   클릭하여 계속"
+        step_txt = i18n.tf("{step} / {total}   ·   클릭하여 계속",
+                           step=farm_scene.tutorial_step + 1, total=len(farm_scene.TUTORIAL_PAGES))
         ss = get_font(14).render(step_txt, True, TEXT_MUTED)
         screen.blit(ss, (card.centerx - ss.get_width() // 2, card.bottom - 32))

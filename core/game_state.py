@@ -104,6 +104,8 @@ class GameState:
         self.request_load = False       # 슬롯 불러오기
         self.request_settings = False   # 설정 오버레이 열기
         self.request_quit = False       # 게임 종료 확인 모달 열기
+        self.request_fullscreen_toggle = False  # 전체화면/창모드 전환 (설정창·F11 공용)
+        self.is_fullscreen = False      # 현재 전체화면 여부(설정창 표시용) — game_main이 갱신
 
         # 갤러리에서 특정 엔딩을 감상용으로 강제 지정 (EndingScene이 소비 후 비운다)
         self.forced_ending = None

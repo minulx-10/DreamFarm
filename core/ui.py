@@ -20,6 +20,9 @@ def draw_mute_icon(screen, x, y):
 
 
 def wrap_text(text, font, max_width, max_lines=None):
+    # 긴 문장은 줄바꿈 '전에' 통째로 번역해야 영어 기준으로 정확히 줄바꿈된다.
+    from core import i18n
+    text = i18n.t(str(text))
     lines = []
     truncated = False
     for paragraph in str(text).split("\n"):
@@ -29,14 +32,22 @@ def wrap_text(text, font, max_width, max_lines=None):
             if font.size(test_line)[0] <= max_width:
                 current = test_line
             else:
-                if current:
-                    if " " in current:
-                        split_at = current.rfind(" ")
-                        lines.append(current[:split_at])
-                        current = current[split_at + 1:] + ("" if char == " " else char)
-                    else:
+                if char == " ":
+                    # 공백에서 넘치면 지금까지를 한 줄로 확정하고 공백은 버린다
+                    # (영어에서 단어가 서로 붙어버리던 버그 방지 — "carrotinto")
+                    if current:
                         lines.append(current)
-                        current = char if char != " " else ""
+                    current = ""
+                elif " " in current:
+                    # 단어 중간에서 넘치면 마지막 공백 기준 단어 단위 줄바꿈
+                    split_at = current.rfind(" ")
+                    lines.append(current[:split_at])
+                    current = current[split_at + 1:] + char
+                elif current:
+                    lines.append(current)
+                    current = char
+                else:
+                    current = char
                 if max_lines and len(lines) >= max_lines:
                     truncated = True
                     break
@@ -322,7 +333,9 @@ def draw_understanding_badge(screen, x, y, w):
     name_surf = font.render(stage_name, True, TEXT_DARK)
     if name_surf.get_width() > avail:
         name_surf = get_font(13).render(stage_name, True, TEXT_DARK)
-    screen.blit(name_surf, (name_x, y))
+    # 영어 등 단계명이 뱃지 폭을 넘으면 라벨·미터만 두고 이름은 생략(겹침 방지)
+    if name_surf.get_width() <= avail:
+        screen.blit(name_surf, (name_x, y))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))

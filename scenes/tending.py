@@ -8,6 +8,7 @@ import pygame
 from core.assets import sprites, get_font
 from core.game_state import game_state
 from core import audio
+from core import i18n
 
 PLOT = pygame.Rect(44, 140, 362, 318)
 
@@ -395,7 +396,7 @@ class WeedPull(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            remain_txt = f"남은 가지 {remain}" if is_apple else f"남은 잡초 {remain}"
+            remain_txt = i18n.tf("남은 가지 {n}", n=remain) if is_apple else i18n.tf("남은 잡초 {n}", n=remain)
             _counter(screen, remain_txt, self.timer / 6.5)
 
 
@@ -497,7 +498,7 @@ class PestTap(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            remain_txt = f"남은 굼벵이 {remain}" if is_potato else f"남은 벌레 {remain}"
+            remain_txt = i18n.tf("남은 굼벵이 {n}", n=remain) if is_potato else i18n.tf("남은 벌레 {n}", n=remain)
             _counter(screen, remain_txt, self.timer / 6.0)
 
 
@@ -628,7 +629,7 @@ class SoilMound(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"남은 자리 {remain}", self.timer / 6.5)
+            _counter(screen, i18n.tf("남은 자리 {n}", n=remain), self.timer / 6.5)
 
 
 # ---- 공통 그리기 헬퍼 ----
@@ -789,7 +790,7 @@ class WeatherSunshine:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"모은 햇살 {self.collected}/{self.target}", self.timer / 8.0)
+            _counter(screen, i18n.tf("모은 햇살 {c}/{t}", c=self.collected, t=self.target), self.timer / 8.0)
 
 
 class WeatherRain:
@@ -897,7 +898,7 @@ class WeatherRain:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"받은 빗물 {self.caught}/{self.target}", self.timer / 8.0)
+            _counter(screen, i18n.tf("받은 빗물 {c}/{t}", c=self.caught, t=self.target), self.timer / 8.0)
 
 
 class WeatherCloudy:
@@ -1001,7 +1002,7 @@ class WeatherCloudy:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"치운 구름 {self.cleared}/{self.target}", self.timer / 10.0)
+            _counter(screen, i18n.tf("치운 구름 {c}/{t}", c=self.cleared, t=self.target), self.timer / 10.0)
 
 
 class WeatherDrought:
@@ -1116,7 +1117,7 @@ class WeatherDrought:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"찾은 수맥 {self.found}/{self.target}", self.timer / 10.0)
+            _counter(screen, i18n.tf("찾은 수맥 {c}/{t}", c=self.found, t=self.target), self.timer / 10.0)
 
 
 class WeatherWind:
@@ -1231,7 +1232,7 @@ class WeatherWind:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"막은 횟수 {self.blocked}", self.timer / 8.0)
+            _counter(screen, i18n.tf("막은 횟수 {n}", n=self.blocked), self.timer / 8.0)
 
 
 # 날씨 → 미니게임 클래스 매핑

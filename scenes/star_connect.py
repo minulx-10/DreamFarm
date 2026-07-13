@@ -12,6 +12,7 @@ from core.game_state import game_state
 from core.assets import get_font, TEXT_MUTED
 from core.ui import draw_story_backdrop
 from core import audio
+from core import i18n
 
 # 북두칠성 모양 — 손잡이(1~4) → 바가지(4~7). 매 판 살짝 흔들어 똑같지 않게.
 _DIPPER = [(583, 116), (505, 138), (432, 166), (368, 198),
@@ -99,11 +100,9 @@ class StarConnectScene:
         frac = n / self.total
         bonus = 18 if frac >= 0.99 else 12 if frac >= 0.7 else 7 if frac >= 0.4 else 3
         game_state.understanding += bonus
-        game_state.transition_text = (
-            "흩어진 별을 이어, 아버지가 보던 새벽 하늘을 그렸다.\n\n"
-            f"이은 별: {n}/{self.total}    이해도 +{bonus}\n"
-            "'저 별이 기울면 일어날 때란다.' 아버지의 말이 떠올랐다."
-        )
+        game_state.transition_text = i18n.tf(
+            "흩어진 별을 이어, 아버지가 보던 새벽 하늘을 그렸다.\n\n이은 별: {n}/{total}    이해도 +{bonus}\n'저 별이 기울면 일어날 때란다.' 아버지의 말이 떠올랐다.",
+            n=n, total=self.total, bonus=bonus)
         game_state.transition_next = game_state.return_scene
         game_state.is_clear_transition = True
         game_state.current_scene = "transition"
@@ -177,7 +176,7 @@ class StarConnectScene:
 
     def _hud(self, screen):
         # 진행 + 남은 시간 (밤하늘에 어울리게 최소한으로)
-        prog = self.font.render(f"이은 별  {self.idx}/{self.total}", True, (236, 230, 206))
+        prog = self.font.render(i18n.tf("이은 별  {idx}/{total}", idx=self.idx, total=self.total), True, (236, 230, 206))
         screen.blit(prog, (28, 26))
         w = 220
         pygame.draw.rect(screen, (40, 44, 60), (28, 56, w, 6), border_radius=3)

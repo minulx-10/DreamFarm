@@ -8,6 +8,7 @@ import pygame
 
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core import audio, save_system
+from core import i18n
 
 
 # 등급(브론즈/실버/골드/플래티넘)별 메달 색과 이름
@@ -59,6 +60,12 @@ def unlock(aid):
         return
     save_system.record_achievement(aid)
     _toasts.append({"a": ach, "t": 0.0})
+    # 스팀 도전과제도 함께 해제 (스팀 연동이 없으면 무해한 no-op).
+    try:
+        from core import steam
+        steam.unlock_achievement(aid)
+    except Exception:
+        pass
     try:
         audio.play("epiphany")
     except Exception:
@@ -109,7 +116,7 @@ def on_name(name):
         # 히든 업적 잠금해제 처리
         unlock("developer_secret")
         # 추가 인사 토스트를 대기열에 삽입
-        _toasts.append({"a": {"title": f"개발자 {name}, 등장!", "tier": "legend"}, "t": 0.0})
+        _toasts.append({"a": {"title": i18n.tf("개발자 {name}, 등장!", name=name), "tier": "legend"}, "t": 0.0})
         try:
             audio.play("epiphany")
         except Exception:
