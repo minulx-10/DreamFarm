@@ -49,7 +49,7 @@ class GalleryScene:
         self.modal_rect = pygame.Rect(120, 120, 560, 380)
         self.modal_close_btn = pygame.Rect(452, 440, 128, 36)
         self.modal_replay_btn = pygame.Rect(220, 440, 128, 36)   # 이벤트 다시 하기
-        self.star_replay_btn = pygame.Rect(290, 544, 220, 40)    # 별 잇기 다시 하기(이야기 탭)
+        self.star_replay_btn = pygame.Rect(290, 532, 220, 36)    # 별 잇기 다시 하기(이야기 탭) — 저작권 표시와 겹치지 않게 위로
         
         self.endings_seen = save_system.endings_seen()
         self.stories_seen = save_system.load_meta().get("stories_seen", [])
@@ -213,11 +213,11 @@ class GalleryScene:
         else:
             self._draw_stories_tab(screen)
             
-        # 하단 중앙 저작권(Copyright) 표시
+        # 하단 중앙 저작권(Copyright) 표시 — '별 잇기 다시 하기' 버튼 아래에 배치(겹침 방지)
         cr_font = get_font(13)
         cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© 삼광", True, cr_col)
-        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 568))
+        cr_surf = cr_font.render("© 2026 삼광 (Samgwang)", True, cr_col)
+        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 580))
 
         # 5. 모달 팝업 그리기 (오버레이)
         if self.reading_title:

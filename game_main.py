@@ -26,6 +26,7 @@ from scenes.ending import EndingScene
 from scenes.epiphany import EpiphanyScene
 from scenes.story_choice import StoryChoiceScene
 from scenes.father_day import FatherDayScene
+from scenes.credits import CreditsScene
 
 
 def setup_window_icon():
@@ -158,8 +159,8 @@ def main():
     pygame.mouse.get_pos = mapped_get_pos
 
     BGM_BY_SCENE = {
-        "title": "night", "crop_select": "night", "gallery": "night", 
-        "name_input": "night", "intro": "night",
+        "title": "night", "crop_select": "night", "gallery": "night",
+        "name_input": "night", "intro": "night", "credits": "night",
         "memory": None, "story_choice": "event", "father_day": None,
         "farm": "farm", "stage1": "event", "stage2": "farm",
         "stage3": "farm", "stage4": "farm", "star_connect": None,
@@ -185,12 +186,13 @@ def main():
         "epiphany": EpiphanyScene,
         "story_choice": StoryChoiceScene,
         "father_day": FatherDayScene,
+        "credits": CreditsScene,
     }
-    
+
     FRESH_ON_ENTER = {
         "title", "crop_select", "gallery", "name_input", "intro", "memory", "epiphany",
         "story_choice", "father_day", "stage1", "stage2", "stage3",
-        "stage4", "star_connect", "ending",
+        "stage4", "star_connect", "ending", "credits",
     }
 
     # 씬 지연 초기화 (Lazy Initialization) 적용
@@ -388,7 +390,7 @@ def main():
                     # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면은 예외.
                     esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
                                       for e in mapped_events)
-                    if esc_pressed and current_key not in ("crop_select", "name_input"):
+                    if esc_pressed and current_key not in ("crop_select", "name_input", "credits"):
                         settings_overlay.open = True
                     else:
                         current_scene_obj.handle_events(mapped_events)

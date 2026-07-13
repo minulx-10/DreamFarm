@@ -85,4 +85,11 @@ scenes/             title · name_input · intro · crop_select · farm · stage
 
 ---
 
-© 삼광. All Rights Reserved.
+## 저작권 (Copyright)
+
+© 2026 삼광 (Samgwang). All Rights Reserved.
+
+이 게임의 소스 코드와 리소스(그래픽·사운드 등)는 삼광(Samgwang) 팀의 자산이며 저작권법의 보호를
+받습니다. 무단 복제·배포·상업적 이용을 금합니다. 자세한 내용은 [`LICENSE`](LICENSE)를 참고하세요.
+
+사용 폰트 **갈무리11(Galmuri11)** — © 2019–2025 Lee Minseo, [SIL Open Font License 1.1](LICENSE).

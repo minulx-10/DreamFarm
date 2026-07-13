@@ -27,12 +27,14 @@ class TitleScene:
             current_y += 50
             
         self.settings_btn = pygame.Rect(280, current_y, 240, 40)
-        self.quit_btn = pygame.Rect(280, current_y + 50, 240, 40)
-        
+        self.credits_btn = pygame.Rect(280, current_y + 50, 240, 40)
+        self.quit_btn = pygame.Rect(280, current_y + 100, 240, 40)
+
         self.hovered_start = False
         self.hovered_load = False
         self.hovered_gallery = False
         self.hovered_settings = False
+        self.hovered_credits = False
         self.hovered_quit = False
 
         # 이스터에그: 달을 네 번 두드리면 악)몽중농원 모드가 켜지고 배경·음악이 검붉게 바뀐다.
@@ -50,19 +52,22 @@ class TitleScene:
         h_load = self.load_btn.collidepoint(mouse_pos)
         h_gallery = self.gallery_btn.collidepoint(mouse_pos) if self.show_gallery else False
         h_settings = self.settings_btn.collidepoint(mouse_pos)
+        h_credits = self.credits_btn.collidepoint(mouse_pos)
         h_quit = self.quit_btn.collidepoint(mouse_pos)
-        
+
         # 호버 시 사운드 피드백
         any_new_hover = (h_start and not self.hovered_start) or \
                          (h_load and not self.hovered_load) or \
                          (h_gallery and not self.hovered_gallery) or \
                          (h_settings and not self.hovered_settings) or \
+                         (h_credits and not self.hovered_credits) or \
                          (h_quit and not self.hovered_quit)
-                         
+
         self.hovered_start = h_start
         self.hovered_load = h_load
         self.hovered_gallery = h_gallery
         self.hovered_settings = h_settings
+        self.hovered_credits = h_credits
         self.hovered_quit = h_quit
         
         if any_new_hover:
@@ -103,6 +108,10 @@ class TitleScene:
                 elif self.hovered_settings:
                     audio.play("click")
                     game_state.request_settings = True
+                # 제작진(크레딧)
+                elif self.hovered_credits:
+                    audio.play("click")
+                    game_state.current_scene = "credits"
                 # 끝내기
                 elif self.hovered_quit:
                     audio.play("click")
@@ -159,10 +168,11 @@ class TitleScene:
             draw_button(screen, self.gallery_btn, "추억 갤러리", self.font_button, hovered=self.hovered_gallery)
             
         draw_button(screen, self.settings_btn, "소리 및 설정", self.font_button, hovered=self.hovered_settings)
+        draw_button(screen, self.credits_btn, "제작진", self.font_button, hovered=self.hovered_credits)
         draw_button(screen, self.quit_btn, "게임 끝내기", self.font_button, hovered=self.hovered_quit)
 
-        # 5. 저작권 표시 추가
+        # 5. 저작권 표시 — 연도·제작사 명시
         cr_font = get_font(13)
         cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© 삼광", True, cr_col)
-        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 568))
+        cr_surf = cr_font.render("© 2026 삼광 (Samgwang). All Rights Reserved.", True, cr_col)
+        screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 574))
