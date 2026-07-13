@@ -55,6 +55,11 @@ def setup_window_icon():
         pass
 
 
+# 미니게임 씬 — 자체 상단바(점수·타이머)를 그리므로 배속·설정 버튼을 겹쳐 그리지 않는다
+# (배속 버튼이 점수 박스 오른쪽을 가리던 문제). 짧은 미니게임이라 배속·설정도 필요 없다.
+MINIGAME_SCENES = {"stage1", "stage2", "stage3", "stage4", "star_connect"}
+
+
 def main():
     pygame.init()
 
@@ -400,7 +405,8 @@ def main():
 
             # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
             if not quit_overlay.handle_events(mapped_events):
-                if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")) \
+                if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm"),
+                                                      button_enabled=game_state.current_scene not in MINIGAME_SCENES) \
                         and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
                     for event in mapped_events:
                         if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
@@ -426,8 +432,9 @@ def main():
         # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
         current_scene_obj.draw(virtual_screen)
         
-        # 배속 토글 버튼 그리기 (설정창이나 종료창이 닫혀 있을 때만 활성화)
-        if not game_state.request_quit and not settings_overlay.open:
+        # 배속 토글 버튼 그리기 (설정창·종료창이 닫혀 있고, 미니게임 씬이 아닐 때만 — 점수 가림 방지)
+        if (not game_state.request_quit and not settings_overlay.open
+                and game_state.current_scene not in MINIGAME_SCENES):
             ff_btn = pygame.Rect(708, 27, 28, 28)
             hovered_ff = ff_btn.collidepoint(pygame.mouse.get_pos())
             ff_active = getattr(game_state, "fast_forward_toggle", False)
@@ -462,7 +469,7 @@ def main():
         except Exception:
             pass
 
-        settings_overlay.draw(virtual_screen)
+        settings_overlay.draw(virtual_screen, show_button=game_state.current_scene not in MINIGAME_SCENES)
         quit_overlay.draw(virtual_screen)
         dev_overlay.draw(virtual_screen)
         achievements.draw(virtual_screen)   # 업적 토스트는 항상 맨 위에

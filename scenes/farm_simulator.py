@@ -396,9 +396,12 @@ class FarmSimulator:
             return "지금은 배수로를 손볼 때가 아니다.", True
 
         if action == "흙 북돋기":
+            # 체력이 낮을수록 회복을 크게 준다 — 안 그러면 잡초·해충 압박(같은 턴에 적용)에 상쇄돼
+            # '흙 북돋기를 해도 살아나지 않는' 죽음의 소용돌이가 생긴다. 잘 해내면 압박을 넘어 회복.
+            base = 15 if self.health < 40 else 8
             if quality is not None:
                 frac = quality.get("cleared_frac", 1.0)
-                self.health += max(2, int(8 * frac))
+                self.health += max(5, int(base * frac))
                 self.stress = max(0, self.stress - max(2, int(10 * frac)))
                 self.drainage += int(4 * frac)
                 if frac >= 0.85:
@@ -410,7 +413,7 @@ class FarmSimulator:
                 return ("거름이 부족해 뿌리가 아직 허전하다." if self.is_tree
                         else "북돋다 말아 뿌리가 아직 허전하다."), False
             if self.health < 65 or self.stress > 24:
-                self.health += 8
+                self.health += base
                 self.stress = max(0, self.stress - 10)
                 self.drainage += 4
                 return ("거름을 주니 한결 생기가 돈다." if self.is_tree

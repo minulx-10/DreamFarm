@@ -68,12 +68,13 @@ class SettingsOverlay:
                 self.show_message = ""
 
     # ------------------------------------------------------------------ 입력
-    def handle_events(self, events, farm_scene=None):
-        """오버레이가 이 프레임의 입력을 소비했으면 True를 반환."""
+    def handle_events(self, events, farm_scene=None, button_enabled=True):
+        """오버레이가 이 프레임의 입력을 소비했으면 True를 반환.
+        button_enabled=False면 톱니 버튼이 숨겨진 상태(미니게임 등)이므로 클릭으로 열리지 않는다."""
         consumed = False
         for event in events:
             if not self.open:
-                if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                if (button_enabled and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                         and self.button.collidepoint(event.pos)):
                     self.open = True
                     consumed = True
@@ -278,8 +279,10 @@ class SettingsOverlay:
                 audio.set_muted(False)
 
     # ------------------------------------------------------------------ 그리기
-    def draw(self, screen):
-        self._draw_button(screen)
+    def draw(self, screen, show_button=True):
+        # show_button=False: 미니게임 등에서 톱니 버튼을 숨긴다(점수 박스 가림 방지). 열린 패널은 유지.
+        if show_button:
+            self._draw_button(screen)
         if self.open:
             self._draw_panel(screen)
 

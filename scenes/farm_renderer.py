@@ -592,7 +592,10 @@ class FarmRenderer:
             ts.set_alpha(int(255 * alpha))
             screen.blit(ts, (px + pad, py + 4))
 
-        draw_bottom_bar(screen, "농장 일지", sim._cropify(f"{sim.message}\n{sim.notice}"))
+        # '살펴보기' 결과 메시지는 조사·상태가 합쳐진 동적 문구라, 저장된 것을 쓰면 언어 전환이 한 턴
+        # 늦게 반영된다. 매 프레임 현재 언어로 다시 생성해 즉시 반영되게 한다(inspect_message는 부작용 없음).
+        msg = sim.inspect_message() if sim.last_action == "살펴보기" else sim.message
+        draw_bottom_bar(screen, "농장 일지", sim._cropify(f"{msg}\n{sim.notice}"))
 
         if farm_scene.forced_wait_active:
             pulse = abs(math.sin(pygame.time.get_ticks() * 0.005))

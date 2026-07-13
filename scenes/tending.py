@@ -502,11 +502,6 @@ class PestTap(MiniGameBase):
             _counter(screen, remain_txt, self.timer / 6.0)
 
 
-class SoilMound:
-    """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
-    잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""
-    PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
-
 class SoilMound(MiniGameBase):
     """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
     잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""

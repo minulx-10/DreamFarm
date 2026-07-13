@@ -27,8 +27,8 @@ p4a.local_recipes = ./p4a-recipes
 # (str) Application versioning (method 1)
 version = 2.2.2
 
-# (str) 앱 아이콘 / 스플래시 (동그란 로고 재사용)
-icon.filename = %(source.dir)s/core/logo.png
+# (str) 앱 아이콘 — 여백을 잘라 아이콘 칸을 꽉 채운 투명 배경 버전(core/icon.png). 스플래시는 로고 사용.
+icon.filename = %(source.dir)s/core/icon.png
 presplash.filename = %(source.dir)s/core/logo.png
 
 # (str) 스플래시 배경색 (게임 밤하늘 톤)
