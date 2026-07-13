@@ -147,6 +147,30 @@ def create_sprite_from_string(sprite_str, scale=4):
     return surf
 
 
+def _pixelize(surf, target_w, target_h, block=4, levels=6):
+    """래스터 이미지(사진·일러스트)를 픽셀 아트 톤에 맞춘다.
+
+    작은 해상도로 부드럽게 줄여 세부를 뭉갠 뒤, 색을 계단화(posterize)하고, 최근접으로 확대해
+    도트 블록을 만든다. **numpy 미사용**(안드로이드 빌드 호환) — 작은 중간 이미지에만 픽셀 연산."""
+    sw = max(1, target_w // block)
+    sh = max(1, target_h // block)
+    small = pygame.transform.smoothscale(surf, (sw, sh))
+    if levels and levels >= 2:
+        step = 255 // (levels - 1)
+        small.lock()
+        for y in range(sh):
+            for x in range(sw):
+                r, g, b, a = small.get_at((x, y))
+                if a < 8:
+                    continue
+                r = min(255, ((r + step // 2) // step) * step)
+                g = min(255, ((g + step // 2) // step) * step)
+                b = min(255, ((b + step // 2) // step) * step)
+                small.set_at((x, y), (r, g, b, a))
+        small.unlock()
+    return pygame.transform.scale(small, (target_w, target_h))   # 최근접 확대 → 도트 블록
+
+
 sprites = {}
 def init_sprites():
     if 'seed' in sprites: return
@@ -295,7 +319,9 @@ X.XkkX.X
     if os.path.exists(dad_path):
         try:
             dad_img = pygame.image.load(dad_path).convert_alpha()
-            sprites['dad'] = pygame.transform.scale(dad_img, (160, 160))
+            # dad.png도 이미 픽셀 아트다. 초상화라 세게 뭉개면 얼굴이 뭉개지므로, 픽셀 '결'만 살짝
+            # 굵게(2px 블록) + 색 살짝 계단화해 작물·아이콘의 굵은 도트 톤에 조금 더 맞춘다.
+            sprites['dad'] = _pixelize(dad_img, 160, 160, block=2, levels=12)
             loaded_dad = True
         except Exception as e:
             print("Failed to load custom dad sprite:", e)
@@ -465,6 +491,7 @@ ZZEz...zEZZ
         try:
             raw_img = pygame.image.load(field_bed_path).convert_alpha()
             cropped = raw_img.subsurface(pygame.Rect(59, 74, 904, 763))
+            # field_bed.jpg는 이미 도트(픽셀 아트) 톤이라 그대로 스케일만 한다(픽셀화하면 오히려 뭉개짐).
             sprites['field_bed'] = pygame.transform.scale(cropped, (362, 318))
 
             # 4 모퉁이의 흰색/베이지색 여백 픽셀을 투명 처리하여 둥글게 마감
