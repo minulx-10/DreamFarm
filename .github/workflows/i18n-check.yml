@@ -1,0 +1,29 @@
+name: i18n check
+
+# 번역 PR 검증 — core/locales/*.json 이나 원문 카탈로그를 건드리는 PR에서
+# JSON 유효성·원문에 없는 '유령 키'를 검사하고 언어별 커버리지를 리포트한다.
+# (Crowdin 대신 GitHub PR로 번역을 받기 위한 자동 검사. 순수 표준 라이브러리라 의존성 설치 불필요.)
+
+on:
+  push:
+    paths:
+      - "core/locales/**"
+      - "core/i18n_data.py"
+      - "tools/i18n_export.py"
+  pull_request:
+    paths:
+      - "core/locales/**"
+      - "core/i18n_data.py"
+      - "tools/i18n_export.py"
+  workflow_dispatch:
+
+jobs:
+  i18n-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate translation JSONs
+        run: python tools/i18n_export.py --check

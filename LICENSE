@@ -1,55 +1,40 @@
-Copyright (c) 2026 삼광 (Samgwang). All Rights Reserved.
+몽중농원 (DreamFarm) — License
+Copyright (c) 2026 삼광 (三光 / Samgwang). All Rights Reserved.
 
-이 게임의 소스 코드 및 관련 리소스(그래픽, 사운드 등)는 삼광(Samgwang) 팀의 자산이며 저작권법의 보호를 받습니다. 무단 복제, 배포 및 상업적 이용을 금합니다.
+===============================================================================
+[한국어]
 
--------------------------------------------------------------------------------
-이 게임에 사용된 갈무리11(Galmuri11) 글꼴의 저작권 및 라이선스 정보는 다음과 같습니다.
-(This game contains the Galmuri11 font, which is licensed under the SIL Open Font License, Version 1.1.)
+이 저장소의 소스 코드와 게임 리소스(그래픽·사운드·텍스트·스토리 등)는 삼광(三光) 팀의
+자산이며 저작권법의 보호를 받습니다. 저작권자의 사전 서면 허가 없이 복제·배포·수정·상업적
+이용을 금합니다. 소스는 학습과 검토를 위해 공개(Public)되어 있을 뿐, 오픈소스 라이선스가
+부여된 것은 아닙니다.
 
-[글꼴 저작권 공지 (Copyright Notice)]
-Copyright (c) 2019-2025 Lee Minseo (quiple@quiple.dev)
-with Reserved Font Name Galmuri11.
+기여(Contributions):
+Pull Request 등으로 이 프로젝트에 기여물(번역, 버그 수정 등)을 제출하는 경우, 기여자는
+자신이 그 기여물을 제출할 권리가 있음을 진술하며, 삼광(三光)에게 해당 기여물을 이 게임의
+일부로 사용·수정·배포(유료 상업 배포 포함)할 수 있는 영구적·전세계적·무상·취소 불가능한
+라이선스를 부여합니다. 기여자는 자신의 기여물에 대한 저작권을 계속 보유합니다.
 
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
+제3자 구성요소(Third-Party):
+번들된 폰트·라이브러리 등 제3자 저작물의 라이선스는 THIRD-PARTY-NOTICES.md 를 참고하세요.
 
--------------------------------------------------------------------------------
-[SIL OPEN FONT LICENSE Version 1.1]
+===============================================================================
+[English]
 
-SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+The source code and game assets (graphics, audio, text, story, etc.) in this
+repository are the property of Team Samgwang (三光) and are protected by copyright
+law. Reproduction, distribution, modification, or commercial use without the
+copyright holder's prior written permission is prohibited. The source is made
+public for study and review only; no open-source license is granted.
 
-PREAMBLE
-The goals of the Open Font License (OFL) are to stimulate worldwide development of collaborative font projects, to support the font creation efforts of academic and linguistic communities, and to provide a free and open framework in which fonts may be shared and improved in partnership with others.
+Contributions:
+By submitting a contribution (e.g., translations, bug fixes) to this project,
+for example via a pull request, you represent that you have the right to do so
+and you grant Team Samgwang (三光) a perpetual, worldwide, royalty-free, and
+irrevocable license to use, modify, and distribute your contribution as part of
+this game, including in paid, commercial releases. You retain copyright in your
+contribution.
 
-The OFL allows the licensed fonts to be used, studied, modified and redistributed freely as long as they are not sold by themselves. The fonts, including any derivative works, can be bundled, embedded, redistributed and/or sold with any software provided that any reserved names are not used by derivative works. The fonts and derivatives, however, cannot be released under any other type of license. The requirement for fonts to remain under this license does not apply to any document created using the fonts or their derivatives.
-
-DEFINITIONS
-"Font Software" refers to the set of files released by the Copyright Holder(s) under this license and clearly marked as such. This may include source files, build scripts and documentation.
-
-"Reserved Font Name" refers to any names specified as such after the copyright statement(s).
-
-"Original Version" refers to the collection of Font Software components as distributed by the Copyright Holder(s).
-
-"Modified Version" refers to any derivative made by adding to, deleting, or substituting—in part or in whole—any of the components of the Original Version, by changing formats or by porting the Font Software to a new environment.
-
-"Author" refers to any designer, engineer, programmer, writer or other person who contributed to the Font Software.
-
-PERMISSION & CONDITIONS
-Permission is hereby granted, free of charge, to any person obtaining a copy of the Font Software, to use, study, copy, merge, embed, modify, redistribute, and sell modified and unmodified copies of the Font Software, subject to the following conditions:
-
-1) Neither the Font Software nor any of its individual components, in Original or Modified Versions, may be sold by itself.
-
-2) Original or Modified Versions of the Font Software may be bundled, redistributed and/or sold with any software, provided that each copy contains the above copyright notice and this license. These can be included either as stand-alone text files, human-readable headers or in the appropriate machine-readable metadata fields within text or binary files as long as those fields can be easily viewed by the user.
-
-3) No Modified Version of the Font Software may use the Reserved Font Name(s) unless explicit written permission is granted by the corresponding Copyright Holder. This requirement applies only to the primary font name as presented to the users.
-
-4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font Software shall not be used to promote, endorse or advertise any Modified Version, except to acknowledge the contribution(s) of the Copyright Holder(s) and the Author(s) or with their explicit written permission.
-
-5) The Font Software, modified or unmodified, in part or in whole, must be distributed entirely under this license, and must not be distributed under any other license. The requirement for fonts to remain under this license does not apply to any document created using the Font Software.
-
-TERMINATION
-This license becomes null and void if any of the above conditions are not met.
-
-DISCLAIMER
-THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
+Third-Party Components:
+Bundled fonts, libraries, and other third-party materials are licensed
+separately — see THIRD-PARTY-NOTICES.md.

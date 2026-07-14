@@ -4,6 +4,14 @@
 최신이 위로 온다.
 
 ## (미출시 · Unreleased)
+- **Crowdin 제거 → GitHub PR 번역 워크플로로 전환**: Crowdin 무료 오픈소스 라이선스가 '관련 상업 제품
+  없음'을 요구해(스팀 유료 판매와 상충) 채택하지 않기로 했습니다. `crowdin.yml`을 지우고, `tools/i18n_export.py`를
+  동기화·새 언어 스캐폴드(`--add`)·CI 검사(`--check`) 도구로 개편, `.github/workflows/i18n-check.yml`(JSON·유령키
+  검사) 추가, `LOCALIZATION.md`와 새 `CONTRIBUTING.md`를 PR 워크플로로 재작성했습니다. 정본은 여전히
+  `core/i18n_data.py`, 번역은 `core/locales/*.json`이며 부분 번역은 자동으로 영어로 폴백됩니다.
+- **라이선스 정리**: 게임은 독점(All Rights Reserved)을 유지하되 `LICENSE`에 **기여 라이선스 조항**을 추가해
+  번역 등 PR 기여물을 상업 배포 포함 사용할 수 있게 했습니다(공개+유료 판매와 커뮤니티 번역 양립). 폰트·라이브러리
+  제3자 고지는 `THIRD-PARTY-NOTICES.md`로 분리했습니다(Galmuri11 SIL OFL·pygame-ce LGPL 등).
 - **밭 튜토리얼 팝업 영어 넘침 수정**: 제목이 폭을 넘겨 잘리고(고정 폰트·줄바꿈 없음) 본문이 세로로 넘치던
   문제를, 제목은 카드 폭에 맞춰 폰트 자동 축소, 본문은 넘치면 폰트를 줄여 카드 안에 맞추도록 고쳤습니다
   (카드도 약간 넓힘 — `farm_renderer.draw_tutorial`).

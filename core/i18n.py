@@ -6,10 +6,10 @@
   - `wrap_text()`는 줄바꿈 '전에' 원문을 통째로 번역한다(긴 대사도 대상 언어 기준으로 줄바꿈).
   - 변수와 합쳐지는 **동적 문자열**은 `tf`/`tnar`로 처리한다.
 
-**번역 소스 (Crowdin 지원):**
+**번역 소스:**
   1. `core/i18n_data.EN` — 파이썬 베이스라인(항상 임포트 가능, 번들 실패 위험 없음).
-  2. `core/locales/<lang>.json` — **Crowdin에서 동기화하는 파일**. 있으면 베이스라인 위에 덮어써
-     번역을 갱신·확장한다(en 외 언어는 이 JSON만으로 추가된다). `crowdin.yml`·`tools/i18n_export.py` 참고.
+  2. `core/locales/<lang>.json` — 커뮤니티 번역 파일(GitHub PR로 기여). 있으면 베이스라인 위에 덮어써
+     번역을 갱신·확장한다(en 외 언어는 이 JSON만으로 추가된다). `tools/i18n_export.py`·`LOCALIZATION.md` 참고.
 
 로직 키(요일·작물·기억 제목 등)는 저장·비교에 원문 그대로 쓰이고 '표시'만 번역되므로,
 **세이브 호환성과 게임 로직은 영향받지 않는다.** 번역이 없는 문자열은 한국어 원문으로 표시(폴백).
@@ -35,7 +35,7 @@ def _load_lang(lang):
             cat.update(getattr(i18n_data, "EN", {}) or {})
         except Exception:
             pass
-    # 2) Crowdin 동기화 JSON (core/locales/<lang>.json) — 있으면 우선
+    # 2) 커뮤니티 번역 JSON (core/locales/<lang>.json) — 있으면 우선
     try:
         from core.assets import resource_path
         p = resource_path(os.path.join("locales", lang + ".json"))

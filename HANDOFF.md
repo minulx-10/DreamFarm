@@ -43,7 +43,7 @@ core/
   platform.py          플랫폼 감지(IS_ANDROID) — p4a의 ANDROID_ARGUMENT 환경변수로 판별
   i18n.py              현지화 엔진 — t()/tf()/tnar(), 렌더 계층 자동 번역, locales JSON 로드
   i18n_data.py         한국어→영어 번역 카탈로그(베이스라인). locales/<lang>.json이 덮어씀
-  locales/             Crowdin 동기화 번역 JSON (ko.json=소스, en.json 등)
+  locales/             언어별 번역 JSON (ko.json=소스 목록, en.json 등). GitHub PR로 기여
   palette.py           공용 색 팔레트(디자인 색 단일 소스) — assets가 re-export
   steam.py             스팀 도전과제 ctypes 스캐폴드(DLL/App ID 없으면 무해한 no-op)
 tools/
@@ -90,7 +90,7 @@ scenes/
 4. **글자 래핑 및 넘침 방지**:
    - 해상도나 레이아웃 영역에 따라 글씨가 잘리는 현상을 막기 위해, 카드나 컨테이너의 내부 너비보다 충분히 좁은 가로 폭 제약(`col_w - 74` 등)을 주어 `wrap_text`가 개행을 수행하게 유도합니다.
 5. **현지화(한/영) — 문구를 어떻게 번역되게 하나** (`core/i18n.py`, 자세히는 `LOCALIZATION.md`):
-   - **정적 문자열**은 원문을 그대로 두면 렌더 계층(`get_font` 래퍼·`wrap_text`)이 자동 번역합니다. `core/i18n_data.py`(또는 Crowdin `core/locales/en.json`)에 `"원문": "English"`만 넣으면 됩니다.
+   - **정적 문자열**은 원문을 그대로 두면 렌더 계층(`get_font` 래퍼·`wrap_text`)이 자동 번역합니다. `core/i18n_data.py`(또는 커뮤니티 번역 `core/locales/en.json`)에 `"원문": "English"`만 넣으면 됩니다.
    - **변수와 합쳐지는 동적 문구**는 f-string 대신 `i18n.tf("… {n} …", n=…)`로 감싸고 템플릿(자리표시자 포함)을 카탈로그에 등록합니다.
    - **이름 조사·작물 치환이 얽힌 서사**는 `i18n.tnar(ko_template, crop_key=game_state.crop, name=…, name_eun=…)`. KO 템플릿엔 `{name_eun}`+`당근` 리터럴, EN 템플릿엔 `{name}`·`{crop}` 자리표시자(작물 영어단어는 `_EN_CROP`에서 자동 주입)를 씁니다. `.format`이 남는 인자를 무시하므로 두 언어 템플릿의 자리표시자가 달라도 안전합니다.
    - **주의**: 씬이 자체 줄바꿈을 쓰면 조각 단위로 렌더돼 카탈로그와 안 맞습니다 → 통째로 `i18n.t()` 한 뒤 `wrap_text`로 개행하세요(`transition.py` 참고).
@@ -105,6 +105,20 @@ scenes/
 
 ## 4. 개발 작업 로그 (최근 업데이트가 위)
 
+- **2026-07-14** (v2.2.0 정식 배포 이후 · 미출시):
+  - **v2.2.0 정식 배포**: `v2.1.1`→`v2.2.0`(깔끔한 마이너 업). dev 라인은 `2.2.2-dev`였으나 안정 버전은
+    `2.2.0`으로. GitHub Pages 소개 사이트 공개(`docs/`, main /docs) + 트레일러 GIF·스크린샷.
+  - **선택 이벤트·밭 튜토리얼 영어 수정**: 선택 이벤트는 본문을 줄 단위로, 튜토리얼은 제목을 고정폰트로
+    렌더해 영어에서 미번역/넘침. 둘 다 통짜 번역·폭에 맞춘 폰트 자동 축소로 수정(`story_choice`,
+    `farm_renderer.draw_tutorial`). *v2.2.0 배포본엔 미포함 — 다음 릴리스 반영.*
+  - **Crowdin 제거 → GitHub PR 번역 워크플로**: Crowdin 무료 오픈소스 라이선스는 '상업 제품 없음'을
+    요구해(스팀 유료 판매와 상충) 채택 불가로 판단. `crowdin.yml` 삭제, `tools/i18n_export.py`를
+    동기화·`--add <lang>`·`--check`(CI) 도구로 개편, `.github/workflows/i18n-check.yml`(JSON·유령키 검사)
+    추가, `LOCALIZATION.md`·`CONTRIBUTING.md`를 PR 워크플로로 재작성. 정본은 여전히 `core/i18n_data.py`,
+    번역은 `core/locales/*.json`(부분 번역 시 영어로 폴백).
+  - **라이선스 정리**: 게임은 독점(All Rights Reserved) 유지하되, `LICENSE`에 **기여 라이선스 조항**
+    추가(번역 PR을 상업 배포 포함 사용 가능) → 공개+상업 판매와 커뮤니티 번역을 양립. 폰트/라이브러리
+    제3자 고지는 `THIRD-PARTY-NOTICES.md`로 분리(Galmuri11 OFL·pygame-ce LGPL 등).
 - **2026-07-14** (v2.2.2-dev.12 프리릴리스 — 영어 현지화 QA: 긴 문장 넘침·미번역):
   - **밭일 일지 = 한국어 원문 저장 + 표시 시점 번역**: `farm_simulator._write_journal`는 일지를 KO 원문으로
     저장하고, 엔딩의 `_localize_journal_line`이 표시할 때 번역합니다. `[N일째·계절·날씨]`·`성장 N%`는 정규식으로
