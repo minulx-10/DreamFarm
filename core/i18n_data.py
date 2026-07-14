@@ -166,9 +166,9 @@ EN = {
     "성장 +5": "Growth +5",
     "성장 -5": "Growth -5",
     "수확가능": "Harvestable",
-    "이해도 +10": "Understanding +10",
-    "악몽 토글": "Toggle Nightmare",
-    "이해도 +30": "Understanding +30",
+    "이해도 +10": "Insight +10",
+    "악몽 토글": "Nightmare",
+    "이해도 +30": "Insight +30",
     "밭": "Field",
     "수확": "Harvest",
     "엔딩": "Ending",
@@ -413,7 +413,7 @@ EN = {
     "녹슨 자리를 문질러(마우스를 비벼) 닦으세요!": "Scrub the rusted spot clean (rub with the mouse)!",
     "녹이 조금 남았지만, 쓰기엔 충분했다.": "A little rust was left, but it was good enough to use.",
     # ── core/quit_overlay.py ──
-    "정말 종료하시겠습니까?": "Are you sure you want to quit?",
+    "정말 종료하시겠습니까?": "Quit the game?",
     "예": "Yes",
     "아니오": "No",
     # ── core/settings_overlay.py ──
@@ -780,7 +780,7 @@ EN = {
     "짧은 회상": "A Brief Recollection",
     # ── scenes/name_input.py ──
     "시작": "Start",
-    "꿈속 밭에 남길 이름은?": "What name will you leave in the dream field?",
+    "꿈속 밭에 남길 이름은?": "Your name in the dream field?",
     "이름": "Name",
     "이름을 입력해 주세요!": "Please enter a name!",
     "Enter 키로도 입력 완료 가능": "Or press Enter to confirm",
@@ -1030,4 +1030,13 @@ EN = {
     "식탁 위의 당근 반찬이 떠오른다.\n이번에는 밀어내고 싶다는 생각보다, 한 번쯤 제대로 맛보고 싶다는 마음이 먼저 든다.": "The {food} on the table comes to mind.\nThis time, before the urge to push it away, comes the wish to really taste it, just once.",
     "아버지가 웃으며 손등의 흙을 털어낸다.\n그 모습은 무겁기보다 다정하다.\n꿈속의 밭도 조금은 덜 낯설게 느껴진다.": "Father laughs and brushes the soil from the back of his hand.\nThe sight is tender, more than heavy.\nEven the {field} in the dream feels a little less strange now.",
     "{name_ga} 말없이 고개를 끄덕인다.\n무언가를 완전히 알게 된 건 아니지만, 이제 외면하고 싶지는 않다.": "{name} nods without a word.\nIt's not that they understand everything now, but they no longer want to look away.",
+
+    # ── QA 보강: 설정 토글 ON/OFF, 이름 입력 안내 등 (누락분) ──
+    "자동저장: ON": "Autosave: ON",
+    "자동저장: OFF": "Autosave: OFF",
+    "전체화면: ON": "Fullscreen: ON",
+    "전체화면: OFF": "Fullscreen: OFF",
+    "버전 표시: ON": "Version: ON",
+    "버전 표시: OFF": "Version: OFF",
+    "입력칸을 탭하여 이름을 입력하세요": "Tap the box to type a name",
 }

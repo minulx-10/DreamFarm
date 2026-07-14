@@ -135,7 +135,13 @@ class DevOverlay:
                 hov = rect.collidepoint(pygame.mouse.get_pos())
                 fill = (86, 120, 96) if hov else (58, 74, 66)
                 draw_panel(screen, rect, fill=fill, border=(120, 170, 140), radius=7, shadow=False)
-                ts = font.render(text, True, WHITE)
+                # 라벨이 길면(영어 등) 버튼 폭에 맞춰 폰트 축소
+                bf = font
+                for sz in (15, 13, 11, 10):
+                    bf = get_font(sz)
+                    if bf.size(text)[0] <= rect.width - 6:
+                        break
+                ts = bf.render(text, True, WHITE)
                 screen.blit(ts, (rect.centerx - ts.get_width() // 2, rect.centery - ts.get_height() // 2))
                 self._buttons.append((rect, text, action))
                 bx += 98

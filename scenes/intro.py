@@ -65,14 +65,31 @@ class IntroScene:
             crop_key=ck, name=name, name_eun=name_eun)
         return [page1, page2]
 
-    def prepare_page(self, index):
+    def _wrap_page(self, index, font):
         lines = []
         for paragraph in self.pages[index].split("\n"):
             if not paragraph:
                 lines.append("")
             else:
-                lines.extend(wrap_text(paragraph, self.font, 640))
-        return "\n".join(lines)
+                lines.extend(wrap_text(paragraph, font, 640))
+        return lines
+
+    def prepare_page(self, index):
+        # 언어마다 줄바꿈 수가 달라(영어가 더 길다) 패널(높이 272)을 세로로 넘칠 수 있다.
+        # → 이 페이지가 패널 안에 들어오는 '가장 큰 폰트'를 골라 self.page_font 로 쓴다.
+        line_gap = 5
+        max_h = 244
+        self.page_font = get_font(22)
+        text = ""
+        for size in (22, 20, 18, 16):
+            f = get_font(size)
+            lines = self._wrap_page(index, f)
+            block_h = len(lines) * (f.get_height() + line_gap) - line_gap
+            self.page_font = f
+            text = "\n".join(lines)
+            if block_h <= max_h:
+                break
+        return text
 
     def advance(self):
         if not self.typewriter.finished:
@@ -122,11 +139,12 @@ class IntroScene:
 
         lines = self.typewriter.printed_text.split("\n")
         # 박스 안에서 상하 가운데 정렬 — 타이핑 중 글이 튀지 않도록 '완성된 페이지' 줄 수 기준으로 시작 y 계산
+        # 폰트는 prepare_page 가 이 페이지에 맞춰 고른 self.page_font 를 쓴다(세로 넘침 방지).
         line_gap = 5
         full_lines = self.text_to_print.split("\n")
-        block_h = len(full_lines) * (self.font.get_height() + line_gap) - line_gap
+        block_h = len(full_lines) * (self.page_font.get_height() + line_gap) - line_gap
         start_y = box_rect.centery - block_h // 2
-        draw_centered_lines(screen, lines, self.font, TEXT_DARK, 400, start_y, line_gap=line_gap)
+        draw_centered_lines(screen, lines, self.page_font, TEXT_DARK, 400, start_y, line_gap=line_gap)
 
         page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 538))

@@ -12,6 +12,38 @@ from core import audio
 from core import i18n
 from core.crops import current_crop, swap_crop_word
 from core.ui_utils import Typewriter
+import re
+
+
+_JOURNAL_STATUS_RE = re.compile(r'^\[(\d+)일째 · (.+?) · (.+?)\]$')
+_JOURNAL_GROWTH_RE = re.compile(r'^여기까지 성장 (\d+)%\.(.*)$')
+
+
+def _localize_journal_line(line):
+    """일지 줄을 현재 언어로 번역한다(일지는 한국어 원문으로 저장됨).
+    상태([N일째·계절·날씨])·성장 줄은 동적 문구라 원문 패턴을 인식해 현재 언어로 재조립하고,
+    나머지 정적 줄은 카탈로그(i18n.t)로 번역한다 → 엔딩에서 언어를 바꿔도 즉시 반영된다."""
+    m = _JOURNAL_STATUS_RE.match(line)
+    if m:
+        return i18n.tf("[{day}일째 · {season} · {weather}]", day=m.group(1),
+                       season=i18n.t(m.group(2)), weather=i18n.t(m.group(3)))
+    m = _JOURNAL_GROWTH_RE.match(line)
+    if m:
+        if m.group(2).strip():
+            return i18n.tf("여기까지 성장 {prog}%. 수확이 가까워진다.", prog=m.group(1))
+        return i18n.tf("여기까지 성장 {prog}%.", prog=m.group(1))
+    hit = i18n.t(line)
+    if hit != line or i18n.get_language() == "ko":
+        return hit
+    # 카탈로그에 통짜로 없는 '조합' 줄(예: "잡초가 자꾸 올라온다, 잎 뒤로 벌레가 보인다.") —
+    # 조각들을 ", "로 잇고 끝에 "."을 붙여 저장하므로, 마침표를 떼고 각 조각을 번역해 다시 잇는다.
+    # (조각이 하나뿐이라 ", "가 없어도 마침표만 붙는 경우까지 포함)
+    if line.endswith("."):
+        frags = line[:-1].split(", ")
+        tr = [i18n.t(f) for f in frags]
+        if all(t != f for t, f in zip(tr, frags)):
+            return ", ".join(tr) + "."
+    return line
 
 
 class EndingScene:
@@ -873,7 +905,8 @@ class EndingScene:
         if game_state.recovery_count >= 2:
             att_items.append("회복력")
         if att_items:
-            att_text = "당신의 태도: " + " · ".join(att_items)
+            # 합쳐진 문구는 통째로는 번역 안 되므로 접두어·항목을 각각 번역해 조립
+            att_text = i18n.t("당신의 태도: ") + " · ".join(i18n.t(a) for a in att_items)
             att_surf = att_font.render(att_text, True, (140, 130, 100))
             screen.blit(att_surf, (400 - att_surf.get_width() // 2, att_y))
 
@@ -981,18 +1014,22 @@ class EndingScene:
         screen.set_clip(view)
         start_y = 116 - self.journal_scroll
         y = start_y
+        from core.ui import wrap_text
         for entry in game_state.journal_entries:
             for line in entry.split("\n"):
                 is_head = line.startswith("[")
-                if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
-                    surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
-                    screen.blit(surf, (120, y))
-                y += 26 if is_head else 22
+                # 표시 시점에 현재 언어로 번역(일지는 한국어 원문 저장) + 패널 폭에 맞춰 줄바꿈(넘침 방지)
+                disp = _localize_journal_line(line)
+                for sub in (wrap_text(disp, self.font_small, 560) if disp else [""]):
+                    if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
+                        surf = self.font_small.render(sub, True, head_color if is_head else TEXT_DARK)
+                        screen.blit(surf, (120, y))
+                    y += 26 if is_head else 22
                 retro_text = None
                 from core.crops import current_crop, swap_crop_word
                 food = current_crop()["food"]
                 for k, v in JOURNAL_RETROSPECTIVES.items():
-                    if swap_crop_word(k, food) == line.strip():
+                    if swap_crop_word(k, food) == line.strip():   # 매칭은 원문(한국어) 기준
                         retro_text = swap_crop_word(v, food)
                         break
                 if self.is_happy and retro_text is not None:

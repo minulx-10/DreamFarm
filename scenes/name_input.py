@@ -110,6 +110,14 @@ class NameInputScene:
                             self.input_text = self.input_text[:-1]
                             audio.play("click")
 
+    def _fit_font(self, text, max_w):
+        """번역문이 길면 폭에 맞는 가장 큰 폰트를 고른다(영어가 길어 카드를 넘치는 것 방지)."""
+        for sz in (36, 30, 26, 22):
+            f = get_font(sz)
+            if f.size(text)[0] <= max_w:   # size()도 현재 언어로 번역해 측정
+                return f
+        return get_font(20)
+
     def update(self, dt):
         if self.warn_timer > 0:
             self.warn_timer -= dt
@@ -118,16 +126,19 @@ class NameInputScene:
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
         draw_button(screen, self.back_btn, "돌아가기", self.font_btn, hovered=self.hovered_back)
 
+        prompt_text = "꿈속 밭에 남길 이름은?"
         android_top = IS_ANDROID and self.kb_shown
         if not android_top:
             # 데스크톱 / 안드로이드 키보드 뜨기 전 — PC식 가운데 카드
             card = pygame.Rect(160, 140, 480, 310)
             draw_light_panel(screen, card)
-            prompt = self.font_large.render("꿈속 밭에 남길 이름은?", True, TEXT_DARK)
-            screen.blit(prompt, (400 - prompt.get_width() // 2, 185))
+            pf = self._fit_font(prompt_text, 440)   # 카드 안에 맞춰 자동 축소
+            prompt = pf.render(prompt_text, True, TEXT_DARK)
+            screen.blit(prompt, (400 - prompt.get_width() // 2, 200 - prompt.get_height() // 2))
         else:
             # 안드로이드 키보드 상태 — 상단 절반에 안내(가운데 카드는 키보드에 가림)
-            prompt = self.font_small.render("꿈속 밭에 남길 이름은?", True, WHITE)
+            pf = self._fit_font(prompt_text, 720)
+            prompt = pf.render(prompt_text, True, WHITE)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 80))
 
         input_rect = self.input_rect

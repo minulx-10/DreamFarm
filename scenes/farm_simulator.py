@@ -495,8 +495,9 @@ class FarmSimulator:
 
     def _write_journal(self):
         season = get_season(self.growth, self.growth_goal)
-        lines = [i18n.tf("[{day}일째 · {season} · {weather}]", day=self.day,
-                         season=i18n.t(season), weather=i18n.t(game_state.weather))]
+        # 일지는 한국어 원문으로 저장하고 '표시 시점'에 현재 언어로 번역한다(엔딩에서 언어를 바꿔도
+        # 즉시 반영되도록 — ending._localize_journal_line 참고).
+        lines = [f"[{self.day}일째 · {season} · {game_state.weather}]"]
         if self.moisture > 75:
             lines.append("오늘 물을 너무 많이 줬다.")
         elif self.moisture < 25:
@@ -512,7 +513,7 @@ class FarmSimulator:
         if self.drainage < 35:
             detail.append("물길이 막혀 물이 더디게 빠진다")
         if detail:
-            lines.append(", ".join(i18n.t(d) for d in detail) + ".")
+            lines.append(", ".join(detail) + ".")
         elif self.is_good_turn():
             lines.append("밭은 대체로 평온했다. 손이 갈 곳이 줄었다.")
         
@@ -525,8 +526,8 @@ class FarmSimulator:
             lines.append("실수가 잦았다. 아직 모르는 것이 많다.")
         
         prog = int(min(1.0, self.growth / self.growth_goal) * 100)
-        lines.append(i18n.tf("여기까지 성장 {prog}%. 수확이 가까워진다.", prog=prog) if prog >= 60
-                     else i18n.tf("여기까지 성장 {prog}%.", prog=prog))
+        lines.append(f"여기까지 성장 {prog}%. 수확이 가까워진다." if prog >= 60
+                     else f"여기까지 성장 {prog}%.")
         
         u = game_state.understanding
         if u < 20:
