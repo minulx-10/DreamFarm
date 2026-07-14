@@ -5,6 +5,24 @@ from core.game_state import game_state, get_understanding_stage
 from core import audio
 
 
+# ─────────────────────── 디자인 토큰 (UI 크롬 규칙 일원화, P4) ───────────────────────
+# 패널·버튼·그림자·배경의 값을 여기 한곳에서 정한다. 개별 화면은 이 함수/토큰을 쓰면 자동 통일.
+RADIUS = 8            # 기본 패널·버튼 모서리
+RADIUS_LG = 10        # 큰 모달 패널
+RADIUS_SM = 5         # 작은 요소(미터바 등)
+BORDER_INSET = 4      # 테두리 안쪽 채움 간격(패널 = 바깥 테두리 + 안쪽 fill)
+SHADOW_OFFSET = (4, 5)
+SHADOW_ALPHA = 80
+HIGHLIGHT_MIX = 0.24  # 패널 상단 하이라이트 강도
+SKY_BAND = 14         # 하늘 그라데이션 밴딩 높이(px) — 도트 톤에 맞게 계단식으로
+SKY_QUANT = 10        # 하늘 색 계단화 단계 폭(채널당 반올림 간격)
+
+
+def _quantize(color, step=SKY_QUANT):
+    """색을 채널별로 step 간격으로 반올림 — 배경 그라데이션을 픽셀 톤의 '띠'로 보이게 한다."""
+    return tuple(min(255, ((c + step // 2) // step) * step) for c in color[:3])
+
+
 def draw_mute_icon(screen, x, y):
     """음소거 상태를 보여주는 작은 스피커 아이콘."""
     muted = audio.is_muted() or not audio.is_enabled()
@@ -20,6 +38,9 @@ def draw_mute_icon(screen, x, y):
 
 
 def wrap_text(text, font, max_width, max_lines=None):
+    # 긴 문장은 줄바꿈 '전에' 통째로 번역해야 영어 기준으로 정확히 줄바꿈된다.
+    from core import i18n
+    text = i18n.t(str(text))
     lines = []
     truncated = False
     for paragraph in str(text).split("\n"):
@@ -29,14 +50,22 @@ def wrap_text(text, font, max_width, max_lines=None):
             if font.size(test_line)[0] <= max_width:
                 current = test_line
             else:
-                if current:
-                    if " " in current:
-                        split_at = current.rfind(" ")
-                        lines.append(current[:split_at])
-                        current = current[split_at + 1:] + ("" if char == " " else char)
-                    else:
+                if char == " ":
+                    # 공백에서 넘치면 지금까지를 한 줄로 확정하고 공백은 버린다
+                    # (영어에서 단어가 서로 붙어버리던 버그 방지 — "carrotinto")
+                    if current:
                         lines.append(current)
-                        current = char if char != " " else ""
+                    current = ""
+                elif " " in current:
+                    # 단어 중간에서 넘치면 마지막 공백 기준 단어 단위 줄바꿈
+                    split_at = current.rfind(" ")
+                    lines.append(current[:split_at])
+                    current = current[split_at + 1:] + char
+                elif current:
+                    lines.append(current)
+                    current = char
+                else:
+                    current = char
                 if max_lines and len(lines) >= max_lines:
                     truncated = True
                     break
@@ -81,20 +110,20 @@ def draw_vertical_gradient(screen, rect, top_color, bottom_color):
         )
 
 
-def draw_soft_shadow(screen, rect, radius=8, offset=(4, 5), alpha=80):
+def draw_soft_shadow(screen, rect, radius=RADIUS, offset=SHADOW_OFFSET, alpha=SHADOW_ALPHA):
     shadow = pygame.Surface((rect.w + abs(offset[0]) + 8, rect.h + abs(offset[1]) + 8), pygame.SRCALPHA)
     shadow_rect = pygame.Rect(4 + max(0, offset[0]), 4 + max(0, offset[1]), rect.w, rect.h)
     pygame.draw.rect(shadow, (12, 16, 18, alpha), shadow_rect, border_radius=radius)
     screen.blit(shadow, (rect.x - 4, rect.y - 4))
 
 
-def draw_panel(screen, rect, fill=PANEL_WARM, border=PANEL_EDGE, radius=8, shadow=True):
+def draw_panel(screen, rect, fill=PANEL_WARM, border=PANEL_EDGE, radius=RADIUS, shadow=True):
     if shadow:
         draw_soft_shadow(screen, rect, radius=radius)
     pygame.draw.rect(screen, border, rect, border_radius=radius)
-    inner = rect.inflate(-4, -4)
+    inner = rect.inflate(-BORDER_INSET, -BORDER_INSET)
     pygame.draw.rect(screen, fill, inner, border_radius=max(2, radius - 2))
-    highlight = mix_color(fill, WHITE, 0.24)
+    highlight = mix_color(fill, WHITE, HIGHLIGHT_MIX)
     pygame.draw.line(screen, highlight, (inner.x + 8, inner.y + 3), (inner.right - 8, inner.y + 3), 2)
 
 
@@ -103,7 +132,7 @@ def draw_button(screen, rect, text, font, hovered=False, selected=False):
     edge = (123, 92, 65) if not selected else (61, 100, 76)
     if hovered:
         base = mix_color(base, WHITE, 0.18)
-    draw_panel(screen, rect, fill=base, border=edge, radius=8, shadow=True)
+    draw_panel(screen, rect, fill=base, border=edge, radius=RADIUS, shadow=True)
     lines = wrap_text(text, font, rect.w - 18, max_lines=2)
     line_h = font.get_height()
     y = rect.centery - (len(lines) * line_h + (len(lines) - 1) * 2) // 2
@@ -160,8 +189,9 @@ def draw_story_backdrop(screen, mood="night"):
                 return mix_color(c0, c1, (t - t0) / max(1e-6, t1 - t0))
         return stops[-1][1]
 
-    for y in range(600):
-        pygame.draw.line(screen, sky(y / 600.0), (0, y), (800, y))
+    # 하늘 — 부드러운 그라데이션 대신 계단식 '띠'로 그려 도트 톤에 맞춘다.
+    for y in range(0, 600, SKY_BAND):
+        pygame.draw.rect(screen, _quantize(sky((y + SKY_BAND * 0.5) / 600.0)), (0, y, 800, SKY_BAND))
 
     # 별
     for sx, sy, sb in _BACKDROP_STARS:
@@ -227,7 +257,7 @@ def draw_story_backdrop(screen, mood="night"):
     else:
         pygame.draw.circle(screen, moon_glow, (mx, my), 32)
         pygame.draw.circle(screen, mix_color(moon_glow, WHITE, 0.4), (mx, my), 30)
-        pygame.draw.circle(screen, sky(my / 600.0), (mx - 13, my - 7), 27)  # 그림자로 초승달
+        pygame.draw.circle(screen, _quantize(sky(my / 600.0)), (mx - 13, my - 7), 27)  # 그림자로 초승달
 
     # 산 2겹 (멀고 옅은 뒤, 가깝고 짙은 앞)
     pygame.draw.polygon(screen, hill_far, [(0, 332), (140, 264), (300, 320), (470, 250), (650, 318), (800, 268), (800, 600), (0, 600)])
@@ -322,7 +352,9 @@ def draw_understanding_badge(screen, x, y, w):
     name_surf = font.render(stage_name, True, TEXT_DARK)
     if name_surf.get_width() > avail:
         name_surf = get_font(13).render(stage_name, True, TEXT_DARK)
-    screen.blit(name_surf, (name_x, y))
+    # 영어 등 단계명이 뱃지 폭을 넘으면 라벨·미터만 두고 이름은 생략(겹침 방지)
+    if name_surf.get_width() <= avail:
+        screen.blit(name_surf, (name_x, y))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))

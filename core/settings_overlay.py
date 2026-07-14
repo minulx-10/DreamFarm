@@ -11,6 +11,7 @@ from core import audio
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core.ui import draw_panel, mix_color
 from core.game_state import game_state
+from core.platform import IS_ANDROID
 from core import save_system
 
 
@@ -22,8 +23,8 @@ class SettingsOverlay:
         # 오른쪽 위 고정 버튼
         self.button = pygame.Rect(746, 27, 28, 28)
 
-        # 가운데 모달 패널 (크기 확장: 360x490)
-        self.panel = pygame.Rect(220, 55, 360, 490)
+        # 가운데 모달 패널 (전체화면·언어 토글 행이 들어가 세로로 늘림: 360x500)
+        self.panel = pygame.Rect(220, 46, 360, 500)
         pad = 26
         self._track_w = 160
         track_x = self.panel.x + pad + 72
@@ -43,17 +44,20 @@ class SettingsOverlay:
         # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
         self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
 
-        # 닫기 버튼과 버전 표시 버튼을 나란히 대칭 배치
-        self._close_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 404, 140, 36)
-        self._version_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 404, 140, 36)
+        # 하단 2×2 토글 그리드: [전체화면][언어] / [버전 표시][닫기]
+        self._fullscreen_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 388, 140, 36)
+        self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 388, 140, 36)
+        self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 432, 140, 36)
+        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
 
         self.show_message = ""
         self.message_timer = 0.0
 
         # 확인 모달 상태 ("delete_save" | "go_main" | "reset_all" | ... | None)
         self._confirm_action = None
-        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력(확정된 글자)
+        self._reset_confirm_text = ""   # 완전 초기화 확정용 입력(확정된 글자) — 데스크톱
         self._reset_ime = ""            # 한글 조합 중인 미확정 글자
+        self._reset_armed = False       # 안드로이드: '예'를 한 번 눌러 무장된 상태(두 번째 눌러야 실행)
         self._confirm_yes = pygame.Rect(self.panel.centerx - 80, self.panel.y + 350, 65, 32)
         self._confirm_no = pygame.Rect(self.panel.centerx + 15, self.panel.y + 350, 65, 32)
 
@@ -64,12 +68,13 @@ class SettingsOverlay:
                 self.show_message = ""
 
     # ------------------------------------------------------------------ 입력
-    def handle_events(self, events, farm_scene=None):
-        """오버레이가 이 프레임의 입력을 소비했으면 True를 반환."""
+    def handle_events(self, events, farm_scene=None, button_enabled=True):
+        """오버레이가 이 프레임의 입력을 소비했으면 True를 반환.
+        button_enabled=False면 톱니 버튼이 숨겨진 상태(미니게임 등)이므로 클릭으로 열리지 않는다."""
         consumed = False
         for event in events:
             if not self.open:
-                if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                if (button_enabled and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                         and self.button.collidepoint(event.pos)):
                     self.open = True
                     consumed = True
@@ -82,37 +87,43 @@ class SettingsOverlay:
 
             # 확인 모달이 뜬 상태에서는 확인/취소만 처리
             if self._confirm_action is not None:
-                # 완전 초기화는 실수 방지를 위해 '초기화'라고 직접 입력해야 확정된다.
+                # 완전 초기화는 실수 방지 장치가 있다.
+                #  - 데스크톱: '초기화'라고 직접 입력해야 확정.
+                #  - 안드로이드: 키보드가 화면을 가려 타이핑이 불편하므로, '예'를 두 번 눌러 확정
+                #    (첫 탭=무장, 둘째 탭=실행). 키보드 없이도 같은 수준의 실수 방지.
                 need_type = (self._confirm_action == "reset_all")
                 type_ok = (self._reset_confirm_text.strip() == "초기화")
-                if event.type == pygame.TEXTEDITING and need_type:
+
+                def _yes():
+                    if need_type and not IS_ANDROID and not type_ok:
+                        audio.play("break")
+                    elif need_type and IS_ANDROID and not self._reset_armed:
+                        self._reset_armed = True
+                        audio.play("break")   # 경고음 — 한 번 더 눌러야 실행
+                    else:
+                        audio.play("click")
+                        self._execute_confirm(farm_scene)
+
+                if event.type == pygame.TEXTEDITING and need_type and not IS_ANDROID:
                     # 한글은 조합이 끝나야 TEXTINPUT으로 확정된다. 조합 중(미확정) 글자를
                     # 실시간으로 보여줘야 '초'가 안 뜨고 한 글자씩 밀려 보이던 문제가 사라진다.
                     self._reset_ime = event.text
-                elif event.type == pygame.TEXTINPUT and need_type:
+                elif event.type == pygame.TEXTINPUT and need_type and not IS_ANDROID:
                     if len(self._reset_confirm_text) < 8:
                         self._reset_confirm_text += event.text
                     self._reset_ime = ""
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._confirm_yes.collidepoint(event.pos):
-                        if need_type and not type_ok:
-                            audio.play("break")
-                        else:
-                            audio.play("click")
-                            self._execute_confirm(farm_scene)
+                        _yes()
                     elif self._confirm_no.collidepoint(event.pos):
                         audio.play("click")
                         self._close_confirm()
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self._close_confirm()
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE and need_type:
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE and need_type and not IS_ANDROID:
                     self._reset_confirm_text = self._reset_confirm_text[:-1]
                 elif event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    if need_type and not type_ok:
-                        audio.play("break")
-                    else:
-                        audio.play("click")
-                        self._execute_confirm(farm_scene)
+                    _yes()
                 continue
 
             if event.type == pygame.KEYDOWN:
@@ -136,6 +147,7 @@ class SettingsOverlay:
         self._confirm_action = None
         self._reset_confirm_text = ""
         self._reset_ime = ""
+        self._reset_armed = False
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -181,6 +193,7 @@ class SettingsOverlay:
         self._confirm_action = None
         self._reset_confirm_text = ""
         self._reset_ime = ""
+        self._reset_armed = False
         try:
             pygame.key.stop_text_input()
         except Exception:
@@ -228,10 +241,22 @@ class SettingsOverlay:
         elif self._reset_all_btn.collidepoint(pos):
             self._confirm_action = "reset_all"
             self._reset_confirm_text = ""
-            try:
-                pygame.key.start_text_input()
-            except Exception:
-                pass
+            self._reset_armed = False
+            # 안드로이드는 소프트 키보드 없이 '예 두 번'으로 확정하므로 텍스트 입력을 켜지 않는다.
+            if not IS_ANDROID:
+                try:
+                    pygame.key.start_text_input()
+                except Exception:
+                    pass
+        elif not IS_ANDROID and self._fullscreen_btn.collidepoint(pos):
+            # 실제 전환은 game_main 루프가 처리(F11과 동일 경로). 설정창은 열어 둔 채 즉시 반영.
+            game_state.request_fullscreen_toggle = True
+            audio.play("click")
+        elif self._lang_btn.collidepoint(pos):
+            from core import i18n
+            new_lang = i18n.toggle()
+            save_system.set_setting("language", new_lang)
+            audio.play("click")
         elif self._version_btn.collidepoint(pos):
             current_show = save_system.get_setting("show_version")
             save_system.set_setting("show_version", not current_show)
@@ -254,8 +279,10 @@ class SettingsOverlay:
                 audio.set_muted(False)
 
     # ------------------------------------------------------------------ 그리기
-    def draw(self, screen):
-        self._draw_button(screen)
+    def draw(self, screen, show_button=True):
+        # show_button=False: 미니게임 등에서 톱니 버튼을 숨긴다(점수 박스 가림 방지). 열린 패널은 유지.
+        if show_button:
+            self._draw_button(screen)
         if self.open:
             self._draw_panel(screen)
 
@@ -271,43 +298,14 @@ class SettingsOverlay:
 
     @staticmethod
     def _draw_gear_icon(screen, cx, cy, bg_color):
-        """뚜렷하고 두꺼운 톱니바퀴 아이콘을 그린다."""
-        col = (220, 226, 218)
-        hi  = (245, 248, 240)
-        
-        # 6개의 톱니 — 각 톱니를 사다리꼴(Polygon)로 묘사
-        teeth = 6
-        r_body = 7
-        r_tooth = 10
-        tooth_half_w = math.pi / (teeth * 2.5)
-        
-        pts = []
-        for i in range(teeth):
-            a = i * (2 * math.pi / teeth)
-            # 톱니 바깥쪽 두 점
-            pts.append((cx + int(r_tooth * math.cos(a - tooth_half_w)),
-                        cy + int(r_tooth * math.sin(a - tooth_half_w))))
-            pts.append((cx + int(r_tooth * math.cos(a + tooth_half_w)),
-                        cy + int(r_tooth * math.sin(a + tooth_half_w))))
-            # 톱니 사이 안쪽 두 점 (다음 톱니 방향)
-            mid_a = a + math.pi / teeth
-            pts.append((cx + int(r_body * math.cos(mid_a - tooth_half_w * 0.7)),
-                        cy + int(r_body * math.sin(mid_a - tooth_half_w * 0.7))))
-            pts.append((cx + int(r_body * math.cos(mid_a + tooth_half_w * 0.7)),
-                        cy + int(r_body * math.sin(mid_a + tooth_half_w * 0.7))))
-
-        # 그림자
-        shadow_pts = [(px, py + 1) for px, py in pts]
-        pygame.draw.polygon(screen, (40, 50, 50), shadow_pts)
-        # 본체
-        pygame.draw.polygon(screen, col, pts)
-        # 본체 하이라이트 테두리
-        pygame.draw.polygon(screen, hi, pts, 1)
-        
-        # 중앙 축 원판 및 안쪽 구멍 (뒷배경색)
-        pygame.draw.circle(screen, col, (cx, cy), 4)
-        pygame.draw.circle(screen, hi, (cx, cy), 4, 1)
-        pygame.draw.circle(screen, bg_color, (cx, cy), 2)
+        """톱니바퀴 아이콘 — 픽셀 스프라이트(작물·날씨 아이콘과 톤 통일)."""
+        from core.assets import sprites
+        spr = sprites.get('icon_gear')
+        if spr is None:
+            return
+        s = 22
+        scaled = pygame.transform.scale(spr, (s, s))
+        screen.blit(scaled, (cx - s // 2, cy - s // 2))
 
     def _draw_panel(self, screen):
         # 뒤를 살짝 어둡게
@@ -361,21 +359,29 @@ class SettingsOverlay:
         # 완전 초기화 (되돌릴 수 없는 파괴적 동작 → danger 스타일)
         self._draw_text_button(screen, self._reset_all_btn, "완전 초기화 (태초부터)", active=False, danger=True)
 
-        # 닫기
-        self._draw_text_button(screen, self._close_btn, "닫기", active=False)
+        # 하단 2×2 토글: [전체화면][언어] / [버전 표시][닫기]
+        if not IS_ANDROID:
+            fs = game_state.is_fullscreen
+            self._draw_text_button(screen, self._fullscreen_btn,
+                                   f"전체화면: {'ON' if fs else 'OFF'}", active=fs)
+        # 언어 토글 — 현재 언어를 그 언어로 표기 (누르면 다른 언어로 전환)
+        from core import i18n
+        is_en = (i18n.get_language() == "en")
+        lang_label = "Language: English" if is_en else "언어: 한국어"
+        self._draw_text_button(screen, self._lang_btn, lang_label, active=is_en)
 
-        # 버전 표시 토글 버튼 그리기
         show_ver = save_system.get_setting("show_version")
         self._draw_text_button(screen, self._version_btn, f"버전 표시: {'ON' if show_ver else 'OFF'}", active=show_ver)
+        self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
         # 알림 메시지 출력
         if self.show_message:
             msg_surf = get_font(14).render(self.show_message, True, (139, 69, 19))
-            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 450))
+            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 476))
 
         if not audio.is_enabled():
             warn = get_font(13).render("(이 기기에서는 소리를 낼 수 없어요)", True, TEXT_MUTED)
-            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.bottom - 26))
+            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.bottom - 20))
 
         # 확인 모달 (세이브 삭제 / 메인 이동)
         if self._confirm_action is not None:
@@ -406,8 +412,17 @@ class SettingsOverlay:
         screen.blit(msg_surf, (modal.centerx - msg_surf.get_width() // 2, modal.y + 20))
 
         yes_disabled = False
-        if self._confirm_action == "reset_all":
-            # 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
+        yes_label = "예"
+        if self._confirm_action == "reset_all" and IS_ANDROID:
+            # 안드로이드: 키보드 없이 '예'를 두 번 눌러 확정한다.
+            if self._reset_armed:
+                warn = get_font(13).render("다시 '예'를 누르면 모두 삭제됩니다", True, (200, 70, 60))
+                yes_label = "정말 삭제"
+            else:
+                warn = get_font(13).render("'예'를 두 번 눌러 확정하세요", True, TEXT_MUTED)
+            screen.blit(warn, (modal.centerx - warn.get_width() // 2, modal.y + 50))
+        elif self._confirm_action == "reset_all":
+            # 데스크톱: 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
             ok = (self._reset_confirm_text.strip() == "초기화")   # 판정은 확정된 글자만
             typed = self._reset_confirm_text + self._reset_ime    # 표시는 조합 중 글자까지
             label = get_font(13).render("확인하려면 '초기화' 입력:", True, TEXT_MUTED)
@@ -425,7 +440,8 @@ class SettingsOverlay:
             sub_surf = get_font(12).render(sub, True, TEXT_MUTED)
             screen.blit(sub_surf, (modal.centerx - sub_surf.get_width() // 2, modal.y + 48))
 
-        self._draw_text_button(screen, self._confirm_yes, "예", active=False, disabled=yes_disabled)
+        self._draw_text_button(screen, self._confirm_yes, yes_label, active=False, disabled=yes_disabled,
+                               danger=(self._confirm_action == "reset_all" and self._reset_armed))
         self._draw_text_button(screen, self._confirm_no, "아니오", active=False)
 
     def _draw_slider_row(self, screen, label, track, value):

@@ -9,8 +9,41 @@ from core.game_state import (
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites, draw_crop_food
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
 from core import audio
+from core import i18n
 from core.crops import current_crop, swap_crop_word
 from core.ui_utils import Typewriter
+import re
+
+
+_JOURNAL_STATUS_RE = re.compile(r'^\[(\d+)일째 · (.+?) · (.+?)\]$')
+_JOURNAL_GROWTH_RE = re.compile(r'^여기까지 성장 (\d+)%\.(.*)$')
+
+
+def _localize_journal_line(line):
+    """일지 줄을 현재 언어로 번역한다(일지는 한국어 원문으로 저장됨).
+    상태([N일째·계절·날씨])·성장 줄은 동적 문구라 원문 패턴을 인식해 현재 언어로 재조립하고,
+    나머지 정적 줄은 카탈로그(i18n.t)로 번역한다 → 엔딩에서 언어를 바꿔도 즉시 반영된다."""
+    m = _JOURNAL_STATUS_RE.match(line)
+    if m:
+        return i18n.tf("[{day}일째 · {season} · {weather}]", day=m.group(1),
+                       season=i18n.t(m.group(2)), weather=i18n.t(m.group(3)))
+    m = _JOURNAL_GROWTH_RE.match(line)
+    if m:
+        if m.group(2).strip():
+            return i18n.tf("여기까지 성장 {prog}%. 수확이 가까워진다.", prog=m.group(1))
+        return i18n.tf("여기까지 성장 {prog}%.", prog=m.group(1))
+    hit = i18n.t(line)
+    if hit != line or i18n.get_language() == "ko":
+        return hit
+    # 카탈로그에 통짜로 없는 '조합' 줄(예: "잡초가 자꾸 올라온다, 잎 뒤로 벌레가 보인다.") —
+    # 조각들을 ", "로 잇고 끝에 "."을 붙여 저장하므로, 마침표를 떼고 각 조각을 번역해 다시 잇는다.
+    # (조각이 하나뿐이라 ", "가 없어도 마침표만 붙는 경우까지 포함)
+    if line.endswith("."):
+        frags = line[:-1].split(", ")
+        tr = [i18n.t(f) for f in frags]
+        if all(t != f for t, f in zip(tr, frags)):
+            return ", ".join(tr) + "."
+    return line
 
 
 class EndingScene:
@@ -52,6 +85,7 @@ class EndingScene:
         self.is_happy = False
         self.journal_scroll = 0
         self.journal_max_scroll = 0
+        self._journal_drag = None   # 모바일 드래그 스크롤 상태: (시작 y, 시작 scroll) 또는 None
         self.show_journal = False
         self.carrot_pulse = 0
         self.letter_written = False
@@ -120,70 +154,64 @@ class EndingScene:
             achievements.on_ending(ending_type)
             save_system.delete_save()
 
-        crop_food = current_crop()["food"]
+        ck = game_state.crop
+
+        def T(title):   # 제목: 작물 치환(KO) / 카탈로그(EN)
+            return i18n.tnar(title, crop_key=ck)
+
+        def X(text):    # 본문: 작물 치환 + 이름 조사
+            return i18n.tnar(text, crop_key=ck, name=name, name_eun=name_eun)
 
         endings = {
             "nightmare": {
-                "title": "악몽의 끝: 비워진 식탁",
+                "title": T("악몽의 끝: 비워진 식탁"),
                 "result": "Nightmare Cleared",
-                "text": swap_crop_word(
-                    f"식탁 위에 여태 남겨두었던 마지막 당근 한 조각까지 모두 삼켜 냈다.\n"
-                    f"순간, 목을 짓누르던 무거운 죄책감이 거짓말처럼 사라진다.\n"
-                    f"쩍 쩍 갈라지는 붉은 하늘을 너머 마주한 아침, 식탁은 말끔히 비어 있었다.\n"
-                    f"'남기지 마라. 이번엔, 끝까지.' 그 말씀이 마음에 조용히 박혔다.",
-                    crop_food
-                ),
+                "text": X(
+                    "식탁 위에 여태 남겨두었던 마지막 당근 한 조각까지 모두 삼켜 냈다.\n"
+                    "순간, 목을 짓누르던 무거운 죄책감이 거짓말처럼 사라진다.\n"
+                    "쩍 쩍 갈라지는 붉은 하늘을 너머 마주한 아침, 식탁은 말끔히 비어 있었다.\n"
+                    "'남기지 마라. 이번엔, 끝까지.' 그 말씀이 마음에 조용히 박혔다."),
             },
             "true": {
-                "title": "진엔딩: 내일 새벽, 함께",
+                "title": T("진엔딩: 내일 새벽, 함께"),
                 "result": "True Ending",
-                "text": (
-                    f"수확한 당근을 베어 문 순간, 세상이 황금빛으로 물든다.\n"
-                    f"아버지의 땀과 기다림이 담긴 달콤한 맛.\n"
-                    f"잠에서 깬 {name_eun} 식탁 앞에 먼저 앉아 당근을 집어 먹는다.\n"
-                    f"'아빠, 내일 새벽에 같이 나갈게요. 다 알려주세요.'"
-                ),
+                "text": X(
+                    "수확한 당근을 베어 문 순간, 세상이 황금빛으로 물든다.\n"
+                    "아버지의 땀과 기다림이 담긴 달콤한 맛.\n"
+                    "잠에서 깬 {name_eun} 식탁 앞에 먼저 앉아 당근을 집어 먹는다.\n"
+                    "'아빠, 내일 새벽에 같이 나갈게요. 다 알려주세요.'"),
             },
             "normal": {
-                "title": "노멀엔딩: 조금은 알 것 같은 마음",
+                "title": T("노멀엔딩: 조금은 알 것 같은 마음"),
                 "result": "Normal Ending",
-                "text": (
-                    f"수확한 당근을 베어 문 순간, 다정한 침묵이 밭을 감싼다.\n"
-                    f"모든 것을 완전히 알지는 못하지만, 아버지가 흘린 땀방울의 가치가 마음속에 조용히 차오른다.\n"
-                    f"잠에서 깬 {name_eun} 식탁의 당근을 가만히 바라보다 천천히 씹어 넘긴다.\n"
-                    f"'조금은 알 것 같아요. 아빠의 그 침묵을.'"
-                ),
+                "text": X(
+                    "수확한 당근을 베어 문 순간, 다정한 침묵이 밭을 감싼다.\n"
+                    "모든 것을 완전히 알지는 못하지만, 아버지가 흘린 땀방울의 가치가 마음속에 조용히 차오른다.\n"
+                    "잠에서 깬 {name_eun} 식탁의 당근을 가만히 바라보다 천천히 씹어 넘긴다.\n"
+                    "'조금은 알 것 같아요. 아빠의 그 침묵을.'"),
             },
             "bad": {
-                "title": "배드엔딩: 아직은 쓰기만 한 맛",
+                "title": T("배드엔딩: 아직은 쓰기만 한 맛"),
                 "result": "Bad Ending",
-                "text": (
-                    f"수확한 당근은 너무 작았고, 성급함이 묻어 있었다.\n"
-                    f"기다리는 법도, 아버지가 매일 새벽 무엇을 홀로 마주해 왔는지도 아직 와닿지 않는다.\n"
-                    f"잠에서 깬 {name_eun} 식탁 앞을 말없이 스쳐 지나가며 생각한다.\n"
-                    f"'아직은 쓰다. 조금 더 서 있어야 할 것 같다.'"
-                ),
+                "text": X(
+                    "수확한 당근은 너무 작았고, 성급함이 묻어 있었다.\n"
+                    "기다리는 법도, 아버지가 매일 새벽 무엇을 홀로 마주해 왔는지도 아직 와닿지 않는다.\n"
+                    "잠에서 깬 {name_eun} 식탁 앞을 말없이 스쳐 지나가며 생각한다.\n"
+                    "'아직은 쓰다. 조금 더 서 있어야 할 것 같다.'"),
             },
             "wither": {
-                "title": "시듦엔딩: 끝내 지켜내지 못한 밭",
+                "title": T("시듦엔딩: 끝내 지켜내지 못한 밭"),
                 "result": "Withered...",
-                "text": (
-                    f"아무리 다독여도 당근은 다시 일어서지 못했다.\n"
-                    f"흙만 남은 두둑을 오래 바라보았다.\n"
-                    f"그래도 이 숱한 새벽이 헛되지는 않았다.\n"
-                    f"아버지가 매일 무엇과 싸웠는지, 이제 조금은 안다."
-                ),
+                "text": X(
+                    "아무리 다독여도 당근은 다시 일어서지 못했다.\n"
+                    "흙만 남은 두둑을 오래 바라보았다.\n"
+                    "그래도 이 숱한 새벽이 헛되지는 않았다.\n"
+                    "아버지가 매일 무엇과 싸웠는지, 이제 조금은 안다."),
             },
         }
 
         data = endings.get(ending_type, endings["normal"])
         self.is_happy = ending_type == "true"
-        # 고른 작물에 맞춰 '당근'을 먹기 좋은 이름으로 갈아 끼운다 (조사까지)
-        food = current_crop()["food"]
-        if food != "당근":
-            data = dict(data)
-            data["title"] = swap_crop_word(data["title"], food)
-            data["text"] = swap_crop_word(data["text"], food)
         return data
 
     def build_pages(self):
@@ -202,7 +230,7 @@ class EndingScene:
         # 플레이 타임 포맷팅 (분, 초)
         m = int(game_state.play_time // 60)
         s = int(game_state.play_time % 60)
-        play_time_str = f"플레이 시간: {m}분 {s}초" if m > 0 else f"플레이 시간: {s}초"
+        play_time_str = i18n.tf("플레이 시간: {m}분 {s}초", m=m, s=s) if m > 0 else i18n.tf("플레이 시간: {s}초", s=s)
 
         dialogue = [
             "«어둠 속의 목소리»",
@@ -228,9 +256,9 @@ class EndingScene:
             "",
             "이번 꿈에서 남은 기록",
             play_time_str,
-            f"물 뿌리기: {game_state.water_count}회",
-            f"잡초 뽑기: {game_state.weed_count}회",
-            f"해충 잡기: {game_state.pest_count}회",
+            i18n.tf("물 뿌리기: {n}회", n=game_state.water_count),
+            i18n.tf("잡초 뽑기: {n}회", n=game_state.weed_count),
+            i18n.tf("해충 잡기: {n}회", n=game_state.pest_count),
         ]
 
         if game_state.choice_impacts:
@@ -243,8 +271,10 @@ class EndingScene:
             "",
             "---------------------------------------",
             "",
-            "기획 / 개발",
-            "삼광 (Samgwang)",
+            "삼광 (三光)",
+            "1302 김민욱 — 팀장 · 개발",
+            "1303 박서현 — 기획 · 스토리",
+            "1305 서태양 — 기획 · 디자인",
             "",
             "사용 폰트",
             "갈무리11 (Galmuri11) - 제작자 달고나(Dalgona) 배포",
@@ -360,6 +390,9 @@ class EndingScene:
 
     # 게임이 끝난 화면에서 보이는 '메인으로' 버튼 (앱을 끄지 않고 타이틀로 돌아간다)
     EXIT_BUTTON = pygame.Rect(632, 550, 146, 40)
+    RETRY_BUTTON = pygame.Rect(476, 550, 146, 40)
+    # 일지 본문(스크롤) 영역 — _draw_journal 의 view 와 일치. 모바일 드래그 스크롤 판정에 쓴다.
+    JOURNAL_VIEW = pygame.Rect(100, 108, 600, 404)
 
     def _exit_visible(self):
         return self.phase == "journal" or (self.phase == "result" and self.result_done)
@@ -368,6 +401,11 @@ class EndingScene:
         hovered = self.EXIT_BUTTON.collidepoint(pygame.mouse.get_pos())
         label = "갤러리로" if self.from_gallery else "메인으로"
         draw_button(screen, self.EXIT_BUTTON, label, self.font_small, hovered=hovered)
+        
+        # 갤러리 감상이 아닐 때만 '다시 시작' 버튼 표시
+        if not self.from_gallery:
+            hovered_retry = self.RETRY_BUTTON.collidepoint(pygame.mouse.get_pos())
+            draw_button(screen, self.RETRY_BUTTON, "다시 시작", self.font_small, hovered=hovered_retry)
 
     def _to_title(self):
         """엔딩을 마치고 타이틀(또는 갤러리 감상 중이면 갤러리)로 돌아간다."""
@@ -381,11 +419,14 @@ class EndingScene:
 
     def handle_events(self, events):
         for event in events:
-            # 끝난 화면에서는 '메인으로' 버튼으로 타이틀 화면에 돌아간다 (다른 클릭 처리보다 먼저)
-            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                    and self._exit_visible() and self.EXIT_BUTTON.collidepoint(event.pos)):
-                self._to_title()
-                return
+            # 끝난 화면에서는 '메인으로' 또는 '다시 시작' 버튼 처리 (다른 클릭 처리보다 먼저)
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._exit_visible():
+                if self.EXIT_BUTTON.collidepoint(event.pos):
+                    self._to_title()
+                    return
+                elif not self.from_gallery and self.RETRY_BUTTON.collidepoint(event.pos):
+                    self.retry()
+                    return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
@@ -436,42 +477,55 @@ class EndingScene:
                 if event.type == pygame.MOUSEWHEEL:
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll - event.y * 30))
+                    self._journal_drag = None
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
                     delta = -30 if event.button == 4 else 30
                     self.journal_scroll = max(0, min(self.journal_max_scroll,
                                                      self.journal_scroll + delta))
+                # 모바일: 휠이 없으므로 본문을 손가락으로 끌어 스크롤한다.
+                elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                        and self.JOURNAL_VIEW.collidepoint(event.pos)):
+                    self._journal_drag = (event.pos[1], self.journal_scroll)
+                elif event.type == pygame.MOUSEMOTION and self._journal_drag is not None:
+                    start_y, start_scroll = self._journal_drag
+                    self.journal_scroll = max(0, min(self.journal_max_scroll,
+                                                     start_scroll - (event.pos[1] - start_y)))
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self._journal_drag = None
 
     def update(self, dt):
         self.carrot_pulse += dt
+        fast_ff = getattr(game_state, "fast_forward", False)
+        effective_dt = dt * 6.0 if fast_ff else dt
 
         if self.phase == "narration":
-            self.typewriter.update(dt)
+            self.typewriter.update(dt, fast_ff)
 
         elif self.phase == "table":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.table_alpha = min(255, int(self.phase_timer * 120))
             if self.phase_timer > 2.5:
                 self.phase = "carrot"
                 self.phase_timer = 0
 
         elif self.phase == "carrot":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
 
         elif self.phase == "golden":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.golden_alpha = min(255, int(self.phase_timer * 200))
             if self.phase_timer > 1.8:
                 self.phase = "dad_voice"
                 self.phase_timer = 0
 
         elif self.phase == "dad_voice":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             self.dad_text_alpha = min(255, int(self.phase_timer * 150))
 
         elif self.phase == "result":
-            self.phase_timer += dt
+            self.phase_timer += effective_dt
             if self.result_y > 260:
-                self.result_y -= 55 * dt
+                self.result_y -= 55 * effective_dt
             else:
                 self.result_y = 260
                 self.result_done = True
@@ -532,7 +586,7 @@ class EndingScene:
         screen.blit(page, (690, 548))
         if self.typewriter.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "계속"
-            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
+            prompt = self.font_small.render(i18n.tf("{prompt}: 클릭 또는 스페이스바", prompt=i18n.t(prompt_text)), True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 562))
 
     def _draw_plate(self, screen, cx, cy, tc=255):
@@ -720,7 +774,9 @@ class EndingScene:
             draw_crop_food(screen, 400, 315, game_state.crop, r=int(30 * pulse))
 
         # Prompt (조사 자동 처리: 사과를 / 감자를 / 쌀밥을 / 당근을)
-        prompt = self.font_small.render(f"{append_josa(crop['food'], '을/를')} 클릭하세요", True, (255, 225, 130))
+        prompt = self.font_small.render(
+            i18n.tf("{food_eul} 클릭하세요", food_eul=append_josa(crop['food'], '을/를'), food=i18n.t(crop['food'])),
+            True, (255, 225, 130))
         screen.blit(prompt, (400 - prompt.get_width() // 2, 430))
 
     def _draw_golden(self, screen):
@@ -833,7 +889,7 @@ class EndingScene:
         screen.blit(result, (400 - result.get_width() // 2, int(self.result_y)))
 
         _, stage_name, _ = get_understanding_stage(game_state.understanding)
-        stage_surf = self.font_small.render(f"마음의 단계: {stage_name}", True, (160, 150, 120))
+        stage_surf = self.font_small.render(i18n.tf("마음의 단계: {stage}", stage=i18n.t(stage_name)), True, (160, 150, 120))
         screen.blit(stage_surf, (400 - stage_surf.get_width() // 2, int(self.result_y) + 60))
 
         # #11 Attitude summary
@@ -849,7 +905,8 @@ class EndingScene:
         if game_state.recovery_count >= 2:
             att_items.append("회복력")
         if att_items:
-            att_text = "당신의 태도: " + " · ".join(att_items)
+            # 합쳐진 문구는 통째로는 번역 안 되므로 접두어·항목을 각각 번역해 조립
+            att_text = i18n.t("당신의 태도: ") + " · ".join(i18n.t(a) for a in att_items)
             att_surf = att_font.render(att_text, True, (140, 130, 100))
             screen.blit(att_surf, (400 - att_surf.get_width() // 2, att_y))
 
@@ -957,18 +1014,22 @@ class EndingScene:
         screen.set_clip(view)
         start_y = 116 - self.journal_scroll
         y = start_y
+        from core.ui import wrap_text
         for entry in game_state.journal_entries:
             for line in entry.split("\n"):
                 is_head = line.startswith("[")
-                if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
-                    surf = self.font_small.render(line, True, head_color if is_head else TEXT_DARK)
-                    screen.blit(surf, (120, y))
-                y += 26 if is_head else 22
+                # 표시 시점에 현재 언어로 번역(일지는 한국어 원문 저장) + 패널 폭에 맞춰 줄바꿈(넘침 방지)
+                disp = _localize_journal_line(line)
+                for sub in (wrap_text(disp, self.font_small, 560) if disp else [""]):
+                    if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
+                        surf = self.font_small.render(sub, True, head_color if is_head else TEXT_DARK)
+                        screen.blit(surf, (120, y))
+                    y += 26 if is_head else 22
                 retro_text = None
                 from core.crops import current_crop, swap_crop_word
                 food = current_crop()["food"]
                 for k, v in JOURNAL_RETROSPECTIVES.items():
-                    if swap_crop_word(k, food) == line.strip():
+                    if swap_crop_word(k, food) == line.strip():   # 매칭은 원문(한국어) 기준
                         retro_text = swap_crop_word(v, food)
                         break
                 if self.is_happy and retro_text is not None:
@@ -985,7 +1046,8 @@ class EndingScene:
         if self.journal_scroll > self.journal_max_scroll:
             self.journal_scroll = self.journal_max_scroll
         if self.journal_max_scroll > 0:
-            sh = retro_font.render("휠로 스크롤", True, (172, 152, 112))
+            from core.platform import IS_ANDROID
+            sh = retro_font.render("드래그로 스크롤" if IS_ANDROID else "휠·드래그로 스크롤", True, (172, 152, 112))
             screen.blit(sh, (672 - sh.get_width(), 110))
 
         prompt = self.font_small.render("오른쪽 아래 버튼으로 나가기  ·  R: 다시하기", True, (214, 204, 178))

@@ -33,18 +33,21 @@ class Typewriter:
         self.char_idx = len(self.text_to_print)
         self.finished = True
 
-    def update(self, dt):
-        """시간 누적에 따라 한 글자씩 추가한다."""
+    def update(self, dt, fast_forward=False):
+        """시간 누적에 따라 한 글자씩 추가한다. 배속 상태일 때 속도를 증폭시킨다."""
         if self.finished:
             return
-        self.char_timer += dt
-        if self.char_timer >= self.char_delay:
-            self.char_timer = 0.0
+        effective_dt = dt * 6.0 if fast_forward else dt
+        self.char_timer += effective_dt
+        while self.char_timer >= self.char_delay and not self.finished:
+            self.char_timer -= self.char_delay
             if self.char_idx < len(self.text_to_print):
                 char = self.text_to_print[self.char_idx]
                 self.printed_text += char
                 self.char_idx += 1
-                audio.type_tick(char)
+                # 배속 연출 시 소리가 중첩되어 찢어지는 현상을 방지하기 위해 일정 빈도로만 소리 재생
+                if not fast_forward or (self.char_idx % 3 == 0):
+                    audio.type_tick(char)
             else:
                 self.finished = True
 

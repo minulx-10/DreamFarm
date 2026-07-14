@@ -1,2 +1,9 @@
+# 게임 실행(데스크톱/EXE)에 필요한 것
 pygame-ce>=2.5.0
+# numpy 는 소리 '합성'에만 쓰인다. 배포 빌드는 tools/bake_audio.py 로 소리를 .ogg 로 미리
+# 구워 싣고(런타임에 numpy 불필요), 안드로이드 APK 에는 numpy 를 아예 넣지 않는다.
+# 데스크톱에서 아직 안 구운 소리는 numpy 로 즉석 합성하므로 개발 환경엔 남겨 둔다.
 numpy>=1.24
+
+# 소리 굽기 도구(tools/bake_audio.py)에만 필요 — OGG 인코딩용. 게임 런타임과는 무관.
+soundfile>=0.12

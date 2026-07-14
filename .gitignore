@@ -21,3 +21,16 @@ test_log.txt
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Buildozer
+!buildozer.spec
+.buildozer/
+bin/
+
+# 안드로이드 서명 키 — 절대 커밋 금지 (분실 시 앱 업데이트 불가)
+*.keystore
+*.jks
+release.keystore
+
+# 스팀 로컬 테스트용 App ID 파일 — 커밋 금지 (앱마다 다름, 개발자 로컬에만)
+steam_appid.txt

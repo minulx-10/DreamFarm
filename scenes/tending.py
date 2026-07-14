@@ -8,6 +8,7 @@ import pygame
 from core.assets import sprites, get_font
 from core.game_state import game_state
 from core import audio
+from core import i18n
 
 PLOT = pygame.Rect(44, 140, 362, 318)
 
@@ -287,6 +288,15 @@ class WeedPull(MiniGameBase):
 
     def _update_game(self, dt):
         self.timer -= dt
+        
+        # 마우스 포인터의 가상 좌표상 호버 여부 확인
+        mx, my = pygame.mouse.get_pos()
+        for w in self.items:
+            if not w["pulled"] and abs(mx - w["x"]) < 22 and abs(my - w["y"]) < 28:
+                w["hovered"] = True
+            else:
+                w["hovered"] = False
+
         for p in self.puffs:
             p[2] -= dt
         self.puffs = [p for p in self.puffs if p[2] > 0]
@@ -317,11 +327,20 @@ class WeedPull(MiniGameBase):
         wsp = sprites["weed_nm"] if game_state.nightmare else sprites["weed"]
         is_apple = (game_state.crop == "apple")
         
+        import math
         for w in self.items:
             if w["pulled"]:
                 continue
             ox, oy = int(w["ox"]), int(w["oy"])
-            gx2, gy2 = w["x"] + ox, w["y"] + oy
+            
+            # 호버 시 진동 연출 (드래그하는 개체는 제외)
+            shake_x, shake_y = 0, 0
+            if w.get("hovered", False) and self.grabbed is not w:
+                ticks = pygame.time.get_ticks() * 0.05
+                shake_x = int(math.sin(ticks) * 3)
+                shake_y = int(math.cos(ticks * 0.7) * 2)
+                
+            gx2, gy2 = w["x"] + ox + shake_x, w["y"] + oy + shake_y
 
             if is_apple:
                 # 나무 밑동(anchor)에서 가지가 뻗어 나온 것처럼 굵은 곁가지를 그린다.
@@ -377,7 +396,7 @@ class WeedPull(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            remain_txt = f"남은 가지 {remain}" if is_apple else f"남은 잡초 {remain}"
+            remain_txt = i18n.tf("남은 가지 {n}", n=remain) if is_apple else i18n.tf("남은 잡초 {n}", n=remain)
             _counter(screen, remain_txt, self.timer / 6.5)
 
 
@@ -479,14 +498,9 @@ class PestTap(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            remain_txt = f"남은 굼벵이 {remain}" if is_potato else f"남은 벌레 {remain}"
+            remain_txt = i18n.tf("남은 굼벵이 {n}", n=remain) if is_potato else i18n.tf("남은 벌레 {n}", n=remain)
             _counter(screen, remain_txt, self.timer / 6.0)
 
-
-class SoilMound:
-    """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
-    잘 덮을수록(채운 자리 비율) 건강·안정에 도움이 크다 — 못해도 소폭은 보장."""
-    PROMPT = "마우스를 누른 채 흙을 쓸어 뿌리를 덮어 주세요"
 
 class SoilMound(MiniGameBase):
     """흙을 쓸어 뿌리를 덮어 북돋운다. 마우스를 누른 채 자리 위를 문질러 두둑을 쌓는다.
@@ -610,7 +624,7 @@ class SoilMound(MiniGameBase):
         cap = self.PROMPT if self.result is None else self.feedback
         _caption(screen, cap, None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"남은 자리 {remain}", self.timer / 6.5)
+            _counter(screen, i18n.tf("남은 자리 {n}", n=remain), self.timer / 6.5)
 
 
 # ---- 공통 그리기 헬퍼 ----
@@ -771,7 +785,7 @@ class WeatherSunshine:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"모은 햇살 {self.collected}/{self.target}", self.timer / 8.0)
+            _counter(screen, i18n.tf("모은 햇살 {c}/{t}", c=self.collected, t=self.target), self.timer / 8.0)
 
 
 class WeatherRain:
@@ -879,7 +893,7 @@ class WeatherRain:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"받은 빗물 {self.caught}/{self.target}", self.timer / 8.0)
+            _counter(screen, i18n.tf("받은 빗물 {c}/{t}", c=self.caught, t=self.target), self.timer / 8.0)
 
 
 class WeatherCloudy:
@@ -983,7 +997,7 @@ class WeatherCloudy:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"치운 구름 {self.cleared}/{self.target}", self.timer / 10.0)
+            _counter(screen, i18n.tf("치운 구름 {c}/{t}", c=self.cleared, t=self.target), self.timer / 10.0)
 
 
 class WeatherDrought:
@@ -1098,7 +1112,7 @@ class WeatherDrought:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"찾은 수맥 {self.found}/{self.target}", self.timer / 10.0)
+            _counter(screen, i18n.tf("찾은 수맥 {c}/{t}", c=self.found, t=self.target), self.timer / 10.0)
 
 
 class WeatherWind:
@@ -1213,7 +1227,7 @@ class WeatherWind:
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)
         if self.result is None:
-            _counter(screen, f"막은 횟수 {self.blocked}", self.timer / 8.0)
+            _counter(screen, i18n.tf("막은 횟수 {n}", n=self.blocked), self.timer / 8.0)
 
 
 # 날씨 → 미니게임 클래스 매핑

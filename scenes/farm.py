@@ -4,6 +4,7 @@ from core.game_state import game_state, get_season_colors
 from core.assets import get_font
 from core import audio
 from core import save_system
+from core import i18n
 from core.ui import draw_button
 from scenes.tending import WaterPour, WeedPull, PestTap, SoilMound
 
@@ -239,7 +240,7 @@ class FarmScene:
                     self.forced_wait_active = False
                     self.sim.turns_since_wait = 0
                     self.sim._run_action(action, self, result)
-                    self.sim.message = f"돌발 상황({action})을 30초 내에 무사히 해결했습니다!"
+                    self.sim.message = i18n.tf("돌발 상황({action})을 30초 내에 무사히 해결했습니다!", action=i18n.t(action))
                     self.sim.notice = "기다림이 작물을 더 튼튼하게 만듭니다."
                     game_state.patience_score += 1
                     game_state.understanding += 4

@@ -1,36 +1,8 @@
 import pygame
 
-BLACK = (13, 16, 20)
-WHITE = (250, 246, 231)
-DARK_GRAY = (42, 46, 48)
-YELLOW = (245, 200, 88)
-GREEN = (54, 142, 94)
-BROWN = (132, 83, 48)
-RED = (190, 70, 58)
-BLUE = (72, 122, 170)
-GOLD = (232, 178, 84)
-GRAY = (142, 146, 138)
-ORANGE = (232, 132, 58)
-
-# Dream-farm palette
-DIRT_COLOR = (136, 88, 56)
-DIRT_DARK = (92, 60, 43)
-DIRT_WET = (88, 72, 58)
-GRASS_COLOR = (84, 148, 91)
-GRASS_DARK = (48, 104, 73)
-WOOD_COLOR = (177, 123, 72)
-WOOD_DARK = (75, 57, 45)
-WOOD_LIGHT = (238, 201, 137)
-TEXT_BROWN = (75, 52, 34)
-TEXT_DARK = (38, 35, 30)
-TEXT_MUTED = (102, 91, 75)
-PANEL_PALE = (248, 232, 196)
-PANEL_WARM = (255, 242, 213)
-PANEL_DEEP = (55, 61, 58)
-PANEL_EDGE = (121, 94, 68)
-ACCENT_BLUE = (74, 131, 151)
-ACCENT_MINT = (104, 164, 118)
-ACCENT_CORAL = (213, 104, 72)
+# 색은 공용 팔레트(core/palette.py)를 단일 소스로 쓴다. 여기서 re-export 해 기존
+# `from core.assets import GOLD, TEXT_DARK ...` 임포트를 그대로 유지한다.
+from core.palette import *  # noqa: F401,F403
 
 import os
 import sys
@@ -49,32 +21,61 @@ def resource_path(rel):
 FONT_PATH = resource_path("Galmuri11.ttf")
 FONT_URL = "https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.ttf"
 
-fonts = {}
+
+class _I18nFont:
+    """폰트 래퍼 — render()/size() 시 문자열을 현재 언어로 번역해 그린다.
+
+    로직은 원문(한국어)을 그대로 쓰고 '표시'만 번역되도록, 렌더 계층에서만 개입한다.
+    render/size 외의 메서드(get_height 등)는 __getattr__로 실제 폰트에 그대로 위임한다."""
+
+    __slots__ = ("_f",)
+
+    def __init__(self, font):
+        self._f = font
+
+    def render(self, text, *args, **kwargs):
+        from core import i18n
+        return self._f.render(i18n.t(text), *args, **kwargs)
+
+    def size(self, text, *args, **kwargs):
+        from core import i18n
+        return self._f.size(i18n.t(text), *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+
+fonts = {}          # size -> _I18nFont (번역 래퍼, 게임 코드가 받는 것)
+
+
+def _make_raw_font(size):
+    """실제 pygame Font 하나를 만든다 (폰트 파일 없으면 다운로드 시도 후 시스템 폰트 폴백)."""
+    if not os.path.exists(FONT_PATH):
+        try:
+            print("Downloading Galmuri11 pixel font...")
+            req = urllib.request.Request(FONT_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response, open(FONT_PATH, 'wb') as out_file:
+                out_file.write(response.read())
+            print("Download complete!")
+        except Exception as e:
+            print("Failed to download font, falling back to system font:", e)
+            try:
+                return pygame.font.SysFont("malgungothic", size)
+            except Exception:
+                return pygame.font.Font(None, size)
+    try:
+        return pygame.font.Font(FONT_PATH, size)
+    except Exception:
+        try:
+            return pygame.font.SysFont("malgungothic", size)
+        except Exception:
+            return pygame.font.Font(None, size)
+
 
 def get_font(size):
+    """번역 래퍼(_I18nFont)로 감싼 폰트를 돌려준다 (사이즈별 캐시)."""
     if size not in fonts:
-        if not os.path.exists(FONT_PATH):
-            try:
-                print("Downloading Galmuri11 pixel font...")
-                req = urllib.request.Request(FONT_URL, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req) as response, open(FONT_PATH, 'wb') as out_file:
-                    out_file.write(response.read())
-                print("Download complete!")
-            except Exception as e:
-                print("Failed to download font, falling back to system font:", e)
-                try:
-                    fonts[size] = pygame.font.SysFont("malgungothic", size)
-                except:
-                    fonts[size] = pygame.font.Font(None, size)
-                return fonts[size]
-                
-        try:
-            fonts[size] = pygame.font.Font(FONT_PATH, size)
-        except:
-            try:
-                fonts[size] = pygame.font.SysFont("malgungothic", size)
-            except:
-                fonts[size] = pygame.font.Font(None, size)
+        fonts[size] = _I18nFont(_make_raw_font(size))
     return fonts[size]
 
 def create_sprite_from_string(sprite_str, scale=4):
@@ -116,6 +117,27 @@ def create_sprite_from_string(sprite_str, scale=4):
         'd': (87, 51, 25, 255),   # Pit base brown
         'D': (56, 33, 15, 255),   # Pit dark shadow
         'l': (110, 65, 30, 255),  # Pit light brown speckle
+        # 작물 '먹는 것' 픽셀 통일용 (사과·감자·쌀밥)
+        'A': (216, 58, 54, 255),  # Apple red
+        'a': (150, 34, 34, 255),  # Apple red shade
+        'h': (245, 138, 128, 255),# Apple highlight
+        'u': (242, 244, 248, 255),# Bowl/rice white
+        'U': (198, 206, 216, 255),# Bowl shade
+        'c': (96, 140, 192, 255), # Bowl blue band
+        'v': (255, 255, 255, 255),# Rice grain highlight
+        'j': (206, 210, 218, 255),# Rice grain shade
+        # 아이콘 통일용 (날씨·톱니·메달) — 팔레트와 톤 일치
+        'Q': (255, 208, 70, 255), # Sun body
+        'T': (236, 176, 40, 255), # Sun edge / ray
+        'C': (206, 212, 224, 255),# Cloud body
+        'P': (150, 158, 172, 255),# Cloud shade
+        'J': (96, 156, 226, 255), # Rain drop
+        'F': (232, 146, 46, 255), # Drought orange
+        'f': (196, 104, 24, 255), # Drought shade / crack
+        'V': (150, 176, 152, 255),# Wind stroke
+        'Z': (208, 216, 210, 255),# Gear body (steel, 밝게)
+        'z': (140, 150, 148, 255),# Gear shade
+        'E': (242, 248, 242, 255),# Gear highlight
     }
     
     for y, line in enumerate(lines):
@@ -123,6 +145,30 @@ def create_sprite_from_string(sprite_str, scale=4):
             if char in colors and colors[char][3] > 0:
                 pygame.draw.rect(surf, colors[char], (x*scale, y*scale, scale, scale))
     return surf
+
+
+def _pixelize(surf, target_w, target_h, block=4, levels=6):
+    """래스터 이미지(사진·일러스트)를 픽셀 아트 톤에 맞춘다.
+
+    작은 해상도로 부드럽게 줄여 세부를 뭉갠 뒤, 색을 계단화(posterize)하고, 최근접으로 확대해
+    도트 블록을 만든다. **numpy 미사용**(안드로이드 빌드 호환) — 작은 중간 이미지에만 픽셀 연산."""
+    sw = max(1, target_w // block)
+    sh = max(1, target_h // block)
+    small = pygame.transform.smoothscale(surf, (sw, sh))
+    if levels and levels >= 2:
+        step = 255 // (levels - 1)
+        small.lock()
+        for y in range(sh):
+            for x in range(sw):
+                r, g, b, a = small.get_at((x, y))
+                if a < 8:
+                    continue
+                r = min(255, ((r + step // 2) // step) * step)
+                g = min(255, ((g + step // 2) // step) * step)
+                b = min(255, ((b + step // 2) // step) * step)
+                small.set_at((x, y), (r, g, b, a))
+        small.unlock()
+    return pygame.transform.scale(small, (target_w, target_h))   # 최근접 확대 → 도트 블록
 
 
 sprites = {}
@@ -273,7 +319,9 @@ X.XkkX.X
     if os.path.exists(dad_path):
         try:
             dad_img = pygame.image.load(dad_path).convert_alpha()
-            sprites['dad'] = pygame.transform.scale(dad_img, (160, 160))
+            # dad.png도 이미 픽셀 아트다. 초상화라 세게 뭉개면 얼굴이 뭉개지므로, 픽셀 '결'만 살짝
+            # 굵게(2px 블록) + 색 살짝 계단화해 작물·아이콘의 굵은 도트 톤에 조금 더 맞춘다.
+            sprites['dad'] = _pixelize(dad_img, 160, 160, block=2, levels=12)
             loaded_dad = True
         except Exception as e:
             print("Failed to load custom dad sprite:", e)
@@ -336,12 +384,114 @@ XYbDDDDDDDDDDbYX
 .....XXXXXXX......
 ''', 5)
 
+    # 작물 '먹는 것' 픽셀 스프라이트 — 당근(픽셀)과 톤·질감을 맞춰 사과·감자·쌀밥도 도트로 통일.
+    # (예전엔 사과·감자·쌀밥이 벡터 도형이라 당근만 픽셀이라 이질감이 컸다.)
+    sprites['food_apple'] = create_sprite_from_string('''
+....gg....
+...gGb....
+....Xb....
+..XAAAAX..
+.XhhAAAaX.
+XhAAAAAaaX
+XAAAAAAaaX
+XAAAAAAaaX
+XAAAAAAaaX
+.XAAAaaaX.
+..XaaaaX..
+...XXX....
+''', 6)
+    sprites['food_potato'] = create_sprite_from_string('''
+..XXXXX...
+.XBYBBBX..
+XBYBbBBBX.
+XBBBBBbBX.
+XBbBBBBBX.
+XBBBBBBbX.
+.XBBBBBX..
+..XXXXX...
+''', 8)
+    sprites['food_rice'] = create_sprite_from_string('''
+...uvuvu...
+..uuvuuvu..
+.uuuuuuuuu.
+XUUUUUUUUUX
+XucccccccuX
+XuuuuuuuuuX
+.XuuuuuuuX.
+..XUUUUUX..
+...XXXXX...
+''', 8)
+
+    # 아이콘 픽셀 통일 (날씨·톱니) — 벡터 대신 도트로 그려 작물·UI와 톤을 맞춘다. scale 1(원본=격자px),
+    # draw_weather_icon 등에서 목표 size로 확대해 쓴다.
+    sprites['icon_clear'] = create_sprite_from_string('''
+.....T.....
+...T.Q.T...
+....QQQ....
+.T.QQQQQ.T.
+T.QQQQQQQ.T
+.T.QQQQQ.T.
+....QQQ....
+...T.Q.T...
+.....T.....
+''', 1)
+    sprites['icon_cloudy'] = create_sprite_from_string('''
+....CCC....
+..CCCCCCC..
+.CCCCCCCCC.
+CCCCCCCCCCC
+PPPPPPPPPPP
+''', 1)
+    sprites['icon_rain'] = create_sprite_from_string('''
+...CCC.....
+.CCCCCCC...
+CCCCCCCCC..
+PPPPPPPPP..
+.J..J..J...
+J..J..J....
+.J..J..J...
+''', 1)
+    sprites['icon_drought'] = create_sprite_from_string('''
+.....F.....
+...F.F.F...
+....FFF....
+.F.FFFFF.F.
+F.FFFFFFF.F
+.F.FFFFF.F.
+....FFF....
+...........
+.f..f.f..f.
+''', 1)
+    sprites['icon_wind'] = create_sprite_from_string('''
+...........
+.VVVVVV.V..
+V.....VVVV.
+...VVVVV...
+VVVV....V..
+.V.VVVVVVV.
+...........
+''', 1)
+    sprites['icon_gear'] = create_sprite_from_string('''
+...Z.Z.Z...
+.ZZZZZZZZZ.
+.ZZEEEEEZZ.
+ZZEz...zEZZ
+.ZE.....EZ.
+ZZE..z..EZZ
+.ZE.....EZ.
+ZZEz...zEZZ
+.ZZEEEEEZZ.
+.ZZZZZZZZZ.
+...Z.Z.Z...
+''', 1)
+
     # 밭 이미지 에셋 불러오기 (여백 크롭 및 362x318 리사이징)
     field_bed_path = resource_path("field_bed.jpg")
     if os.path.exists(field_bed_path):
         try:
             raw_img = pygame.image.load(field_bed_path).convert_alpha()
             cropped = raw_img.subsurface(pygame.Rect(59, 74, 904, 763))
+            # field_bed.jpg는 이미 도트(픽셀 아트) 톤이라 그대로 스케일만 한다(픽셀화하면 오히려 뭉개짐).
             sprites['field_bed'] = pygame.transform.scale(cropped, (362, 318))
 
             # 4 모퉁이의 흰색/베이지색 여백 픽셀을 투명 처리하여 둥글게 마감
@@ -366,6 +516,15 @@ def _mix_color(a, b, ratio):
         int(a[1] + (b[1] - a[1]) * ratio),
         int(a[2] + (b[2] - a[2]) * ratio),
     )
+
+
+# 배경 그라데이션 밴딩(P4) — 하늘·잔디를 계단식 '띠'로 그려 도트 톤에 맞춘다.
+# (core.ui 와 같은 개념이지만 assets는 ui를 import 하면 순환이라 여기 로컬로 둠.)
+_BG_BAND = 10
+
+
+def _bg_quant(color, step=10):
+    return tuple(min(255, ((c + step // 2) // step) * step) for c in color[:3])
 
 
 # 황혼 하늘 다단 그라데이션 — 위에서 지평선으로 갈수록 남보라→자주→장미→노을빛
@@ -429,9 +588,10 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         dd = dirt_dk or DIRT_DARK
     horizon = 166
 
-    # --- 하늘: 다단 황혼 그라데이션 ---
-    for y in range(horizon):
-        pygame.draw.line(screen, _sky_color(y / horizon), (0, y), (w, y))
+    # --- 하늘: 다단 황혼 그라데이션 (계단식 밴딩) ---
+    for y in range(0, horizon, _BG_BAND):
+        pygame.draw.rect(screen, _bg_quant(_sky_color((y + _BG_BAND * 0.5) / horizon)),
+                         (0, y, w, min(_BG_BAND, horizon - y)))
 
     # --- 별 (윗하늘, 태양에서 먼 쪽일수록 또렷하게) ---
     for sx, sy, sb in _STARS:
@@ -488,10 +648,10 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         pygame.draw.line(haze, col, (0, i * 2), (w, i * 2))
     screen.blit(haze, (0, horizon - 20))
 
-    # --- 잔디: 세로 그라데이션 + 결 ---
-    for i in range(h - horizon):
+    # --- 잔디: 세로 그라데이션(계단식 밴딩) + 결 ---
+    for i in range(0, h - horizon, _BG_BAND):
         c = _mix_color(_mix_color(gc, (255, 200, 150) if not game_state.nightmare else (100, 40, 40), 0.12), gd, min(1.0, i / 150.0))
-        pygame.draw.line(screen, c, (0, horizon + i), (w, horizon + i))
+        pygame.draw.rect(screen, _bg_quant(c), (0, horizon + i, w, min(_BG_BAND, h - horizon - i)))
     for y in range(horizon, h, 34):
         c = _mix_color(gc, gd, 0.30 if (y // 34) % 2 == 0 else 0.50)
         pygame.draw.line(screen, c, (0, y), (w, y + 16), 2)
@@ -535,52 +695,23 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
 
 
+_FOOD_SPRITE = {"apple": "food_apple", "potato": "food_potato", "rice": "food_rice"}
+
+
 def draw_crop_food(screen, cx, cy, crop_key, r=26):
-    """작물별 '먹는 것'을 (cx, cy) 중심에 그린다 — 엔딩·수확 연출에서 공용으로 사용.
-    당근은 기존 픽셀 스프라이트를, 나머지는 벡터 도형(사과·감자·쌀밥)을 그린다."""
-    if crop_key == "apple":
-        pygame.draw.circle(screen, (60, 16, 16), (cx, cy + 3), r)                 # 그림자
-        pygame.draw.circle(screen, (200, 48, 44), (cx, cy), r)                    # 몸통
-        # 아랫 음영 — 몸통 안쪽에 머무는 채워진 원(밖으로 삐져나오지 않게)
-        pygame.draw.circle(screen, (168, 32, 32), (cx + r // 6, cy + r // 6), int(r * 0.48))
-        pygame.draw.circle(screen, (240, 120, 105), (cx - r // 3, cy - r // 3), max(3, r // 3))  # 하이라이트
-        pygame.draw.rect(screen, (96, 62, 36), (cx - 2, cy - r - 4, 4, 8), border_radius=2)  # 꼭지
-        pygame.draw.ellipse(screen, (86, 168, 84), (cx + 1, cy - r - 2, 12, 7))   # 잎
+    """작물별 '먹는 것'을 (cx, cy) 중심에 픽셀 스프라이트로 그린다 (엔딩·수확 연출 공용).
+
+    당근·사과·감자·쌀밥 모두 도트 스프라이트로 통일했다(예전엔 사과·감자·쌀밥만 벡터라 이질감).
+    r에 맞춰 **정수 배율**로만 확대해 픽셀이 뭉개지지 않게 한다."""
+    spr = sprites.get(_FOOD_SPRITE.get(crop_key, "carrot"))
+    if not spr:
         return
-    if crop_key == "potato":
-        pygame.draw.ellipse(screen, (78, 52, 32), (cx - r, cy - int(r * 0.7) + 3, 2 * r, int(1.4 * r)))  # 그림자
-        pygame.draw.ellipse(screen, (150, 108, 66), (cx - r, cy - int(r * 0.7), 2 * r, int(1.4 * r)))    # 몸통
-        pygame.draw.ellipse(screen, (182, 142, 92), (cx - int(r * 0.8), cy - int(r * 0.55), int(1.5 * r), int(1.0 * r)))  # 윗빛
-        for ex, ey in [(-r // 2, -3), (r // 3, r // 4), (0, r // 2), (r // 2, -r // 4)]:
-            pygame.draw.circle(screen, (96, 62, 38), (cx + ex, cy + ey), 2)       # 싹눈
-        return
-    if crop_key == "rice":
-        # 밥공기 — 흰 사기그릇에 소복이 담긴 쌀밥 (찻잔처럼 보이지 않게 넓고 낮은 공기 모양)
-        tw, bw = int(r * 2.2), int(r * 1.2)
-        ty, by = cy + int(r * 0.12), cy + int(r * 0.98)
-        shadow = pygame.Surface((tw + 12, 14), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 70), shadow.get_rect())
-        screen.blit(shadow, (cx - (tw + 12) // 2, by - 7))
-        # 그릇 몸통 (아래로 좁아지는 사기 공기)
-        body = [(cx - tw // 2, ty), (cx + tw // 2, ty), (cx + bw // 2, by), (cx - bw // 2, by)]
-        pygame.draw.polygon(screen, (240, 242, 247), body)
-        pygame.draw.polygon(screen, (196, 204, 215), body, 2)
-        pygame.draw.line(screen, (96, 140, 192), (cx - tw // 2 + 5, ty + 10), (cx + tw // 2 - 5, ty + 10), 3)  # 청화 띠
-        # 소복한 쌀밥 봉우리
-        pygame.draw.ellipse(screen, (249, 249, 245), (cx - int(r * 1.0), ty - int(r * 0.72), int(r * 2.0), int(r * 1.05)))
-        pygame.draw.ellipse(screen, (255, 255, 255), (cx - int(r * 0.62), ty - int(r * 0.66), int(r * 0.8), int(r * 0.42)))  # 하이라이트
-        for gx, gy in [(-int(r * 0.5), -int(r * 0.26)), (0, -int(r * 0.34)), (int(r * 0.5), -int(r * 0.18)),
-                       (-int(r * 0.24), -int(r * 0.04)), (int(r * 0.28), -int(r * 0.1)),
-                       (-int(r * 0.42), -int(r * 0.02)), (int(r * 0.14), -int(r * 0.24)), (-int(r * 0.06), -int(r * 0.14))]:
-            px_, py_ = cx + gx, ty - int(r * 0.18) + gy
-            pygame.draw.ellipse(screen, (198, 196, 186), (px_ + 1, py_ + 1, 4, 3))   # 낟알 그늘 (또렷하게)
-            pygame.draw.ellipse(screen, (255, 255, 255), (px_, py_, 4, 3))            # 낟알
-        pygame.draw.ellipse(screen, (214, 220, 230), (cx - tw // 2, ty - 5, tw, 12), 2)  # 그릇 앞 테두리
-        return
-    # carrot (기본): 픽셀 당근 스프라이트
-    spr = sprites.get("carrot")
-    if spr:
-        screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
+    # 목표 높이 ≈ 2.7*r 에 가장 가까운 정수 배율(최소 1배)로 확대 → 픽셀 유지
+    target_h = max(1, int(r * 2.7))
+    factor = max(1, round(target_h / spr.get_height()))
+    if factor != 1:
+        spr = pygame.transform.scale(spr, (spr.get_width() * factor, spr.get_height() * factor))
+    screen.blit(spr, (cx - spr.get_width() // 2, cy - spr.get_height() // 2))
 
 
 def draw_crop_seed(screen, cx, cy, crop_key):
@@ -612,37 +743,18 @@ def draw_crop_seed(screen, cx, cy, crop_key):
 
 
 
+_WEATHER_ICON = {'맑음': 'icon_clear', '흐림': 'icon_cloudy', '비': 'icon_rain',
+                 '가뭄': 'icon_drought', '강풍': 'icon_wind'}
+
+
 def draw_weather_icon(screen, weather, x, y, size=20):
-    import math
-    cx, cy = x + size // 2, y + size // 2
-    r = size // 2
-    if weather == '맑음':
-        pygame.draw.circle(screen, (255, 210, 60), (cx, cy), r - 2)
-        pygame.draw.circle(screen, (240, 180, 30), (cx, cy), r - 2, 2)
-        for angle in range(0, 360, 45):
-            dx = int(math.cos(math.radians(angle)) * (r + 1))
-            dy = int(math.sin(math.radians(angle)) * (r + 1))
-            pygame.draw.line(screen, (255, 200, 50), (cx + dx, cy + dy),
-                             (cx + int(dx * 1.4), cy + int(dy * 1.4)), 2)
-    elif weather == '흐림':
-        pygame.draw.ellipse(screen, (180, 180, 190), (x, y + 4, size, size - 6))
-        pygame.draw.ellipse(screen, (160, 160, 170), (x + 4, y, size - 6, size - 4))
-        pygame.draw.ellipse(screen, (200, 200, 210), (x + 2, y + 2, size - 2, size - 6))
-    elif weather == '비':
-        pygame.draw.ellipse(screen, (140, 150, 165), (x, y, size, size // 2))
-        for i in range(3):
-            lx = x + 4 + i * (size // 3)
-            pygame.draw.line(screen, (100, 160, 230), (lx, y + size // 2 + 2),
-                             (lx - 2, y + size - 2), 2)
-    elif weather == '가뭄':
-        pygame.draw.circle(screen, (230, 140, 40), (cx, cy - 2), r - 3)
-        pygame.draw.circle(screen, (200, 100, 20), (cx, cy - 2), r - 3, 2)
-        for i in range(3):
-            wx = x + 2 + i * (size // 3)
-            pygame.draw.line(screen, (180, 80, 20), (wx, y + size - 5),
-                             (wx + 4, y + size - 2), 2)
-    elif weather == '강풍':
-        for i in range(3):
-            ly = y + 3 + i * 6
-            pygame.draw.arc(screen, (120, 150, 130),
-                            (x, ly, size - 4, 8), 0.3, 2.8, 2)
+    """날씨 아이콘을 (x, y) 좌상단, size 정사각 박스 안에 픽셀 스프라이트로 그린다.
+    (예전엔 벡터 pygame.draw였는데 도트로 통일해 작물·UI와 톤을 맞춤.)"""
+    spr = sprites.get(_WEATHER_ICON.get(weather))
+    if spr is None:
+        return
+    sw, sh = spr.get_size()
+    scale = size / max(sw, sh)
+    w, h = max(1, int(round(sw * scale))), max(1, int(round(sh * scale)))
+    scaled = pygame.transform.scale(spr, (w, h))
+    screen.blit(scaled, (x + (size - w) // 2, y + (size - h) // 2))

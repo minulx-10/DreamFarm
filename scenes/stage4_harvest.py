@@ -4,6 +4,7 @@ import random
 from core.game_state import game_state, append_josa
 from core.assets import *
 from core import audio
+from core import i18n
 from core.crops import current_crop
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
@@ -740,7 +741,7 @@ class Stage4Scene:
             cur_attempt = min(self.attempts + 1, self.max_attempts)
             att_panel = pygame.Rect(400 - 80, 396, 160, 30)
             draw_wood_panel(screen, att_panel)
-            att_text = att_font.render(f"수확 시도: {cur_attempt}/{self.max_attempts}", True, (255, 240, 210))
+            att_text = att_font.render(i18n.tf("수확 시도: {cur}/{max}", cur=cur_attempt, max=self.max_attempts), True, (255, 240, 210))
             screen.blit(att_text, (400 - att_text.get_width() // 2, 402))
 
         draw_top_bar(screen)
@@ -766,8 +767,9 @@ class Stage4Scene:
             screen.blit(t2, (400 - t2.get_width() // 2, 260))
             
             food_eul = append_josa(current_crop()["food"], "을/를")
+            food_en = i18n.t(current_crop()["food"])
             if self.is_apple:
-                t3 = font_b.render(f"{food_eul} 조금씩 당겨 따내세요.", True, (200, 180, 140))
+                t3 = font_b.render(i18n.tf("{food_eul} 조금씩 당겨 따내세요.", food_eul=food_eul, food=food_en), True, (200, 180, 140))
                 t4 = font_b.render("너무 빠르게 하면 꼭지가 상해 못 쓰게 됩니다.", True, (230, 110, 90))
             elif self.is_potato:
                 t3 = font_b.render("좌우로 조금씩 흔들며 뽑아 캐내세요.", True, (200, 180, 140))
@@ -786,14 +788,15 @@ class Stage4Scene:
             panel = pygame.Rect(300, 200, 200, 50)
             draw_wood_panel(screen, panel)
             screen.blit(t, (400 - t.get_width() // 2, 210))
-            draw_bottom_bar(screen, "결과", f"수확 점수: {game_state.score}")
+            draw_bottom_bar(screen, "결과", i18n.tf("수확 점수: {score}", score=game_state.score))
         else:
             food_eul = append_josa(current_crop()["food"], "을/를")
+            food_en = i18n.t(current_crop()["food"])
             if self.is_apple:
-                draw_bottom_bar(screen, "수확하기", f"마우스를 연타해 {food_eul} 당겨 따내세요. 너무 빠르면 상합니다.")
+                draw_bottom_bar(screen, "수확하기", i18n.tf("마우스를 연타해 {food_eul} 당겨 따내세요. 너무 빠르면 상합니다.", food_eul=food_eul, food=food_en))
             elif self.is_potato:
-                draw_bottom_bar(screen, "수확하기", f"감자를 잡고 좌우로 번갈아 흔들어 캐내세요. 너무 거칠면 상합니다.")
+                draw_bottom_bar(screen, "수확하기", "감자를 잡고 좌우로 번갈아 흔들어 캐내세요. 너무 거칠면 상합니다.")
             elif self.is_rice:
-                draw_bottom_bar(screen, "수확하기", f"좌우로 흔들어 이삭을 털고, 비벼서 껍질을 벗기세요.")
+                draw_bottom_bar(screen, "수확하기", "좌우로 흔들어 이삭을 털고, 비벼서 껍질을 벗기세요.")
             else:
-                draw_bottom_bar(screen, "수확하기", f"{food_eul} 잡고 위로 끌어올리길 여러 번 반복해 뽑으세요. 한 번엔 안 뽑히고, 홱 채면 상합니다.")
+                draw_bottom_bar(screen, "수확하기", i18n.tf("{food_eul} 잡고 위로 끌어올리길 여러 번 반복해 뽑으세요. 한 번엔 안 뽑히고, 홱 채면 상합니다.", food_eul=food_eul, food=food_en))

@@ -1,9 +1,12 @@
-name: Build & Release (Windows EXE)
+name: Build & Release (Windows EXE & Android APK)
 
-# 태그를 push하면 exe를 빌드해 GitHub 릴리스로 올린다.
-#  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시, 반 친구들이 받는 것)
+# 태그를 push하면 Windows EXE와 Android APK를 빌드해 GitHub 릴리스로 올린다.
+#  - 안정 태그   (예: v1.0.5)        → 정식 릴리스 ('Latest'로 표시)
 #  - 개발 태그   (예: v1.0.5-dev.1)  → 프리릴리스 (테스터용, 'Latest' 아님)
 # Actions 탭에서 수동 실행(workflow_dispatch)도 가능.
+#
+# 소리는 두 잡 모두 tools/bake_audio.py 로 .ogg 를 미리 구워 싣는다. 그래서 안드로이드
+# APK 에는 numpy 가 필요 없다(numpy 소스 컴파일이 빌드를 느리고 취약하게 만들던 주범).
 on:
   push:
     tags:
@@ -28,11 +31,12 @@ jobs:
       - name: 의존성 설치
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install -r requirements.txt soundfile pyinstaller
 
-      # exe 파일명은 ASCII로 (GitHub 릴리스가 한글 자산명을 default.exe로 바꿔버림).
-      # 창 제목은 코드에서 "몽중농원"으로 표시된다.
+      - name: 소리 굽기 (numpy → .ogg)
+        run: python tools/bake_audio.py
+
+      # exe 파일명은 ASCII로.
       - name: EXE 빌드 (PyInstaller onefile)
         run: >
           pyinstaller --noconfirm --clean --onefile --windowed
@@ -41,6 +45,8 @@ jobs:
           --add-data "core/dad.png;core"
           --add-data "core/field_bed.jpg;core"
           --add-data "core/logo.png;core"
+          --add-data "core/sound;core/sound"
+          --add-data "core/locales;core/locales"
           main.py
 
       - name: 빌드 산출물 업로드 (아티팩트)
@@ -49,7 +55,173 @@ jobs:
           name: DreamFarm-windows
           path: dist/DreamFarm.exe
 
-      # 태그 이름에 -dev / -beta / -rc 가 들어가면 프리릴리스로 취급한다.
+  build-android:
+    runs-on: ubuntu-latest
+    # 안드로이드 빌드가 실패해도 Windows 릴리스는 막지 않는다(아직 안정화 중).
+    continue-on-error: true
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Java 17 설정
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Buildozer NDK/SDK 및 캐시 폴더 캐싱. numpy 를 뺀 뒤로는 캐시가 잘 재사용된다.
+      # 키는 buildozer.spec + 로컬 레시피 해시에만 의존 → 이 둘이 안 바뀌면 캐시 히트.
+      - name: Cache Buildozer directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            .buildozer
+            ~/.buildozer
+            ~/.gradle
+          # 키는 buildozer.spec 만 해시한다(레시피 include 경로 등 소규모 수정 때 NDK/CPython/SDL2
+          # 툴체인 캐시를 버리지 않도록). 레시피가 바뀌면 pygame-ce 만 다시 컴파일된다.
+          key: buildozer-v4-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-v4-${{ runner.os }}-
+
+      - name: 시스템 빌드 의존성 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip openjdk-17-jdk \
+            autoconf automake libtool libtool-bin libltdl-dev m4 autotools-dev autoconf-archive \
+            pkg-config zlib1g-dev libncurses-dev libsqlite3-dev libgdbm-dev libssl-dev libffi-dev \
+            libbz2-dev libreadline-dev liblzma-dev gettext cmake
+
+      - name: 파이썬 빌드 도구 설치 (Cython<3, buildozer 고정)
+        run: |
+          pip install --upgrade pip
+          pip install "Cython==0.29.36" "buildozer==1.5.0" numpy soundfile pygame-ce
+
+      - name: 소리 굽기 (numpy → .ogg)
+        run: python tools/bake_audio.py
+
+      - name: APK 빌드 (Buildozer)
+        env:
+          # setuptools 가 벤더링한 현대화 distutils(ccompiler.spawn 제거됨) 대신, 파이썬 3.11 의
+          # stdlib distutils 를 쓰게 강제한다 → pygame-ce 2.4.0 의 구식 빌드가 컴파일된다.
+          SETUPTOOLS_USE_DISTUTILS: stdlib
+        run: |
+          # 러너에 미리 깔린 Android SDK/NDK 환경변수를 지워 Buildozer 가 워크스페이스에서
+          # 자체 관리하도록 격리한다(과거 NDK 충돌 회피).
+          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
+          yes | buildozer android debug
+
+      - name: APK 파일 경로 확인
+        id: apk_find
+        run: echo "apk_path=$(find bin/ -name '*.apk' | head -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: 빌드 산출물 업로드 (아티팩트)
+        if: steps.apk_find.outputs.apk_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DreamFarm-android
+          path: ${{ steps.apk_find.outputs.apk_path }}
+
+      # ── 플레이스토어용 서명된 AAB ──────────────────────────────────────────
+      # keystore 시크릿이 등록돼 있을 때만 동작한다. 없으면 위 디버그 APK만 나온다.
+      # 등록 방법은 저장소의 RELEASING.md 참고.
+      - name: 서명 시크릿 존재 확인
+        id: signcheck
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; else echo "signed=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 릴리스 서명 빌드 (AAB, 플레이스토어용)
+        if: steps.signcheck.outputs.signed == 'true'
+        env:
+          SETUPTOOLS_USE_DISTUTILS: stdlib
+          P4A_RELEASE_KEYSTORE: ${{ github.workspace }}/release.keystore
+          P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KS_B64" | base64 -d > "$P4A_RELEASE_KEYSTORE"
+          # release 산출물은 AAB로(플레이스토어 요구). 커밋된 spec은 안 건드려 캐시를 보존하려고
+          # 여기서만 덧붙인다.
+          echo "android.release_artifact = aab" >> buildozer.spec
+          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
+          yes | buildozer android release
+          rm -f "$P4A_RELEASE_KEYSTORE"
+
+      - name: AAB 파일 경로 확인
+        id: aab_find
+        if: steps.signcheck.outputs.signed == 'true'
+        run: echo "aab_path=$(find bin/ -name '*.aab' | head -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: 서명 AAB 업로드 (아티팩트)
+        if: steps.signcheck.outputs.signed == 'true' && steps.aab_find.outputs.aab_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DreamFarm-android-aab
+          path: ${{ steps.aab_find.outputs.aab_path }}
+
+  release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 빌드 다운로드 (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-windows
+          path: dist
+
+      # 안드로이드 아티팩트는 없을 수도 있으므로(빌드 실패 시) 실패해도 넘어간다.
+      - name: 빌드 다운로드 (Android APK)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-android
+          path: dist
+
+      # 서명된 AAB는 keystore 시크릿이 있을 때만 존재한다.
+      - name: 빌드 다운로드 (Android AAB)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: DreamFarm-android-aab
+          path: dist
+
+      - name: 릴리스 자산 목록 구성
+        id: files
+        shell: bash
+        run: |
+          # ncipollo/release-action 의 artifacts 는 콤마 구분 목록이다.
+          ASSETS="dist/DreamFarm.exe"
+          APK_FILE=$(find dist -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then ASSETS="$ASSETS,$APK_FILE"; fi
+          AAB_FILE=$(find dist -name "*.aab" | head -n 1)
+          if [ -n "$AAB_FILE" ]; then ASSETS="$ASSETS,$AAB_FILE"; fi
+          echo "assets=$ASSETS" >> "$GITHUB_OUTPUT"
+
+      - name: CHANGELOG에서 릴리스 노트 추출
+        id: notes
+        shell: bash
+        run: |
+          python -c "
+          import re
+          content = open('CHANGELOG.md', encoding='utf-8').read()
+          match = re.search(r'## v[^\n]+.*?(?=\n## v|$)', content, re.S)
+          if match:
+              with open('release_notes.md', 'w', encoding='utf-8') as f:
+                  f.write(match.group(0))
+          "
+
       - name: 릴리스 채널 판별
         id: channel
         shell: bash
@@ -62,11 +234,16 @@ jobs:
             echo "make_latest=true"  >> "$GITHUB_OUTPUT"
           fi
 
-      - name: GitHub 릴리스에 EXE 첨부
+      - name: GitHub 릴리스 생성/갱신 및 자산 첨부
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          files: dist/DreamFarm.exe
-          generate_release_notes: true
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          # ncipollo 입력 이름은 bodyFile/artifacts 다(body_path/files 아님 — 예전 워크플로우가
+          # softprops→ncipollo 로 갈아타며 옛 입력명을 그대로 둬 자산이 조용히 안 붙던 버그).
+          bodyFile: release_notes.md
+          artifacts: ${{ steps.files.outputs.assets }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
-          make_latest: ${{ steps.channel.outputs.make_latest }}
+          makeLatest: ${{ steps.channel.outputs.make_latest }}
+          allowUpdates: true

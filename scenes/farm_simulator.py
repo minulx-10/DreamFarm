@@ -10,6 +10,7 @@ from core.game_state import (
 )
 from core import audio
 from core import save_system
+from core import i18n
 from core.crops import farm_config, swap_crop_word, current_crop
 
 # 행동별 효과음 매핑
@@ -395,9 +396,12 @@ class FarmSimulator:
             return "지금은 배수로를 손볼 때가 아니다.", True
 
         if action == "흙 북돋기":
+            # 체력이 낮을수록 회복을 크게 준다 — 안 그러면 잡초·해충 압박(같은 턴에 적용)에 상쇄돼
+            # '흙 북돋기를 해도 살아나지 않는' 죽음의 소용돌이가 생긴다. 잘 해내면 압박을 넘어 회복.
+            base = 15 if self.health < 40 else 8
             if quality is not None:
                 frac = quality.get("cleared_frac", 1.0)
-                self.health += max(2, int(8 * frac))
+                self.health += max(5, int(base * frac))
                 self.stress = max(0, self.stress - max(2, int(10 * frac)))
                 self.drainage += int(4 * frac)
                 if frac >= 0.85:
@@ -409,7 +413,7 @@ class FarmSimulator:
                 return ("거름이 부족해 뿌리가 아직 허전하다." if self.is_tree
                         else "북돋다 말아 뿌리가 아직 허전하다."), False
             if self.health < 65 or self.stress > 24:
-                self.health += 8
+                self.health += base
                 self.stress = max(0, self.stress - 10)
                 self.drainage += 4
                 return ("거름을 주니 한결 생기가 돈다." if self.is_tree
@@ -491,6 +495,8 @@ class FarmSimulator:
 
     def _write_journal(self):
         season = get_season(self.growth, self.growth_goal)
+        # 일지는 한국어 원문으로 저장하고 '표시 시점'에 현재 언어로 번역한다(엔딩에서 언어를 바꿔도
+        # 즉시 반영되도록 — ending._localize_journal_line 참고).
         lines = [f"[{self.day}일째 · {season} · {game_state.weather}]"]
         if self.moisture > 75:
             lines.append("오늘 물을 너무 많이 줬다.")
@@ -563,9 +569,9 @@ class FarmSimulator:
             "가뭄": "가뭄엔 수분이 뚝 떨어진다.",
             "강풍": "강풍은 해충을 날리지만 밭을 들쑤신다.",
         }
-        tip = weather_tips.get(game_state.weather, "")
-        status_str = ", ".join(warnings[:3]) if warnings else "밭이 안정적이다"
-        return f"자세히 보니 — {status_str}. {tip}"
+        tip = i18n.t(weather_tips.get(game_state.weather, ""))
+        status_str = ", ".join(i18n.t(w) for w in warnings[:3]) if warnings else i18n.t("밭이 안정적이다")
+        return i18n.tf("자세히 보니 — {status}. {tip}", status=status_str, tip=tip)
 
     def build_notice(self):
         if self.is_harvest_ready():
@@ -632,8 +638,11 @@ class FarmSimulator:
         key, title, text = memory
         self.memories_seen.add(key)
         self.memory_cooldown = 4 if u < 25 else 6 if u < 50 else 8
-        game_state.memory_title = self._cropify(title)
-        game_state.memory_text = self._cropify(text)
+        pname = game_state.player_name
+        game_state.memory_title = self._cropify(title)   # 제목: 작물 치환(EN은 렌더에서 번역)
+        game_state.memory_text = i18n.tnar(text, crop_key=game_state.crop, name=pname,
+                                           name_eun=append_josa(pname, "은/는"),
+                                           name_ga=append_josa(pname, "이/가"))
         game_state.memory_next = "farm"
         game_state.current_scene = "memory"
 
@@ -648,12 +657,12 @@ class FarmSimulator:
                 (
                     "first",
                     "희미한 식탁",
-                    f"식탁 위에 당근 반찬이 놓여 있다.\n{name_eun} 젓가락으로 그릇을 밀어냈고, 아버지는 잠깐 말을 멈췄다.\n그때는 그 침묵이 왜 길게 느껴졌는지 몰랐다.",
+                    "식탁 위에 당근 반찬이 놓여 있다.\n{name_eun} 젓가락으로 그릇을 밀어냈고, 아버지는 잠깐 말을 멈췄다.\n그때는 그 침묵이 왜 길게 느껴졌는지 몰랐다.",
                 ),
                 (
                     "low_market",
                     "장바구니 소리",
-                    f"비닐봉지가 문고리에 부딪히는 소리가 난다.\n아버지는 흙 묻은 당근을 꺼내며 '오늘 건 달다'고 말했다.\n{name_ga}는 대답 대신 물컵만 만지작거렸다.",
+                    "비닐봉지가 문고리에 부딪히는 소리가 난다.\n아버지는 흙 묻은 당근을 꺼내며 '오늘 건 달다'고 말했다.\n{name_ga}는 대답 대신 물컵만 만지작거렸다.",
                 ),
                 (
                     "second",
@@ -666,7 +675,7 @@ class FarmSimulator:
                 (
                     "first",
                     "다시 보이는 식탁",
-                    f"당근 반찬을 밀어내던 손이 떠오른다.\n{name_eun} 그때 아버지의 표정보다 자기 입맛만 먼저 생각했다는 걸 알아차린다.",
+                    "당근 반찬을 밀어내던 손이 떠오른다.\n{name_eun} 그때 아버지의 표정보다 자기 입맛만 먼저 생각했다는 걸 알아차린다.",
                 ),
                 (
                     "mid_field",
@@ -684,7 +693,7 @@ class FarmSimulator:
                 (
                     "first",
                     "따뜻한 식탁",
-                    f"식탁 위의 당근 반찬이 떠오른다.\n이번에는 밀어내고 싶다는 생각보다, 한 번쯤 제대로 맛보고 싶다는 마음이 먼저 든다.",
+                    "식탁 위의 당근 반찬이 떠오른다.\n이번에는 밀어내고 싶다는 생각보다, 한 번쯤 제대로 맛보고 싶다는 마음이 먼저 든다.",
                 ),
                 (
                     "high_field",
@@ -694,7 +703,7 @@ class FarmSimulator:
                 (
                     "second",
                     "짧은 고개 끄덕임",
-                    f"{name_ga} 말없이 고개를 끄덕인다.\n무언가를 완전히 알게 된 건 아니지만, 이제 외면하고 싶지는 않다.",
+                    "{name_ga} 말없이 고개를 끄덕인다.\n무언가를 완전히 알게 된 건 아니지만, 이제 외면하고 싶지는 않다.",
                 ),
             ]
 

@@ -3,6 +3,7 @@ from core.game_state import append_josa, game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WHITE, get_font, sprites
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text
 from core import audio
+from core import i18n
 from core.ui_utils import Typewriter
 
 
@@ -26,53 +27,69 @@ class IntroScene:
         # 악)몽중농원 — 진엔딩 해금 모드의 전용 도입부
         # NIGHTMARE_INTRO 전체를 한 페이지에 밀어넣으면 패널을 넘쳐 안내문구와 겹친다.
         # 문단 단위로 나눠 각 페이지가 패널 안에 들어오도록 한다.
+        ck = game_state.crop
         if game_state.nightmare:
             return [
-                "[악)몽중농원]\n남긴 것들의 밭\n\n"
-                "여느 밤과 같은 꿈인 줄 알았다.\n\n"
-                "그런데 하늘이 검붉다. 흙에서 탄내가 난다.\n"
-                "밭 한가운데, 낯익은 접시들이 쌓여 있다 —\n"
-                "여태 내가 남긴 음식들이다.",
-                (
+                i18n.tnar(
+                    "[악)몽중농원]\n남긴 것들의 밭\n\n"
+                    "여느 밤과 같은 꿈인 줄 알았다.\n\n"
+                    "그런데 하늘이 검붉다. 흙에서 탄내가 난다.\n"
+                    "밭 한가운데, 낯익은 접시들이 쌓여 있다 —\n"
+                    "여태 내가 남긴 음식들이다."),
+                i18n.tnar(
                     "어디선가 낮은 목소리가 울린다.\n"
                     "'남긴 것은 여기서 다 먹어야 한다.\n"
                     "먹으려면, 다시 길러야지.'\n\n"
                     "이 검붉은 밭에서 작물을 끝까지 길러 수확해야\n"
-                    "꿈에서 깨어날 수 있다."
-                ),
-                (
-                    f"{name_eun} 검붉은 흙 앞에 선다.\n"
-                    f"이 지옥의 밭에서 {crop_name}를 끝까지 길러 거두어야\n"
+                    "꿈에서 깨어날 수 있다."),
+                i18n.tnar(
+                    "{name_eun} 검붉은 흙 앞에 선다.\n"
+                    "이 지옥의 밭에서 {crop_word}를 끝까지 길러 거두어야\n"
                     "비로소 꿈에서 놓여날 수 있다.\n\n"
-                    "'남기지 마라. 이번엔, 끝까지.'"
-                ),
+                    "'남기지 마라. 이번엔, 끝까지.'",
+                    crop_key=ck, name=name, name_eun=name_eun, crop_word=crop_name),
             ]
 
-        # 일반 도입부 — 고른 작물에 맞춰 '당근'을 갈아 끼운다
-        page1 = swap_crop_word(
+        # 일반 도입부 — 고른 작물에 맞춰 '당근'을 갈아 끼운다 (KO: swap_crop_word / EN: {crop} 치환)
+        page1 = i18n.tnar(
             "[몽중농원]\n당근 한 뿌리의 시간\n\n"
-            f"{name_eun} 식탁 위 당근 반찬을 슬쩍 밀어냈다.\n"
+            "{name_eun} 식탁 위 당근 반찬을 슬쩍 밀어냈다.\n"
             "아버지는 아무 말 없이 그릇을 바라보다가 작게 한숨을 쉬었다.\n"
             "'언젠가는 이 한 조각에도 시간이 들어 있다는 걸 알게 되겠지.'",
-            crop_name,
-        )
-        page2 = swap_crop_word(
-            f"그날 밤, {name_eun} 낯선 흙냄새 속에서 눈을 뜬다.\n"
+            crop_key=ck, name=name, name_eun=name_eun)
+        page2 = i18n.tnar(
+            "그날 밤, {name_eun} 낯선 흙냄새 속에서 눈을 뜬다.\n"
             "발밑에는 끝이 보이지 않는 당근밭이 펼쳐져 있었다.\n\n"
             "어디선가 낮은 목소리가 들린다.\n"
             "'네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.'",
-            crop_name,
-        )
+            crop_key=ck, name=name, name_eun=name_eun)
         return [page1, page2]
 
-    def prepare_page(self, index):
+    def _wrap_page(self, index, font):
         lines = []
         for paragraph in self.pages[index].split("\n"):
             if not paragraph:
                 lines.append("")
             else:
-                lines.extend(wrap_text(paragraph, self.font, 640))
-        return "\n".join(lines)
+                lines.extend(wrap_text(paragraph, font, 640))
+        return lines
+
+    def prepare_page(self, index):
+        # 언어마다 줄바꿈 수가 달라(영어가 더 길다) 패널(높이 272)을 세로로 넘칠 수 있다.
+        # → 이 페이지가 패널 안에 들어오는 '가장 큰 폰트'를 골라 self.page_font 로 쓴다.
+        line_gap = 5
+        max_h = 244
+        self.page_font = get_font(22)
+        text = ""
+        for size in (22, 20, 18, 16):
+            f = get_font(size)
+            lines = self._wrap_page(index, f)
+            block_h = len(lines) * (f.get_height() + line_gap) - line_gap
+            self.page_font = f
+            text = "\n".join(lines)
+            if block_h <= max_h:
+                break
+        return text
 
     def advance(self):
         if not self.typewriter.finished:
@@ -106,7 +123,7 @@ class IntroScene:
         game_state.current_scene = "transition"
 
     def update(self, dt):
-        self.typewriter.update(dt)
+        self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
@@ -122,16 +139,17 @@ class IntroScene:
 
         lines = self.typewriter.printed_text.split("\n")
         # 박스 안에서 상하 가운데 정렬 — 타이핑 중 글이 튀지 않도록 '완성된 페이지' 줄 수 기준으로 시작 y 계산
+        # 폰트는 prepare_page 가 이 페이지에 맞춰 고른 self.page_font 를 쓴다(세로 넘침 방지).
         line_gap = 5
         full_lines = self.text_to_print.split("\n")
-        block_h = len(full_lines) * (self.font.get_height() + line_gap) - line_gap
+        block_h = len(full_lines) * (self.page_font.get_height() + line_gap) - line_gap
         start_y = box_rect.centery - block_h // 2
-        draw_centered_lines(screen, lines, self.font, TEXT_DARK, 400, start_y, line_gap=line_gap)
+        draw_centered_lines(screen, lines, self.page_font, TEXT_DARK, 400, start_y, line_gap=line_gap)
 
         page = self.font_small.render(f"{self.page_index + 1}/{len(self.pages)}", True, TEXT_MUTED)
         screen.blit(page, (690, 538))
 
         if self.typewriter.finished:
             prompt_text = "다음으로" if self.page_index < len(self.pages) - 1 else "시작하기"
-            prompt = self.font_small.render(f"{prompt_text}: 클릭 또는 스페이스바", True, TEXT_MUTED)
+            prompt = self.font_small.render(i18n.tf("{prompt}: 클릭 또는 스페이스바", prompt=i18n.t(prompt_text)), True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 560))

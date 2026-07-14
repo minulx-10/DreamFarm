@@ -4,6 +4,7 @@ from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE, GOLD, PANEL_WARM
 from core.ui import draw_light_panel, draw_story_backdrop, draw_button, wrap_text, mix_color, draw_panel
 from core import audio
 from core import save_system
+from core import i18n
 from core.crops import CROPS
 
 class CropSelectScene:
@@ -104,7 +105,7 @@ class CropSelectScene:
             cnt = clears.get(key, 0)
             badge_font = get_font(12)
             if cnt > 0:
-                btxt = badge_font.render(f"클리어 {cnt}회", True, (74, 52, 34))
+                btxt = badge_font.render(i18n.tf("클리어 {cnt}회", cnt=cnt), True, (74, 52, 34))
                 bg = (232, 205, 130)
                 bw, bh = btxt.get_width() + 16, btxt.get_height() + 6
             else:
@@ -144,7 +145,7 @@ class CropSelectScene:
                 y += 20
                 
             # 작물 유형 정보 표기 (하단 배치)
-            fam_surf = get_font(12).render(f"분류: {info['family']}", True, TEXT_MUTED)
+            fam_surf = get_font(12).render(i18n.tf("분류: {family}", family=i18n.t(info['family'])), True, TEXT_MUTED)
             screen.blit(fam_surf, (rect.centerx - fam_surf.get_width() // 2, rect.bottom - 22))
 
         # 4. [악)몽중농원] 모드 체크박스 (진엔딩 해금 또는 달 이스터에그로 켜졌을 때 표시)

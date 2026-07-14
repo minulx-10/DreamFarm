@@ -5,6 +5,7 @@ from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font, WHITE, GOLD
 from core.ui import draw_button, draw_light_panel, draw_story_backdrop, wrap_text, mix_color, draw_panel
 from core import audio
+from core import i18n
 from core.ui_utils import Typewriter
 
 
@@ -190,7 +191,7 @@ class StoryChoiceScene:
         else:
             audio.play("break")
             fail_text = self.qte_task.get("fail_text", "작업이 원활히 끝나지 못했습니다.")
-            self.result_text = f"실패: {fail_text}"
+            self.result_text = i18n.tf("실패: {text}", text=i18n.t(fail_text))
             
             # 실패 시 이해도 획득 절반 차감
             und = effects.get("understanding", 6) // 2
@@ -296,7 +297,7 @@ class StoryChoiceScene:
         if self.typewriter.finished:
             return
  
-        self.typewriter.update(dt)
+        self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def _draw_qte(self, screen):
         # 상단 프롬프트
@@ -304,7 +305,7 @@ class StoryChoiceScene:
         screen.blit(prompt_surf, (400 - prompt_surf.get_width() // 2, 138))
 
         remain = sum(1 for t in self.qte_targets if not t["done"])
-        remain_surf = self.font_small.render(f"남은 곳: {remain}개", True, TEXT_DARK)
+        remain_surf = self.font_small.render(i18n.tf("남은 곳: {n}개", n=remain), True, TEXT_DARK)
         screen.blit(remain_surf, (400 - remain_surf.get_width() // 2, 170))
 
         # 타이머 바
@@ -314,7 +315,7 @@ class StoryChoiceScene:
         bar_col = (220, 60, 60) if self.qte_timer < total * 0.35 else (90, 160, 110)
         pygame.draw.rect(screen, bar_col, (150, 470, timer_w, 16), border_radius=4)
         t_font = get_font(13)
-        time_text = t_font.render(f"제한시간: {self.qte_timer:.1f}초", True, WHITE)
+        time_text = t_font.render(i18n.tf("제한시간: {t}초", t=f"{self.qte_timer:.1f}"), True, WHITE)
         screen.blit(time_text, (400 - time_text.get_width() // 2, 472))
 
         pulse = abs(math.sin(pygame.time.get_ticks() * 0.008))

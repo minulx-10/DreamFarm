@@ -4,6 +4,7 @@ from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
 from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
 from core import audio
+from core import i18n
 from core.ui_utils import Typewriter
 
 
@@ -65,18 +66,20 @@ class FatherDayScene:
                     self.transition_timer = 0
 
     def update(self, dt):
-        self.glow_timer += dt
+        fast_ff = getattr(game_state, "fast_forward", False)
+        effective_dt = dt * 6.0 if fast_ff else dt
+        self.glow_timer += effective_dt
 
         if self.phase == "fade_in":
-            self.fade_alpha = max(0, self.fade_alpha - 150 * dt)
+            self.fade_alpha = max(0, self.fade_alpha - 150 * effective_dt)
             if self.fade_alpha <= 0:
                 self.phase = "narration"
 
         elif self.phase == "narration":
-            self.typewriter.update(dt)
+            self.typewriter.update(dt, fast_ff)
 
         elif self.phase == "fade_to_farm":
-            self.transition_timer += dt
+            self.transition_timer += effective_dt
             self.fade_alpha = min(255, self.transition_timer * 200)
             if self.fade_alpha >= 255:
                 # #10: Activate dad mode in farm
@@ -124,7 +127,7 @@ class FatherDayScene:
             # Prompt
             if self.typewriter.finished:
                 label = "다음으로" if self.page_index < len(self.pages) - 1 else "아버지의 밭으로"
-                prompt = self.font_small.render(f"{label} ▸ 클릭하거나 스페이스바", True, (172, 148, 106))
+                prompt = self.font_small.render(i18n.tf("{label} ▸ 클릭하거나 스페이스바", label=i18n.t(label)), True, (172, 148, 106))
                 screen.blit(prompt, (400 - prompt.get_width() // 2, 520))
 
         # Fade overlay
