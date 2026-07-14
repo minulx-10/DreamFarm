@@ -72,6 +72,9 @@ class StoryChoiceScene:
         return new_effects
 
     def _prepare(self, text):
+        # 카탈로그 키가 '전체 본문'(줄바꿈 포함)이라 줄 단위로 넘기면 번역이 안 맞는다.
+        # → 먼저 통째로 번역한 뒤 줄바꿈으로 나눠 폭에 맞춰 다시 감싼다.
+        text = i18n.t(text)
         lines = []
         for p in text.split("\n"):
             if not p:
@@ -648,7 +651,8 @@ class StoryChoiceScene:
             r_surf = self.font.render(self.result_text, True, (140, 90, 20))
             screen.blit(r_surf, (400 - r_surf.get_width() // 2, 410))
         elif self.typewriter.finished:
-            self._draw_btn(screen, self.btn_a, "A. " + self.choice_a[0], self.hover_a)
-            self._draw_btn(screen, self.btn_b, "B. " + self.choice_b[0], self.hover_b)
+            # 라벨을 개별 번역한 뒤 접두어를 붙인다("A. "+원문 통짜론 카탈로그와 안 맞음)
+            self._draw_btn(screen, self.btn_a, "A. " + i18n.t(self.choice_a[0]), self.hover_a)
+            self._draw_btn(screen, self.btn_b, "B. " + i18n.t(self.choice_b[0]), self.hover_b)
             prompt = self.font_small.render("선택하세요", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 480))
