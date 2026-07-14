@@ -19,6 +19,10 @@
 Pygame으로 만든 **감성 내러티브 픽셀 농장 게임**입니다. **한국어·영어**를 지원합니다.
 
 <p align="center">
+  🌐 <b><a href="https://minulx-10.github.io/DreamFarm/">소개 사이트 · Website</a></b>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/title_en.png" width="410" alt="title">
   &nbsp;
   <img src="docs/screenshots/farm_en.png" width="410" alt="farm">

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>몽중농원 · DreamFarm</title>
+<meta name="description" content="밀어낸 당근 한 조각에는 누군가의 새벽이 들어 있었다 — Pygame으로 만든 감성 내러티브 픽셀 농장 게임. 한국어·English.">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta property="og:title" content="몽중농원 · DreamFarm">
+<meta property="og:description" content="한 작물을 길러내며 아버지의 노동과 사랑을 이해해 가는 감성 내러티브 픽셀 농장 게임.">
+<meta property="og:image" content="logo.png">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css">
+<style>
+  :root {
+    --night:   #16132b;
+    --night2:  #1f1a3a;
+    --panel:   #241f45;
+    --panel2:  #2c2652;
+    --dusk:    #4a3160;
+    --coral:   #ff6b45;
+    --coral-d: #e8590c;
+    --gold:    #f2c94c;
+    --moon:    #ffe9b0;
+    --green:   #5bb56a;
+    --cream:   #f7f0e0;
+    --muted:   #b8afd0;
+    --line:    rgba(255,255,255,.09);
+    --pixel: 'Galmuri11', ui-monospace, monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    color: var(--cream);
+    background: var(--night);
+    line-height: 1.7;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  .pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
+  a { color: var(--gold); text-decoration: none; }
+
+  /* dreamy layered background */
+  .bg {
+    position: fixed; inset: 0; z-index: -2;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #3a2450 0%, transparent 60%),
+      radial-gradient(900px 500px at 85% 15%, #4a1f3a 0%, transparent 55%),
+      linear-gradient(180deg, #1a1533 0%, #16132b 40%, #120f24 100%);
+  }
+  .stars {
+    position: fixed; inset: 0; z-index: -1; opacity: .5;
+    background-image:
+      radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent),
+      radial-gradient(1.5px 1.5px at 70% 20%, #ffe9b0 50%, transparent),
+      radial-gradient(1px 1px at 40% 70%, #fff 50%, transparent),
+      radial-gradient(1px 1px at 85% 60%, #fff 50%, transparent),
+      radial-gradient(1.5px 1.5px at 60% 45%, #cfe0ff 50%, transparent),
+      radial-gradient(1px 1px at 15% 80%, #fff 50%, transparent),
+      radial-gradient(1px 1px at 92% 85%, #ffe9b0 50%, transparent);
+  }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+  /* top bar */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(10px);
+    background: rgba(18,15,36,.72);
+    border-bottom: 1px solid var(--line);
+  }
+  .navrow { display: flex; align-items: center; justify-content: space-between; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--pixel); font-size: 18px; color: var(--cream); }
+  .brand img { width: 30px; height: 30px; }
+  .nav-links { display: flex; gap: 22px; align-items: center; }
+  .nav-links a { color: var(--muted); font-size: 14px; transition: color .2s; }
+  .nav-links a:hover { color: var(--cream); }
+  .lang-toggle {
+    font-family: var(--pixel); font-size: 13px;
+    background: var(--panel); color: var(--cream);
+    border: 1px solid var(--dusk); border-radius: 999px;
+    padding: 6px 14px; cursor: pointer; transition: all .2s;
+  }
+  .lang-toggle:hover { border-color: var(--gold); color: var(--gold); }
+  @media (max-width: 680px) { .nav-links .navlink { display: none; } }
+
+  /* hero */
+  .hero { text-align: center; padding: 64px 0 40px; }
+  .hero-logo {
+    width: 260px; height: 260px; margin: 0 auto 8px;
+    filter: drop-shadow(0 12px 40px rgba(255,107,69,.28));
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-12px);} }
+  .hero h1 { font-family: var(--pixel); font-size: clamp(34px, 7vw, 60px); letter-spacing: 1px; line-height: 1.15; }
+  .hero .en-title { color: var(--muted); font-family: var(--pixel); font-size: clamp(16px,3vw,22px); margin-top: 4px; letter-spacing: 2px; }
+  .tagline {
+    max-width: 620px; margin: 22px auto 0; font-size: clamp(15px,2.4vw,19px);
+    color: var(--moon); font-style: italic;
+  }
+  .tagline .sub { display:block; color: var(--muted); font-size: .82em; margin-top: 6px; font-style: normal; }
+
+  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+  .btn {
+    font-family: var(--pixel); font-size: 15px; letter-spacing: .5px;
+    padding: 13px 24px; border-radius: 12px; cursor: pointer; border: none;
+    display: inline-flex; align-items: center; gap: 9px; transition: transform .15s, box-shadow .2s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary { background: linear-gradient(135deg, var(--coral), var(--coral-d)); color: #fff; box-shadow: 0 8px 24px rgba(232,89,12,.35); }
+  .btn-primary:hover { box-shadow: 0 12px 30px rgba(232,89,12,.5); }
+  .btn-ghost { background: var(--panel); color: var(--cream); border: 1px solid var(--dusk); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-steam { background: #1b2838; color: #c7d5e0; border: 1px solid #2a475e; }
+  .badges { margin-top: 26px; display:flex; gap: 8px; justify-content:center; flex-wrap:wrap; }
+  .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: rgba(255,255,255,.03); }
+
+  /* sections */
+  section { padding: 56px 0; }
+  .sec-title { font-family: var(--pixel); font-size: clamp(22px,4vw,30px); text-align: center; margin-bottom: 8px; }
+  .sec-sub { text-align: center; color: var(--muted); margin-bottom: 38px; font-size: 15px; }
+  .divider { height:1px; background: linear-gradient(90deg, transparent, var(--line), transparent); }
+
+  .synopsis {
+    max-width: 680px; margin: 0 auto; text-align: center; font-size: 17px; color: #e6ddd0;
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 18px; padding: 32px 30px;
+  }
+  .synopsis .quote { color: var(--gold); font-family: var(--pixel); font-size: 16px; display:block; margin-top: 16px; }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: 18px; }
+  .feature {
+    background: linear-gradient(180deg, var(--panel), var(--night2));
+    border: 1px solid var(--line); border-radius: 16px; padding: 24px 22px; transition: transform .2s, border-color .2s;
+  }
+  .feature:hover { transform: translateY(-4px); border-color: var(--dusk); }
+  .feature .ic { font-size: 30px; margin-bottom: 12px; }
+  .feature h3 { font-family: var(--pixel); font-size: 16px; margin-bottom: 8px; color: var(--moon); }
+  .feature p { color: var(--muted); font-size: 14.5px; }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 16px; }
+  .shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+  .shot img { width: 100%; transition: transform .3s; }
+  .shot:hover img { transform: scale(1.04); }
+
+  /* download */
+  .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 18px; max-width: 760px; margin: 0 auto; }
+  .dl-card { text-align: center; background: var(--panel); border: 1px solid var(--dusk); border-radius: 16px; padding: 30px 24px; }
+  .dl-card .plat { font-family: var(--pixel); font-size: 20px; margin-bottom: 6px; }
+  .dl-card .file { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .note { text-align:center; color: var(--muted); font-size: 13.5px; margin-top: 22px; }
+
+  /* footer / credits */
+  footer { border-top: 1px solid var(--line); padding: 44px 0 60px; margin-top: 30px; }
+  .credits { text-align: center; }
+  .credits h3 { font-family: var(--pixel); color: var(--moon); margin-bottom: 14px; font-size: 17px; }
+  .roster { display: inline-flex; flex-direction: column; gap: 6px; margin: 0 auto 20px; text-align: left; }
+  .roster div { display: flex; justify-content: space-between; gap: 26px; font-size: 14px; }
+  .roster .role { color: var(--muted); }
+  .foot-meta { color: var(--muted); font-size: 12.5px; line-height: 1.9; }
+  .foot-meta a { color: var(--muted); text-decoration: underline; }
+  .copyr { font-family: var(--pixel); font-size: 13px; color: var(--cream); margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="stars"></div>
+
+<header>
+  <div class="wrap navrow">
+    <div class="brand"><img class="pixelated" src="favicon.png" alt=""><span>몽중농원</span></div>
+    <nav class="nav-links">
+      <a class="navlink" href="#about" data-ko="이야기" data-en="Story">이야기</a>
+      <a class="navlink" href="#features" data-ko="특징" data-en="Features">특징</a>
+      <a class="navlink" href="#shots" data-ko="스크린샷" data-en="Screens">스크린샷</a>
+      <a class="navlink" href="#download" data-ko="다운로드" data-en="Download">다운로드</a>
+      <button class="lang-toggle" id="langBtn" aria-label="language">EN</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero wrap">
+    <img class="hero-logo pixelated" src="logo.png" alt="몽중농원 로고">
+    <h1>몽중농원</h1>
+    <div class="en-title">DREAMFARM</div>
+    <p class="tagline"
+       data-ko="&ldquo;밀어낸 당근 한 조각에는, 누군가의 새벽이 들어 있었다.&rdquo;<span class='sub'>한 작물을 길러내며 아버지의 노동과 사랑을 이해해 가는 감성 내러티브 픽셀 농장 게임</span>"
+       data-en="&ldquo;In that one carrot you pushed aside, someone&rsquo;s dawn was folded in.&rdquo;<span class='sub'>A narrative pixel-farming game about understanding a father&rsquo;s labor and love, one crop at a time.</span>">
+       &ldquo;밀어낸 당근 한 조각에는, 누군가의 새벽이 들어 있었다.&rdquo;
+       <span class="sub">한 작물을 길러내며 아버지의 노동과 사랑을 이해해 가는 감성 내러티브 픽셀 농장 게임</span>
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/minulx-10/DreamFarm/releases/latest" data-ko="⬇ 지금 내려받기" data-en="⬇ Download now">⬇ 지금 내려받기</a>
+      <a class="btn btn-ghost" href="https://github.com/minulx-10/DreamFarm" data-ko="⌨ 깃허브 저장소" data-en="⌨ GitHub Repo">⌨ 깃허브 저장소</a>
+      <button class="btn btn-steam" disabled title="준비 중" data-ko="🎮 스팀 위시리스트 (준비 중)" data-en="🎮 Steam Wishlist (soon)">🎮 스팀 위시리스트 (준비 중)</button>
+    </div>
+    <div class="badges">
+      <span class="pill">Windows · Android</span>
+      <span class="pill">pygame-ce</span>
+      <span class="pill">Python 100%</span>
+      <span class="pill" data-ko="한국어 · English" data-en="Korean · English">한국어 · English</span>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="about" class="wrap">
+    <h2 class="sec-title" data-ko="이야기" data-en="The Story">이야기</h2>
+    <div class="synopsis">
+      <p data-ko="식탁 위 반찬을 말없이 밀어낸 아이가, 그날 밤 꿈속의 밭에서 눈을 뜬다. 끝이 보이지 않는 밭 위로 낮은 목소리가 울린다."
+         data-en="A child who quietly pushed the food aside at the table wakes that night in a dream-field. Over the endless rows, a low voice echoes.">식탁 위 반찬을 말없이 밀어낸 아이가, 그날 밤 꿈속의 밭에서 눈을 뜬다. 끝이 보이지 않는 밭 위로 낮은 목소리가 울린다.</p>
+      <span class="quote" data-ko="&ldquo;네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.&rdquo;" data-en="&ldquo;What you pushed away — this time, raise it with your own hands.&rdquo;">&ldquo;네가 밀어낸 것을, 이번에는 네 손으로 길러 보아라.&rdquo;</span>
+    </div>
+  </section>
+
+  <section id="features" class="wrap">
+    <h2 class="sec-title" data-ko="특징" data-en="Features">특징</h2>
+    <p class="sec-sub" data-ko="작물 한 뿌리에 담긴 시간을 손끝으로 배웁니다." data-en="Learn, hand by hand, the time held in a single crop.">작물 한 뿌리에 담긴 시간을 손끝으로 배웁니다.</p>
+    <div class="features">
+      <div class="feature"><div class="ic">🌱</div><h3 data-ko="감성 내러티브" data-en="Emotional Narrative">감성 내러티브</h3><p data-ko="한 작물을 끝까지 길러내는 과정에 아버지의 노동과 사랑이 겹쳐집니다. 5가지 엔딩과 회상." data-en="A father's labor and love unfold as you raise a single crop to harvest. Five endings and retrospectives.">한 작물을 끝까지 길러내는 과정에 아버지의 노동과 사랑이 겹쳐집니다. 5가지 엔딩과 회상.</p></div>
+      <div class="feature"><div class="ic">🥕</div><h3 data-ko="픽셀 농사 시뮬" data-en="Pixel Farming Sim">픽셀 농사 시뮬</h3><p data-ko="물·잡초·해충·배수를 살피며 당근·감자·사과·벼를 키웁니다. 날씨와 계절이 밭을 바꿉니다." data-en="Tend water, weeds, pests and drainage to raise carrot, potato, apple, or rice. Weather and seasons reshape the field.">물·잡초·해충·배수를 살피며 당근·감자·사과·벼를 키웁니다. 날씨와 계절이 밭을 바꿉니다.</p></div>
+      <div class="feature"><div class="ic">✨</div><h3 data-ko="미니게임 & 별잇기" data-en="Minigames & Stars">미니게임 & 별잇기</h3><p data-ko="밭 정리·해충 대응·물 주기 미니게임과, 아버지가 보던 새벽 하늘의 별을 잇는 순간들." data-en="Field-clearing, pest, and watering minigames — and quiet moments connecting the dawn stars a father once watched.">밭 정리·해충 대응·물 주기 미니게임과, 아버지가 보던 새벽 하늘의 별을 잇는 순간들.</p></div>
+      <div class="feature"><div class="ic">🌐</div><h3 data-ko="한국어 · English" data-en="Korean · English">한국어 · English</h3><p data-ko="설정에서 언제든 언어를 전환할 수 있습니다. 조사·작물까지 자연스럽게 옮긴 완역." data-en="Switch language anytime in settings — a full localization that carries even particles and crop names naturally.">설정에서 언제든 언어를 전환할 수 있습니다. 조사·작물까지 자연스럽게 옮긴 완역.</p></div>
+      <div class="feature"><div class="ic">🖥️</div><h3 data-ko="Windows & Android" data-en="Windows & Android">Windows & Android</h3><p data-ko="설치 없는 단일 EXE와 안드로이드 APK. 터치·소프트키보드·폴더블 화면까지 대응." data-en="A single install-free EXE and an Android APK — with touch, soft-keyboard and foldable support.">설치 없는 단일 EXE와 안드로이드 APK. 터치·소프트키보드·폴더블 화면까지 대응.</p></div>
+      <div class="feature"><div class="ic">🎨</div><h3 data-ko="도트 감성" data-en="Dreamy Pixel Art">도트 감성</h3><p data-ko="갈무리11 픽셀 폰트와 통일된 도트 아트, 몽환적인 황혼빛 팔레트로 꿈속 밭을 그렸습니다." data-en="Galmuri11 pixel type, a unified dot-art style, and a dreamy dusk palette paint the dream-field.">갈무리11 픽셀 폰트와 통일된 도트 아트, 몽환적인 황혼빛 팔레트로 꿈속 밭을 그렸습니다.</p></div>
+    </div>
+  </section>
+
+  <section id="shots" class="wrap">
+    <h2 class="sec-title" data-ko="스크린샷" data-en="Screenshots">스크린샷</h2>
+    <p class="sec-sub" data-ko="꿈속 밭의 한 장면들." data-en="Moments from the dream-field.">꿈속 밭의 한 장면들.</p>
+    <div class="shots">
+      <div class="shot"><img class="pixelated" src="screenshots/title_en.png" alt="title" loading="lazy"></div>
+      <div class="shot"><img class="pixelated" src="screenshots/farm_en.png" alt="farm" loading="lazy"></div>
+      <div class="shot"><img class="pixelated" src="screenshots/intro_en.png" alt="intro" loading="lazy"></div>
+      <div class="shot"><img class="pixelated" src="screenshots/gallery_en.png" alt="gallery" loading="lazy"></div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="download" class="wrap">
+    <h2 class="sec-title" data-ko="다운로드" data-en="Download">다운로드</h2>
+    <p class="sec-sub" data-ko="무료로 즐기세요. 최신 릴리스에서 내려받습니다." data-en="Play for free — grab it from the latest release.">무료로 즐기세요. 최신 릴리스에서 내려받습니다.</p>
+    <div class="dl-grid">
+      <div class="dl-card">
+        <div class="plat">🖥️ Windows</div>
+        <div class="file">DreamFarm.exe · <span data-ko="설치 불필요" data-en="no install">설치 불필요</span></div>
+        <a class="btn btn-primary" href="https://github.com/minulx-10/DreamFarm/releases/latest" data-ko="EXE 내려받기" data-en="Get the EXE">EXE 내려받기</a>
+      </div>
+      <div class="dl-card">
+        <div class="plat">📱 Android</div>
+        <div class="file">APK · <span data-ko="사이드로드" data-en="sideload">사이드로드</span></div>
+        <a class="btn btn-primary" href="https://github.com/minulx-10/DreamFarm/releases/latest" data-ko="APK 내려받기" data-en="Get the APK">APK 내려받기</a>
+      </div>
+    </div>
+    <p class="note" data-ko="&ldquo;Latest&rdquo; 릴리스가 정식 버전이고, -dev가 붙은 릴리스는 테스터용 프리릴리스입니다." data-en="The &ldquo;Latest&rdquo; release is the stable build; -dev releases are tester prereleases.">&ldquo;Latest&rdquo; 릴리스가 정식 버전이고, -dev가 붙은 릴리스는 테스터용 프리릴리스입니다.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap credits">
+    <h3>삼광 (三光)</h3>
+    <div class="roster">
+      <div><span>김민욱</span><span class="role" data-ko="팀장 · 개발" data-en="Lead · Dev">팀장 · 개발</span></div>
+      <div><span>박서현</span><span class="role" data-ko="기획 · 스토리" data-en="Design · Story">기획 · 스토리</span></div>
+      <div><span>서태양</span><span class="role" data-ko="기획 · 디자인" data-en="Design · Art">기획 · 디자인</span></div>
+    </div>
+    <p class="foot-meta">
+      <span data-ko="픽셀 폰트: 갈무리11 (Galmuri11) — 달고나, SIL OFL 1.1" data-en="Pixel font: Galmuri11 by Dalgona, SIL OFL 1.1">픽셀 폰트: 갈무리11 (Galmuri11) — 달고나, SIL OFL 1.1</span><br>
+      <a href="https://github.com/minulx-10/DreamFarm">github.com/minulx-10/DreamFarm</a>
+    </p>
+    <p class="copyr">© 2026 삼광 (三光). All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var lang = 'ko';
+    var btn = document.getElementById('langBtn');
+    function apply(l) {
+      lang = l;
+      document.documentElement.lang = l;
+      btn.textContent = (l === 'ko') ? 'EN' : '한국어';
+      document.querySelectorAll('[data-ko]').forEach(function (el) {
+        var v = el.getAttribute('data-' + l);
+        if (v !== null) el.innerHTML = v;
+      });
+    }
+    btn.addEventListener('click', function () { apply(lang === 'ko' ? 'en' : 'ko'); });
+  })();
+</script>
+</body>
+</html>
