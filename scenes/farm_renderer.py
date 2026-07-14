@@ -625,22 +625,37 @@ class FarmRenderer:
         title, body = farm_scene.TUTORIAL_PAGES[farm_scene.tutorial_step]
         title = farm_scene.sim._cropify(title)
         body = farm_scene.sim._cropify(body)
-        card = pygame.Rect(150, 195, 500, 210)
+        card = pygame.Rect(120, 180, 560, 252)
         draw_light_panel(screen, card)
 
-        title_surf = get_font(23).render(title, True, TEXT_DARK)
-        screen.blit(title_surf, (card.centerx - title_surf.get_width() // 2, card.y + 26))
+        # 제목: 카드 폭에 맞춰 폰트 자동 축소(영어가 길어 넘치지 않게). size()도 현재 언어로 측정.
+        title_font = get_font(23)
+        for sz in (23, 21, 19, 17):
+            title_font = get_font(sz)
+            if title_font.size(title)[0] <= card.w - 48:
+                break
+        title_surf = title_font.render(title, True, TEXT_DARK)
+        screen.blit(title_surf, (card.centerx - title_surf.get_width() // 2, card.y + 24))
         pygame.draw.rect(screen, (221, 173, 96),
-                         (card.centerx - 60, card.y + 58, 120, 3), border_radius=2)
+                         (card.centerx - 60, card.y + 56, 120, 3), border_radius=2)
 
+        # 본문: 폭에 맞춰 줄바꿈하고, 세로로 넘치면 폰트를 줄여 카드 안에 맞춘다.
+        body_top = card.y + 76
+        avail_h = (card.bottom - 34) - body_top   # 하단 진행표시(step) 공간 확보
         body_font = get_font(17)
-        y = card.y + 78
-        for line in wrap_text(body, body_font, card.w - 56):
+        lines = wrap_text(body, body_font, card.w - 56)
+        for sz in (17, 16, 15, 14, 13):
+            body_font = get_font(sz)
+            lines = wrap_text(body, body_font, card.w - 56)
+            if len(lines) * (body_font.get_height() + 6) <= avail_h:
+                break
+        y = body_top
+        for line in lines:
             ls = body_font.render(line, True, TEXT_DARK)
             screen.blit(ls, (card.x + 28, y))
-            y += body_font.get_height() + 7
+            y += body_font.get_height() + 6
 
         step_txt = i18n.tf("{step} / {total}   ·   클릭하여 계속",
                            step=farm_scene.tutorial_step + 1, total=len(farm_scene.TUTORIAL_PAGES))
         ss = get_font(14).render(step_txt, True, TEXT_MUTED)
-        screen.blit(ss, (card.centerx - ss.get_width() // 2, card.bottom - 32))
+        screen.blit(ss, (card.centerx - ss.get_width() // 2, card.bottom - 26))
