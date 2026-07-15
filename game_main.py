@@ -447,7 +447,8 @@ def main():
         steam.run_callbacks()
 
         # 3. 프레임 시작: 캔버스 여백 초기화(배경이 못 채우는 씬 대비) 후, 씬/UI 는 안전영역(safe_sub)에 그린다.
-        #    배경 함수(draw_story_backdrop·draw_tiled_background)가 안전영역 밖 여백을 배경으로 이어 채운다.
+        #    배경 함수(draw_story_backdrop·draw_tiled_background)가 안전영역 밖 여백을 꿈-분위기로 채운다.
+        layout.set_time(game_state.play_time)   # 여백에 떠다니는 빛 애니메이션용 시간
         virtual_screen.fill((0, 0, 0))
         current_scene_obj.draw(safe_sub)
 

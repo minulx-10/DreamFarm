@@ -108,8 +108,10 @@ scenes/
 - **2026-07-14** (v2.2.0 정식 배포 이후 · 미출시):
   - **화면 비율 적응형 UI**: 고정 800×600(4:3) 레터박스 → **적응형 캔버스**. `core/layout.py`가 창 비율에 맞춰
     캔버스 크기(안전영역 800×600 + 여백)를 정하고, `game_main`이 캔버스 버퍼 + 안전영역 서브서피스(`safe_sub`)를
-    만들어 **씬/오버레이는 safe_sub(800×600)에 그대로 그린다**(씬 코드 무수정). 배경은 `layout.bleed_edges`가
-    가장자리 열/행을 늘려 여백을 채운다(`draw_story_backdrop`·`draw_tiled_background` 끝에서 호출). 상/하 HUD 바는
+    만들어 **씬/오버레이는 safe_sub(800×600)에 그대로 그린다**(씬 코드 무수정). 여백은 `layout.bleed_edges`가
+    채우되 단순 스트레치가 아니라 **소프트 블러 + 밝기 자동 감지**로 처리한다: 밤 씬은 꿈-어둠 페이드 + 떠다니는
+    빛 입자(`set_time`으로 애니메이션), 밝은 밭 씬은 부드러운 자연 연장만(`draw_story_backdrop`·`draw_tiled_background`
+    끝에서 호출). 상/하 HUD 바는
     부모(캔버스) 폭으로 확장(`draw_top_bar`·`draw_bottom_bar`가 `screen.get_parent()` 감지). 입력은 `to_virtual_pos`가
     실좌표→캔버스→안전영역 로컬로 역보정(드래그 rel도 캔버스 배율). 창 모드 RESIZABLE + `recompute_layout`이
     리사이즈 시 재계산(안드로이드는 set_mode 재호출 안 함). **4:3은 완전 동일**. 개별 씬 크롬의 추가 앵커는 점진 확장.
