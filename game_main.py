@@ -76,11 +76,14 @@ def main():
     # 디스플레이 초기화 변수
     # 안드로이드는 창 개념이 없고 항상 전체화면이므로, 시작부터 전체화면 스케일 모드로 둔다.
     # (800x600 가상 캔버스를 기기 해상도에 4:3 레터박스로 맞춰 그린다.)
+    from core import layout
     is_fullscreen = IS_ANDROID
     current_nightmare = False
     screen = None
     offset_x, offset_y = 0, 0
     target_w, target_h = 800, 600
+    virtual_screen = None       # 적응형 캔버스(안전영역+여백). 크기는 창 비율에 따라 변한다.
+    safe_sub = None             # 캔버스 안 800x600 안전영역 서브서피스 — 씬/UI는 여기에 그린다.
     
     def update_display_mode():
         nonlocal screen, current_nightmare, is_fullscreen, offset_x, offset_y, target_w, target_h
@@ -103,34 +106,47 @@ def main():
                     screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
                     is_fullscreen = False
         else:
-            screen = pygame.display.set_mode((w, h), pygame.DOUBLEBUF)
+            # 창 모드도 크기 조절 가능(RESIZABLE) — 창 비율을 바꾸면 적응형 캔버스가 따라온다.
+            # (데스크톱 한정. 안드로이드는 항상 위 전체화면 분기를 탄다.) 리사이즈 이벤트는
+            # RESIZE_EVENTS → recompute_layout 에서 새 크기로 다시 계산한다.
+            flags = pygame.DOUBLEBUF | (0 if IS_ANDROID else pygame.RESIZABLE)
+            screen = pygame.display.set_mode((w, h), flags)
 
         # 설정창의 '전체화면' 토글 라벨이 실제 상태를 반영하도록 game_state에 동기화한다.
         game_state.is_fullscreen = is_fullscreen
         _apply_scaling(*screen.get_size())
 
     def _apply_scaling(actual_w, actual_h):
-        # 4:3 종횡비를 유지하며 스케일. '정수 배율'이 꽉 채우는 배율에 충분히 가까우면(≥80%)
-        # 정수로 스냅해 픽셀이 또렷하게 보이게 한다(1440p·4K 등에서 효과). 정수 배율이 너무 작아지는
-        # 해상도(1080p·720p 등)에서는 기존처럼 꽉 채우는 배율을 써서 화면이 작아지지 않게 한다.
-        nonlocal offset_x, offset_y, target_w, target_h
+        # 적응형: 화면 비율에 맞춰 캔버스(안전영역 800x600 + 좌우/상하 여백)를 정하고, 그 캔버스를
+        # 창에 '꽉 차게' 스케일한다(비율이 같아 레터박스 없음; 상한 초과 울트라와이드만 약간 남음).
+        nonlocal offset_x, offset_y, target_w, target_h, virtual_screen, safe_sub
         if actual_h <= 0:
             return
-        fit = min(actual_w / 800.0, actual_h / 600.0)   # 레터박스로 꽉 채우는 배율
-        isc = int(fit)                                   # 가장 큰 정수 배율
-        # 2배 이상이 들어가는 고해상도(1440p·4K 등)에서만 정수로 스냅해 픽셀을 또렷하게.
-        # 720p·1080p처럼 정수 배율이 1배뿐인 해상도는 기존처럼 꽉 채워 작아지지 않게 한다.
-        scale = isc if (isc >= 2 and isc >= fit * 0.8) else fit
-        target_w = int(800 * scale)
-        target_h = int(600 * scale)
+        layout.set_viewport(actual_w, actual_h)
+        cw, ch = layout.canvas_size()
+        if virtual_screen is None or virtual_screen.get_size() != (cw, ch):
+            virtual_screen = pygame.Surface((cw, ch))
+            safe_sub = virtual_screen.subsurface(layout.safe_rect())
+        scale = min(actual_w / cw, actual_h / ch)        # 캔버스를 창에 꽉 채우는 배율
+        target_w = int(cw * scale)
+        target_h = int(ch * scale)
         offset_x = (actual_w - target_w) // 2
         offset_y = (actual_h - target_h) // 2
 
     def recompute_layout():
-        # 폴더블 접기/펼치기 등으로 창 크기가 바뀌면 실제 화면 크기에 맞춰 레터박스를 다시 계산한다.
-        # set_mode 를 다시 부르지 않고(안드로이드에서 위험) 현재 표면 크기만 읽어 반영한다.
+        # 창 크기 변경(데스크톱 리사이즈·폴더블 접기/펼치기·회전) 시 적응형 캔버스를 다시 계산한다.
         nonlocal screen
-        surf = pygame.display.get_surface()
+        if is_fullscreen or IS_ANDROID:
+            # 전체화면/안드로이드: 표면이 자동으로 새 크기를 가진다. set_mode 재호출은 안드로이드에서 위험.
+            surf = pygame.display.get_surface()
+        else:
+            # 데스크톱 창 리사이즈: RESIZABLE 창은 새 크기로 set_mode 를 다시 불러야 표면이 갱신된다.
+            try:
+                nw, nh = pygame.display.get_window_size()
+                surf = pygame.display.set_mode((max(480, nw), max(360, nh)),
+                                               pygame.DOUBLEBUF | pygame.RESIZABLE)
+            except Exception:
+                surf = pygame.display.get_surface()
         if surf is not None:
             screen = surf
             _apply_scaling(*surf.get_size())
@@ -158,15 +174,15 @@ def main():
     # #14 Check for 2nd playthrough
     apply_second_run()
 
-    # 가상 화면 800x600 버퍼 생성
-    virtual_screen = pygame.Surface((800, 600))
+    # (가상 캔버스 virtual_screen / 안전영역 safe_sub 는 _apply_scaling 에서 생성됨)
 
-    # 마우스 좌표 역계산(역배율 스케일링)을 위한 변환 함수 및 get_pos 재정의 (종횡비 보정 반영)
+    # 마우스 좌표 역계산: 실제 창 좌표 → 캔버스 좌표 → 안전영역(800x600) 로컬 좌표
     def to_virtual_pos(pos):
-        mx = pos[0] - offset_x
-        my = pos[1] - offset_y
-        vx = int(mx * 800.0 / target_w)
-        vy = int(my * 600.0 / target_h)
+        cw, ch = layout.canvas_size()
+        cx = (pos[0] - offset_x) * cw / max(1, target_w)
+        cy = (pos[1] - offset_y) * ch / max(1, target_h)
+        vx = int(cx - layout.safe_x)
+        vy = int(cy - layout.safe_y)
         return max(0, min(799, vx)), max(0, min(599, vy))
 
     orig_get_pos = pygame.mouse.get_pos
@@ -375,8 +391,9 @@ def main():
                 mapped_events.append(mapped_event)
             elif event.type == pygame.MOUSEMOTION:
                 vx, vy = to_virtual_pos(event.pos)
-                vrx = int(event.rel[0] * 800.0 / target_w)
-                vry = int(event.rel[1] * 600.0 / target_h)
+                _cw, _ch = layout.canvas_size()   # 드래그 델타는 캔버스 기준 역배율(안전영역 배율과 동일)
+                vrx = int(event.rel[0] * _cw / max(1, target_w))
+                vry = int(event.rel[1] * _ch / max(1, target_h))
                 mapped_event = pygame.event.Event(event.type, pos=(vx, vy), rel=(vrx, vry), buttons=event.buttons)
                 mapped_events.append(mapped_event)
             else:
@@ -429,9 +446,11 @@ def main():
         # 스팀 콜백 처리 (연동 없으면 no-op) — 도전과제 해제 오버레이 알림 등에 필요
         steam.run_callbacks()
 
-        # 3. 모든 그리기 연산은 800x600 가상 화면 버퍼에 수행
-        current_scene_obj.draw(virtual_screen)
-        
+        # 3. 프레임 시작: 캔버스 여백 초기화(배경이 못 채우는 씬 대비) 후, 씬/UI 는 안전영역(safe_sub)에 그린다.
+        #    배경 함수(draw_story_backdrop·draw_tiled_background)가 안전영역 밖 여백을 배경으로 이어 채운다.
+        virtual_screen.fill((0, 0, 0))
+        current_scene_obj.draw(safe_sub)
+
         # 배속 토글 버튼 그리기 (설정창·종료창이 닫혀 있고, 미니게임 씬이 아닐 때만 — 점수 가림 방지)
         if (not game_state.request_quit and not settings_overlay.open
                 and game_state.current_scene not in MINIGAME_SCENES):
@@ -442,16 +461,16 @@ def main():
             if hovered_ff:
                 from core.ui import mix_color
                 bg_ff = mix_color(bg_ff, (250, 246, 231), 0.2)
-            pygame.draw.rect(virtual_screen, bg_ff, ff_btn, border_radius=7)
-            pygame.draw.rect(virtual_screen, (229, 192, 124), ff_btn, 1, border_radius=7)
-            
+            pygame.draw.rect(safe_sub, bg_ff, ff_btn, border_radius=7)
+            pygame.draw.rect(safe_sub, (229, 192, 124), ff_btn, 1, border_radius=7)
+
             # 화살표 기호 '>>' 렌더링
             from core.assets import get_font
             font_ver = get_font(12)
             symbol = ">>" if ff_active else ">"
             text_surf = font_ver.render(symbol, True, (250, 246, 231))
-            virtual_screen.blit(text_surf, (ff_btn.centerx - text_surf.get_width() // 2, ff_btn.centery - text_surf.get_height() // 2))
-        
+            safe_sub.blit(text_surf, (ff_btn.centerx - text_surf.get_width() // 2, ff_btn.centery - text_surf.get_height() // 2))
+
         # 좌상단 디버그 버전 표시 (회색 소형 텍스트) — core/version.py 한 곳에서 관리
         try:
             from core import save_system
@@ -464,15 +483,15 @@ def main():
                 vbg = pygame.Surface(vbox.size, pygame.SRCALPHA)
                 vbg.fill((20, 24, 28, 200))
                 pygame.draw.rect(vbg, (120, 130, 120, 200), vbg.get_rect(), 1, border_radius=5)
-                virtual_screen.blit(vbg, vbox.topleft)
-                virtual_screen.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
+                safe_sub.blit(vbg, vbox.topleft)
+                safe_sub.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
         except Exception:
             pass
 
-        settings_overlay.draw(virtual_screen, show_button=game_state.current_scene not in MINIGAME_SCENES)
-        quit_overlay.draw(virtual_screen)
-        dev_overlay.draw(virtual_screen)
-        achievements.draw(virtual_screen)   # 업적 토스트는 항상 맨 위에
+        settings_overlay.draw(safe_sub, show_button=game_state.current_scene not in MINIGAME_SCENES)
+        quit_overlay.draw(safe_sub)
+        dev_overlay.draw(safe_sub)
+        achievements.draw(safe_sub)   # 업적 토스트는 항상 맨 위에
 
         # 창 포커스 분실 일시정지 오버레이 반사
         if game_state.paused:
@@ -486,9 +505,9 @@ def main():
             txt_sub = font_sub.render("화면을 클릭하거나 아무 키를 눌러 재개", True, (168, 150, 130))
             pause_veil.blit(txt_pause, (400 - txt_pause.get_width() // 2, 276))
             pause_veil.blit(txt_sub, (400 - txt_sub.get_width() // 2, 318))
-            virtual_screen.blit(pause_veil, (0, 0))
+            safe_sub.blit(pause_veil, (0, 0))
 
-        # 4. 가상 화면을 실제 물리 창 해상도로 스케일링 복사 (종횡비 유지 검은 띠 적용)
+        # 4. 적응형 캔버스 전체를 실제 창 해상도로 스케일링 복사(비율 일치 → 꽉 참; 상한 초과분만 여백)
         scaled_screen = pygame.transform.scale(virtual_screen, (target_w, target_h))
         screen.fill((0, 0, 0))
         screen.blit(scaled_screen, (offset_x, offset_y))

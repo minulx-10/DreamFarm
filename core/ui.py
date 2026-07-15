@@ -163,6 +163,9 @@ _BACKDROP_STARS = [
 ]
 
 
+from core.layout import bleed_edges   # 적응형 캔버스 여백 채우기(재노출)
+
+
 def draw_story_backdrop(screen, mood="night"):
     if mood == "nightmare":
         # 악)몽중농원 — 검붉은 하늘과 핏빛 달
@@ -268,6 +271,8 @@ def draw_story_backdrop(screen, mood="night"):
     for y in range(420, 600, 38):
         pygame.draw.line(screen, mix_color(ground, WHITE, 0.07), (0, y), (800, y + 12), 1)
 
+    bleed_edges(screen)   # 적응형: 안전영역 밖 여백을 배경으로 이어 채움(4:3이면 무동작)
+
 
 def draw_multiline_text(screen, text, font, color, x, y, max_width, line_gap=4, max_lines=None):
     lines = wrap_text(text, font, max_width, max_lines)
@@ -365,8 +370,17 @@ def draw_understanding_badge(screen, x, y, w):
 
 
 def draw_top_bar(screen, show_stats=True):
-    panel_rect = pygame.Rect(14, 12, 772, 56)
-    draw_panel(screen, panel_rect, fill=(44, 57, 58), border=(229, 192, 124), radius=10)
+    # 적응형(가장자리 앵커): 넓은 화면에선 바를 캔버스 폭까지 늘려 그린다. 내용(제목·타이머·점수)은
+    # 안전영역 좌표 그대로 두어 가운데 정렬을 유지한다. 4:3(여백 0)이면 기존과 동일.
+    parent = screen.get_parent()
+    if parent:
+        ox, oy = screen.get_offset()
+        pw = parent.get_size()[0]
+        draw_panel(parent, pygame.Rect(14, oy + 12, pw - 28, 56),
+                   fill=(44, 57, 58), border=(229, 192, 124), radius=10)
+    else:
+        draw_panel(screen, pygame.Rect(14, 12, 772, 56),
+                   fill=(44, 57, 58), border=(229, 192, 124), radius=10)
 
     font = get_font(23)
     small_font = get_font(14)
@@ -398,8 +412,16 @@ def draw_top_bar(screen, show_stats=True):
 
 
 def draw_bottom_bar(screen, obj_name, obj_desc):
-    panel_rect = pygame.Rect(18, 486, 764, 98)
-    draw_panel(screen, panel_rect, fill=(252, 238, 211), border=(119, 90, 64), radius=10)
+    # 적응형(가장자리 앵커): 넓은 화면에선 하단 바를 캔버스 폭까지 늘린다. 글은 안전영역 좌표 유지.
+    parent = screen.get_parent()
+    if parent:
+        ox, oy = screen.get_offset()
+        pw = parent.get_size()[0]
+        draw_panel(parent, pygame.Rect(18, oy + 486, pw - 36, 98),
+                   fill=(252, 238, 211), border=(119, 90, 64), radius=10)
+    else:
+        draw_panel(screen, pygame.Rect(18, 486, 764, 98),
+                   fill=(252, 238, 211), border=(119, 90, 64), radius=10)
 
     font_name = get_font(22)
     font_desc = get_font(16)

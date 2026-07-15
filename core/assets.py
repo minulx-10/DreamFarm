@@ -694,6 +694,9 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         pygame.draw.rect(screen, speck, (dirt_rect.x + sx_, dirt_rect.y + sy_, ss, ss))
     pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
 
+    from core.layout import bleed_edges
+    bleed_edges(screen)   # 적응형: 안전영역 밖 여백을 잔디/하늘로 이어 채움(4:3이면 무동작)
+
 
 _FOOD_SPRITE = {"apple": "food_apple", "potato": "food_potato", "rice": "food_rice"}
 
