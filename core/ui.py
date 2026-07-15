@@ -376,7 +376,8 @@ def draw_top_bar(screen, show_stats=True):
     if parent:
         ox, oy = screen.get_offset()
         pw = parent.get_size()[0]
-        draw_panel(parent, pygame.Rect(14, oy + 12, pw - 28, 56),
+        g = 14 + int(min(58, max(0, ox - 40) * 0.32))   # 넓을수록 가장자리 여유를 더 남긴다(끝까지 안 늘림)
+        draw_panel(parent, pygame.Rect(g, oy + 12, pw - 2 * g, 56),
                    fill=(44, 57, 58), border=(229, 192, 124), radius=10)
     else:
         draw_panel(screen, pygame.Rect(14, 12, 772, 56),
@@ -417,7 +418,8 @@ def draw_bottom_bar(screen, obj_name, obj_desc):
     if parent:
         ox, oy = screen.get_offset()
         pw = parent.get_size()[0]
-        draw_panel(parent, pygame.Rect(18, oy + 486, pw - 36, 98),
+        g = 18 + int(min(58, max(0, ox - 40) * 0.32))   # 하단 바도 가장자리 여유를 남긴다
+        draw_panel(parent, pygame.Rect(g, oy + 486, pw - 2 * g, 98),
                    fill=(252, 238, 211), border=(119, 90, 64), radius=10)
     else:
         draw_panel(screen, pygame.Rect(18, 486, 764, 98),

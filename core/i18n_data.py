@@ -1058,4 +1058,6 @@ EN = {
     "실수": "Mistakes",
     "평온": "Calm",
     "손이 필요해": "Needs care",
+    "오늘": "Today",
+    "{n}일 뒤": "In {n}d",
 }

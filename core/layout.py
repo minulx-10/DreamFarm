@@ -124,21 +124,11 @@ def bleed_edges(screen):
     for (edge_x, mx0, mw, is_left) in sides:
         col = screen.subsurface((edge_x, 0, 1, sh)).copy()
         lum = _avg_lum(col)
-        # (1) 세로로 아주 강하게 축약 → 디테일 없는 '부드러운 색 그라데이션'으로 확대(가로 줄무늬 제거)
-        vsamp = max(5, sh // 80)
+        # (1) 가장자리 한 열을 소수 샘플로 축약 → 순수 '세로 색 그라데이션'으로 확대(블러/스트레치·줄무늬 없음)
+        vsamp = max(4, sh // 90)
         wash = pygame.transform.smoothscale(pygame.transform.smoothscale(col, (1, vsamp)), (mw, sh))
         parent.blit(wash, (mx0, oy))
-        # (2) 경계 feather: 경계쪽 좁은 띠에만 원본(약블러)을 얹어 '장면이 잠깐 이어지다 녹게' → 이음새 제거
-        fw = min(40, mw)
-        if fw > 6:
-            det = _blur(pygame.transform.scale(col, (fw, sh)), 5)
-            mask = pygame.Surface((fw, sh), pygame.SRCALPHA)
-            for xi in range(fw):
-                dist = (fw - 1 - xi) if is_left else xi        # 경계로부터 거리(경계=0 → 불투명)
-                mask.fill((255, 255, 255, int(220 * max(0.0, 1 - dist / fw) ** 1.7)), (xi, 0, 1, sh))
-            det.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-            parent.blit(det, ((mx0 + mw - fw) if is_left else mx0, oy))
-        # (3) 은은한 비네트 → 가장자리가 자연스럽게 물러난다. 어두운 씬일수록 '강한 꿈-어둠'으로.
+        # (2) 은은한 비네트 → 가장자리가 자연스럽게 물러난다. 어두운 씬일수록 '강한 꿈-어둠'으로.
         d = max(0.0, min(1.0, (78.0 - lum) / 60.0))            # lum<18→1, lum>78→0
         darkness = 0.26 + 0.74 * d                             # 밝은 밭도 은은히(0.26), 밤은 강하게(1.0)
         grad = pygame.Surface((mw, sh), pygame.SRCALPHA)

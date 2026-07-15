@@ -155,6 +155,15 @@ class FarmScene:
             return
 
         for event in events:
+            # 대시보드 펼침/접힘 손잡이(넓은 화면에서만) — 다른 처리보다 먼저 소비
+            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                    and getattr(self, "_dash_available", False)):
+                from scenes.farm_renderer import DASH_TAB
+                if DASH_TAB.collidepoint(event.pos):
+                    game_state.dashboard_open = not getattr(game_state, "dashboard_open", True)
+                    audio.play("click")
+                    continue
+
             if event.type == pygame.MOUSEWHEEL and self.action_menu_open:
                 max_scroll = max(0, len(self.sim.get_action_choices()) - 4)
                 self.action_scroll = max(0, min(max_scroll, self.action_scroll - event.y))
