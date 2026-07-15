@@ -13,6 +13,7 @@ from core.ui import (
 )
 from core.crops import current_crop
 from core import i18n
+from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM  # 곡선 없음: 픽셀 챔퍼/원
 
 TEXT_DARK = (48, 38, 28)
 TEXT_MUTED = (123, 106, 92)
@@ -111,12 +112,12 @@ class FarmRenderer:
             return
 
         track = pygame.Rect(732, 330, 8, 121)
-        pygame.draw.rect(screen, (198, 166, 118), track, border_radius=4)
+        pixel_rect(screen, (198, 166, 118), track, chamfer=CHAMFER_SM)
         thumb_h = max(22, int(track.h * 4 / len(actions)))
         max_scroll = max(1, len(actions) - 4)
         thumb_y = track.y + int((track.h - thumb_h) * farm_scene.action_scroll / max_scroll)
         thumb = pygame.Rect(track.x, thumb_y, track.w, thumb_h)
-        pygame.draw.rect(screen, (123, 92, 65), thumb, border_radius=4)
+        pixel_rect(screen, (123, 92, 65), thumb, chamfer=CHAMFER_SM)
 
     def crop_positions(self):
         return [(126, 241), (223, 241), (322, 241), (126, 360), (223, 360), (322, 360)]
@@ -130,9 +131,9 @@ class FarmRenderer:
         inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
         nm = game_state.nightmare
         frame = inner.inflate(16, 16)
-        pygame.draw.rect(screen, (40, 30, 25) if not nm else (28, 8, 8), frame.move(0, 4), border_radius=18)
-        pygame.draw.rect(screen, (132, 83, 48) if not nm else (96, 32, 30), frame, border_radius=18)
-        pygame.draw.rect(screen, (185, 125, 80) if not nm else (150, 45, 42), frame, 3, border_radius=18)
+        pixel_rect(screen, (40, 30, 25) if not nm else (28, 8, 8), frame.move(0, 4), chamfer=CHAMFER)
+        pixel_rect(screen, (132, 83, 48) if not nm else (96, 32, 30), frame, chamfer=CHAMFER)
+        pixel_rect(screen, (185, 125, 80) if not nm else (150, 45, 42), frame, width=3, chamfer=CHAMFER)
         
         if nm:
             soil = (78, 20, 18) if sim.moisture > 72 else (116, 40, 34) if sim.moisture < 28 else (96, 30, 28)
@@ -140,8 +141,8 @@ class FarmRenderer:
         else:
             soil = (96, 62, 42) if sim.moisture > 72 else (120, 82, 54) if sim.moisture < 28 else sc["dirt"]
             soil_dark = sc["dirt_dark"]
-        pygame.draw.rect(screen, soil_dark, inner.move(0, 3), border_radius=14)
-        pygame.draw.rect(screen, soil, inner, border_radius=14)
+        pixel_rect(screen, soil_dark, inner.move(0, 3), chamfer=CHAMFER)
+        pixel_rect(screen, soil, inner, chamfer=CHAMFER)
         
         for i in range(1, 5):
             ly = inner.y + inner.h * i // 5
@@ -167,23 +168,22 @@ class FarmRenderer:
             water_col = (66, 150, 198)
 
         frame = inner.inflate(16, 16)
-        pygame.draw.rect(screen, (35, 30, 25), frame.move(0, 4), border_radius=18)
-        pygame.draw.rect(screen, frame_body, frame, border_radius=18)
-        pygame.draw.rect(screen, frame_dark, frame, 3, border_radius=18)
+        pixel_rect(screen, (35, 30, 25), frame.move(0, 4), chamfer=CHAMFER)
+        pixel_rect(screen, frame_body, frame, chamfer=CHAMFER)
+        pixel_rect(screen, frame_dark, frame, width=3, chamfer=CHAMFER)
 
         wet = max(0.0, min(1.0, (sim.moisture - 12) / 74.0))
 
         mud = mix_color(mud_dry, mud_wet, wet)
-        pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.25), inner.move(0, 3), border_radius=14)
-        pygame.draw.rect(screen, mud, inner, border_radius=14)
+        pixel_rect(screen, mix_color(mud, (0, 0, 0), 0.25), inner.move(0, 3), chamfer=CHAMFER)
+        pixel_rect(screen, mud, inner, chamfer=CHAMFER)
 
         base_col = (36, 100, 152) if not nm else (110, 24, 24)
         film_col = (96, 178, 214) if not nm else (172, 52, 44)
         water = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
-        pygame.draw.rect(water, (*base_col, int(120 + 110 * wet)), (0, 0, inner.w, inner.h), border_radius=14)
+        pixel_rect(water, (*base_col, int(120 + 110 * wet)), (0, 0, inner.w, inner.h), chamfer=CHAMFER)
         film = pygame.Surface((inner.w, int(inner.h * 0.5)), pygame.SRCALPHA)
-        pygame.draw.rect(film, (*film_col, int(34 + 54 * wet)), film.get_rect(),
-                         border_top_left_radius=14, border_top_right_radius=14)
+        pixel_rect(film, (*film_col, int(34 + 54 * wet)), film.get_rect(), chamfer=CHAMFER)
         water.blit(film, (0, 0))
         screen.blit(water, (inner.x, inner.y))
 
@@ -202,13 +202,13 @@ class FarmRenderer:
 
         if wet < 0.18:
             for cx, cy in self.crop_positions()[:3]:
-                pygame.draw.ellipse(screen, mud, (cx - 20, cy - 6, 40, 16))
+                pixel_rect(screen, mud, (cx - 20, cy - 6, 40, 14), chamfer=CHAMFER)
 
         mound_top = mix_color(mud, (206, 172, 118) if not nm else (150, 60, 50), 0.45)
         for cx, cy in self.crop_positions():
-            pygame.draw.ellipse(screen, mix_color(mud, (0, 0, 0), 0.25), (cx - 19, cy - 1, 38, 15))
-            pygame.draw.ellipse(screen, mud, (cx - 18, cy - 4, 36, 15))
-            pygame.draw.ellipse(screen, mound_top, (cx - 12, cy - 5, 24, 8))
+            pixel_rect(screen, mix_color(mud, (0, 0, 0), 0.25), (cx - 19, cy - 1, 38, 13), chamfer=CHAMFER)
+            pixel_rect(screen, mud, (cx - 18, cy - 4, 36, 13), chamfer=CHAMFER)
+            pixel_rect(screen, mound_top, (cx - 12, cy - 5, 24, 7), chamfer=CHAMFER_SM)
             for dx, dy in ((-6, -2), (5, -1), (0, 1)):
                 pygame.draw.rect(screen, mix_color(mud, (0, 0, 0), 0.3), (cx + dx, cy + dy, 2, 2))
 
@@ -455,19 +455,19 @@ class FarmRenderer:
             sc = farm_scene.season_colors
             base_color = (110, 75, 45) if sim.moisture > 72 else (135, 92, 60) if sim.moisture < 28 else sc["dirt"]
             frame_rect = inner_plot.inflate(16, 16)
-            pygame.draw.rect(screen, (40, 30, 25), frame_rect.move(0, 4), border_radius=18)
-            pygame.draw.rect(screen, (132, 83, 48), frame_rect, border_radius=18)
-            pygame.draw.rect(screen, (185, 125, 80), frame_rect, 3, border_radius=18)
-            pygame.draw.rect(screen, (65, 42, 28), inner_plot.inflate(2, 2), 2, border_radius=14)
+            pixel_rect(screen, (40, 30, 25), frame_rect.move(0, 4), chamfer=CHAMFER)
+            pixel_rect(screen, (132, 83, 48), frame_rect, chamfer=CHAMFER)
+            pixel_rect(screen, (185, 125, 80), frame_rect, width=3, chamfer=CHAMFER)
+            pixel_rect(screen, (65, 42, 28), inner_plot.inflate(2, 2), width=2, chamfer=CHAMFER)
             bed_bg_color = (80, 52, 36) if sim.moisture > 72 else (100, 66, 46) if sim.moisture < 28 else sc["dirt_dark"]
-            pygame.draw.rect(screen, bed_bg_color, inner_plot, border_radius=12)
+            pixel_rect(screen, bed_bg_color, inner_plot, chamfer=CHAMFER)
             pw, ph = 88, 92
             for idx, (x, y) in enumerate(self.crop_positions()):
                 px, py = x - pw // 2, y + 12 - ph // 2
                 patch_rect = pygame.Rect(px, py, pw, ph)
-                pygame.draw.rect(screen, sc["dirt_dark"], patch_rect.move(0, 3), border_radius=12)
-                pygame.draw.rect(screen, base_color, patch_rect, border_radius=12)
-                pygame.draw.rect(screen, mix_color(base_color, (255, 235, 180), 0.16), patch_rect, 2, border_radius=12)
+                pixel_rect(screen, sc["dirt_dark"], patch_rect.move(0, 3), chamfer=CHAMFER)
+                pixel_rect(screen, base_color, patch_rect, chamfer=CHAMFER)
+                pixel_rect(screen, mix_color(base_color, (255, 235, 180), 0.16), patch_rect, width=2, chamfer=CHAMFER)
 
         if not sim.is_tree and game_state.crop != "rice" and sim.moisture < 28:
             for idx, (x, y) in enumerate(self.crop_positions()):
@@ -594,8 +594,8 @@ class FarmRenderer:
             px = 225 - pill_w // 2
             py = 460
             pill = pygame.Surface((pill_w, pill_h), pygame.SRCALPHA)
-            pill.fill((28, 24, 20, int(205 * alpha)))
-            pygame.draw.rect(pill, (150, 120, 80, int(220 * alpha)), (0, 0, pill_w, pill_h), 1, border_radius=8)
+            pixel_rect(pill, (28, 24, 20, int(205 * alpha)), (0, 0, pill_w, pill_h), chamfer=CHAMFER)
+            pixel_rect(pill, (150, 120, 80, int(220 * alpha)), (0, 0, pill_w, pill_h), width=1, chamfer=CHAMFER)
             screen.blit(pill, (px, py))
             ts.set_alpha(int(255 * alpha))
             screen.blit(ts, (px + pad, py + 4))
@@ -647,7 +647,7 @@ class FarmRenderer:
         temp = pygame.Surface((w, MAXH), pygame.SRCALPHA)
         t = get_font(15).render(i18n.t(title), True, (92, 66, 42))
         temp.blit(t, (w // 2 - t.get_width() // 2, 11))
-        pygame.draw.rect(temp, (203, 160, 96), (12, 33, w - 24, 2), border_radius=1)
+        pygame.draw.rect(temp, (203, 160, 96), (12, 33, w - 24, 2))
         h = min(MAXH, build(temp, 46) + 14)
         draw_light_panel(parent, pygame.Rect(px, y0, w, h))
         parent.blit(temp.subsurface((0, 0, w, h)), (px, y0))
@@ -757,7 +757,7 @@ class FarmRenderer:
         title_surf = title_font.render(title, True, TEXT_DARK)
         screen.blit(title_surf, (card.centerx - title_surf.get_width() // 2, card.y + 24))
         pygame.draw.rect(screen, (221, 173, 96),
-                         (card.centerx - 60, card.y + 56, 120, 3), border_radius=2)
+                         (card.centerx - 60, card.y + 56, 120, 3))
 
         # 본문: 폭에 맞춰 줄바꿈하고, 세로로 넘치면 폰트를 줄여 카드 안에 맞춘다.
         body_top = card.y + 76

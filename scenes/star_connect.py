@@ -11,6 +11,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_MUTED
 from core.ui import draw_story_backdrop
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 
@@ -179,9 +180,9 @@ class StarConnectScene:
         prog = self.font.render(i18n.tf("이은 별  {idx}/{total}", idx=self.idx, total=self.total), True, (236, 230, 206))
         screen.blit(prog, (28, 26))
         w = 220
-        pygame.draw.rect(screen, (40, 44, 60), (28, 56, w, 6), border_radius=3)
-        pygame.draw.rect(screen, (210, 190, 120),
-                         (28, 56, int(w * (self.idx / self.total)), 6), border_radius=3)
+        pixel_rect(screen, (40, 44, 60), (28, 56, w, 6), chamfer=CHAMFER_SM)
+        pixel_rect(screen, (210, 190, 120),
+                   (28, 56, int(w * (self.idx / self.total)), 6), chamfer=CHAMFER_SM)
         if self.done:
             msg = "다 이었다…" if self.idx >= self.total else "별이 흐려진다…"
             tip = self.font.render(msg, True, GOLD_DIM)

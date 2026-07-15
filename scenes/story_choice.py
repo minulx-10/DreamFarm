@@ -4,6 +4,7 @@ import math
 from core.game_state import game_state
 from core.assets import TEXT_DARK, TEXT_MUTED, WOOD_LIGHT, get_font, WHITE, GOLD
 from core.ui import draw_button, draw_light_panel, draw_story_backdrop, wrap_text, mix_color, draw_panel
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 from core.ui_utils import Typewriter
@@ -314,9 +315,9 @@ class StoryChoiceScene:
         # 타이머 바
         total = self.qte_task.get("time_limit", 30.0)
         timer_w = int(500 * max(0.0, self.qte_timer / total))
-        pygame.draw.rect(screen, (80, 70, 60), (150, 470, 500, 16), border_radius=4)
+        pixel_rect(screen, (80, 70, 60), (150, 470, 500, 16), chamfer=CHAMFER_SM)
         bar_col = (220, 60, 60) if self.qte_timer < total * 0.35 else (90, 160, 110)
-        pygame.draw.rect(screen, bar_col, (150, 470, timer_w, 16), border_radius=4)
+        pixel_rect(screen, bar_col, (150, 470, timer_w, 16), chamfer=CHAMFER_SM)
         t_font = get_font(13)
         time_text = t_font.render(i18n.tf("제한시간: {t}초", t=f"{self.qte_timer:.1f}"), True, WHITE)
         screen.blit(time_text, (400 - time_text.get_width() // 2, 472))
@@ -410,7 +411,7 @@ class StoryChoiceScene:
                     pygame.draw.circle(screen, (210, 150, 90), (cx, cy), int(16 + 4 * pulse), 2)
                     if self.qte_progress > 0:
                         w = int(24 * self.qte_progress)
-                        pygame.draw.rect(screen, (180, 186, 192), (cx - 12, cy + 16, w, 4), border_radius=2)
+                        pygame.draw.rect(screen, (180, 186, 192), (cx - 12, cy + 16, w, 4))
             hint = t_font.render("호미의 녹슨 자리에서 마우스를 좌우로 문지르세요", True, TEXT_MUTED)
             screen.blit(hint, (400 - hint.get_width() // 2, 418))
 

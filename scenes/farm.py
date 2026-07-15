@@ -6,6 +6,7 @@ from core import audio
 from core import save_system
 from core import i18n
 from core.ui import draw_button
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from scenes.tending import WaterPour, WeedPull, PestTap, SoilMound
 
 # 행동 -> 손맛 인터랙션 클래스
@@ -30,8 +31,8 @@ class Button:
         if self.kind == "close":
             base = (86, 78, 70) if not self.hovered else (110, 100, 90)
             r = self.rect
-            pygame.draw.rect(screen, base, r, border_radius=r.height // 2)
-            pygame.draw.rect(screen, (150, 138, 126), r, 1, border_radius=r.height // 2)
+            pixel_rect(screen, base, r, chamfer=CHAMFER)
+            pixel_rect(screen, (150, 138, 126), r, width=1, chamfer=CHAMFER)
             surf = self.font.render("✕ " + self.text, True, (236, 228, 214))
             screen.blit(surf, (r.centerx - surf.get_width() // 2,
                                r.centery - surf.get_height() // 2))

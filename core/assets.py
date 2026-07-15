@@ -3,6 +3,8 @@ import pygame
 # 색은 공용 팔레트(core/palette.py)를 단일 소스로 쓴다. 여기서 re-export 해 기존
 # `from core.assets import GOLD, TEXT_DARK ...` 임포트를 그대로 유지한다.
 from core.palette import *  # noqa: F401,F403
+# 곡선 없음: 픽셀 챔퍼 사각형·픽셀 원 프리미티브(ui 와 공유, 순환참조 방지 위해 별도 모듈)
+from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM
 
 import os
 import sys
@@ -588,10 +590,26 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         dd = dirt_dk or DIRT_DARK
     horizon = 166
 
-    # --- 하늘: 다단 황혼 그라데이션 (계단식 밴딩) ---
-    for y in range(0, horizon, _BG_BAND):
-        pygame.draw.rect(screen, _bg_quant(_sky_color((y + _BG_BAND * 0.5) / horizon)),
-                         (0, y, w, min(_BG_BAND, horizon - y)))
+    # 여백까지 '실제 배경'을 이어 그린다 — 안전영역 밖(부모 캔버스에 여백이 있으면) 하늘/산/땅을
+    # 캔버스 전체 폭으로 연장한다(지평선이 자연스럽게 옆으로 이어짐). 오브젝트(해·밭)는 안전영역에.
+    parent = screen.get_parent()
+    if parent is not None and parent.get_size() != (w, h):
+        bg = parent
+        ox, oy = screen.get_offset()
+        PW, PH = parent.get_size()
+    else:
+        bg = screen
+        ox, oy = 0, 0
+        PW, PH = w, h
+    top_y = -oy                  # 그릴 최상단(safe-y, 여백 있으면 음수)
+    bot_y = PH - oy              # 그릴 최하단(safe-y)
+
+    # --- 하늘: 다단 황혼 그라데이션 (계단식 밴딩) — 위 여백까지 전체 폭 ---
+    y = (top_y // _BG_BAND) * _BG_BAND
+    while y < horizon:
+        t = max(0.0, min(1.0, (y + _BG_BAND * 0.5) / horizon))
+        pygame.draw.rect(bg, _bg_quant(_sky_color(t)), (0, y + oy, PW, _BG_BAND))
+        y += _BG_BAND
 
     # --- 별 (윗하늘, 태양에서 먼 쪽일수록 또렷하게) ---
     for sx, sy, sb in _STARS:
@@ -599,24 +617,25 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
             tw = 200 + sb * 22
             # 악몽 모드에서는 붉은 빛 별로 변경
             col = (min(255, tw), 60, 60) if game_state.nightmare else (min(255, tw), min(255, tw), 210)
-            pygame.draw.circle(screen, col, (sx, sy), sb)
+            pygame.draw.circle(bg, col, (sx + ox, sy + oy), sb)
 
     # --- 태양 + 부드러운 블룸 ---
-    sun_x, sun_y = 640, 78
+    sun_x, sun_y = 640 + ox, 78 + oy
     bloom = pygame.Surface((260, 260), pygame.SRCALPHA)
     for r in range(126, 0, -7):
         a = int(54 * (1.0 - r / 126.0))
         glow_c = (180, 20, 20, a) if game_state.nightmare else (255, 188, 120, a)
         pygame.draw.circle(bloom, glow_c, (130, 130), r)
-    screen.blit(bloom, (sun_x - 130, sun_y - 130))
+    bg.blit(bloom, (sun_x - 130, sun_y - 130))
+    # 태양 본체 — 블룸(위)은 소프트하게 두고, 본체는 큰 픽셀 디스크로(곡선 없음)
     if game_state.nightmare:
-        pygame.draw.circle(screen, (30, 0, 0), (sun_x, sun_y), 40)
-        pygame.draw.circle(screen, (90, 10, 10), (sun_x, sun_y), 29)
-        pygame.draw.circle(screen, (150, 15, 15), (sun_x, sun_y), 15)
+        pixel_disc(bg, (30, 0, 0), (sun_x, sun_y), 40, px=3)
+        pixel_disc(bg, (90, 10, 10), (sun_x, sun_y), 29, px=3)
+        pixel_disc(bg, (150, 15, 15), (sun_x, sun_y), 15, px=3)
     else:
-        pygame.draw.circle(screen, (255, 152, 86), (sun_x, sun_y), 40)
-        pygame.draw.circle(screen, (255, 206, 142), (sun_x, sun_y), 29)
-        pygame.draw.circle(screen, (255, 240, 206), (sun_x, sun_y), 15)
+        pixel_disc(bg, (255, 152, 86), (sun_x, sun_y), 40, px=3)
+        pixel_disc(bg, (255, 206, 142), (sun_x, sun_y), 29, px=3)
+        pixel_disc(bg, (255, 240, 206), (sun_x, sun_y), 15, px=3)
 
     # --- 노을 구름 (반투명, 빛을 받은 아랫면이 환하게) ---
     for cx, cy, cw, ch in _CLOUDS:
@@ -625,9 +644,9 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         cloud_c2 = (140, 30, 30, 110) if game_state.nightmare else (236, 158, 120, 110)
         pygame.draw.ellipse(cloud, cloud_c1, (0, 0, cw, ch))
         pygame.draw.ellipse(cloud, cloud_c2, (cw * 0.18, ch * 0.5, cw * 0.7, ch))
-        screen.blit(cloud, (cx - cw // 2, cy - ch // 2))
+        bg.blit(cloud, (cx - cw // 2 + ox, cy - ch // 2 + oy))
 
-    # --- 안개 낀 산 3겹 (멀수록 옅고 푸르게) ---
+    # --- 안개 낀 산 3겹 (멀수록 옅고 푸르게) — 능선을 캔버스 양끝까지 평평하게 연장 ---
     if game_state.nightmare:
         m1 = (48, 10, 10)
         m2 = (34, 6, 6)
@@ -636,31 +655,40 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         m1 = (108, 74, 116)
         m2 = (78, 52, 98)
         m3 = (46, 70, 78)
-    pygame.draw.polygon(screen, m1, [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104), (800, horizon + 10), (0, horizon + 10)])
-    pygame.draw.polygon(screen, m2, [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122), (800, h), (0, h)])
-    pygame.draw.polygon(screen, m3, [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50), (800, h), (0, h)])
 
-    # --- 지평선 햇무리 (따뜻한 가로 빛띠) ---
-    haze = pygame.Surface((w, 40), pygame.SRCALPHA)
+    def _hill(color, ridge, base):
+        poly = [(0, ridge[0][1] + oy)]                        # 왼쪽 캔버스 끝(첫 능선 높이로 평평히)
+        poly += [(px + ox, py + oy) for px, py in ridge]      # 능선
+        poly += [(PW, ridge[-1][1] + oy), (PW, base + oy), (0, base + oy)]  # 오른쪽 끝 + 아래 모서리
+        pygame.draw.polygon(bg, color, poly)
+
+    _hill(m1, [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104)], horizon + 10)
+    _hill(m2, [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122)], h)
+    _hill(m3, [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50)], h)
+
+    # --- 지평선 햇무리 (따뜻한 가로 빛띠) — 전체 폭 ---
+    haze = pygame.Surface((PW, 40), pygame.SRCALPHA)
     for i in range(20):
         a = int(70 * (1 - abs(i - 10) / 10))
         col = (180, 20, 20, a) if game_state.nightmare else (255, 196, 140, a)
-        pygame.draw.line(haze, col, (0, i * 2), (w, i * 2))
-    screen.blit(haze, (0, horizon - 20))
+        pygame.draw.line(haze, col, (0, i * 2), (PW, i * 2))
+    bg.blit(haze, (0, horizon - 20 + oy))
 
-    # --- 잔디: 세로 그라데이션(계단식 밴딩) + 결 ---
-    for i in range(0, h - horizon, _BG_BAND):
+    # --- 잔디: 세로 그라데이션(계단식 밴딩) + 결 — 아래 여백까지 전체 폭 ---
+    i = 0
+    while horizon + i < bot_y:
         c = _mix_color(_mix_color(gc, (255, 200, 150) if not game_state.nightmare else (100, 40, 40), 0.12), gd, min(1.0, i / 150.0))
-        pygame.draw.rect(screen, _bg_quant(c), (0, horizon + i, w, min(_BG_BAND, h - horizon - i)))
-    for y in range(horizon, h, 34):
-        c = _mix_color(gc, gd, 0.30 if (y // 34) % 2 == 0 else 0.50)
-        pygame.draw.line(screen, c, (0, y), (w, y + 16), 2)
+        pygame.draw.rect(bg, _bg_quant(c), (0, horizon + i + oy, PW, _BG_BAND))
+        i += _BG_BAND
+    for gy in range(horizon, bot_y, 34):
+        c = _mix_color(gc, gd, 0.30 if (gy // 34) % 2 == 0 else 0.50)
+        pygame.draw.line(bg, c, (0, gy + oy), (PW, gy + 16 + oy), 2)
 
-    for x in range(0, w, 44):
-        for y in range(horizon + 18, h, 70):
-            if (x + y) % 3 == 0:
-                pygame.draw.line(screen, gd, (x + 10, y + 8), (x + 18, y + 2), 2)
-                pygame.draw.line(screen, gd, (x + 17, y + 3), (x + 22, y + 11), 2)
+    for gx in range(0, PW, 44):
+        for gy in range(horizon + 18, bot_y, 70):
+            if (gx + gy) % 3 == 0:
+                pygame.draw.line(bg, gd, (gx + 10, gy + 8 + oy), (gx + 18, gy + 2 + oy), 2)
+                pygame.draw.line(bg, gd, (gx + 17, gy + 3 + oy), (gx + 22, gy + 11 + oy), 2)
 
     # --- 텃밭 흙바닥: 나무 테두리 + 결 고운 흙 + 빛·그늘 밴드 + 입체 이랑 ---
     dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)
@@ -669,12 +697,12 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     border_c1 = (40, 15, 15) if game_state.nightmare else (52, 36, 25)
     border_c2 = (100, 30, 30) if game_state.nightmare else (122, 86, 53)
     border_c3 = (130, 45, 45) if game_state.nightmare else (156, 114, 74)
-    pygame.draw.rect(screen, border_c1, frame.move(0, 6), border_radius=15)
-    pygame.draw.rect(screen, border_c2, frame, border_radius=15)
-    pygame.draw.rect(screen, border_c3, frame, 2, border_radius=15)
+    pixel_rect(screen, border_c1, frame.move(0, 6), chamfer=CHAMFER)
+    pixel_rect(screen, border_c2, frame, chamfer=CHAMFER)
+    pixel_rect(screen, border_c3, frame, width=2, chamfer=CHAMFER)
     # 흙 바닥
-    pygame.draw.rect(screen, dd, dirt_rect.move(0, 4), border_radius=12)
-    pygame.draw.rect(screen, dc, dirt_rect, border_radius=12)
+    pixel_rect(screen, dd, dirt_rect.move(0, 4), chamfer=CHAMFER)
+    pixel_rect(screen, dc, dirt_rect, chamfer=CHAMFER)
     # 위쪽 빛 밴드 / 아래쪽 그늘 밴드로 깊이감
     top_band = pygame.Surface((dirt_rect.w, 64), pygame.SRCALPHA)
     for i in range(64):
@@ -686,13 +714,13 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     screen.blit(bot_band, (dirt_rect.x, dirt_rect.bottom - 90))
     # 입체 이랑 (어두운 고랑 + 윗면 노을 하이라이트)
     for y in range(dirt_rect.y + 30, dirt_rect.bottom - 16, 40):
-        pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.20), (dirt_rect.x + 14, y + 6, dirt_rect.w - 28, 6), border_radius=3)
-        pygame.draw.rect(screen, _mix_color(dc, (255, 205, 150) if not game_state.nightmare else (200, 80, 80), 0.24), (dirt_rect.x + 14, y, dirt_rect.w - 28, 4), border_radius=2)
+        pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.20), (dirt_rect.x + 14, y + 6, dirt_rect.w - 28, 6))
+        pygame.draw.rect(screen, _mix_color(dc, (255, 205, 150) if not game_state.nightmare else (200, 80, 80), 0.24), (dirt_rect.x + 14, y, dirt_rect.w - 28, 4))
     # 흙 알갱이 텍스처
     speck = _mix_color(dc, dd, 0.65)
     for sx_, sy_, ss in _SOIL_SPECKS:
         pygame.draw.rect(screen, speck, (dirt_rect.x + sx_, dirt_rect.y + sy_, ss, ss))
-    pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, 3, border_radius=12)
+    pixel_rect(screen, _mix_color(dd, BLACK, 0.10), dirt_rect, width=3, chamfer=CHAMFER)
 
     from core.layout import bleed_edges
     bleed_edges(screen)   # 적응형: 안전영역 밖 여백을 잔디/하늘로 이어 채움(4:3이면 무동작)
@@ -721,23 +749,23 @@ def draw_crop_seed(screen, cx, cy, crop_key):
     """작물별 씨앗 모양을 (cx, cy) 중심에 그린다.
     당근은 기존 픽셀 스프라이트를, 나머지는 벡터 도형을 그린다."""
     if crop_key == "apple":
-        # 사과 씨앗: 작고 검붉은 물방울 씨앗 몇 알
+        # 사과 씨앗: 작고 검붉은 도트 씨앗 몇 알(각진 픽셀)
         for dx, dy in [(-5, 1), (5, -1), (0, 6)]:
-            pygame.draw.ellipse(screen, (92, 46, 28), (cx + dx - 2, cy + dy - 3, 5, 8))
-            pygame.draw.ellipse(screen, (150, 92, 56), (cx + dx - 1, cy + dy - 2, 2, 3))
+            pygame.draw.rect(screen, (92, 46, 28), (cx + dx - 2, cy + dy - 3, 4, 7))
+            pygame.draw.rect(screen, (150, 92, 56), (cx + dx - 1, cy + dy - 1, 2, 3))
         return
     if crop_key == "potato":
-        # 씨감자: 둥근 황갈색 덩이 + 싹눈
-        pygame.draw.ellipse(screen, (120, 84, 50), (cx - 10, cy - 6, 20, 15))
-        pygame.draw.ellipse(screen, (170, 130, 82), (cx - 8, cy - 5, 15, 11))
+        # 씨감자: 각진 황갈색 덩이 + 싹눈 도트
+        pixel_rect(screen, (120, 84, 50), (cx - 10, cy - 7, 20, 14), chamfer=CHAMFER)
+        pixel_rect(screen, (170, 130, 82), (cx - 8, cy - 5, 15, 10), chamfer=CHAMFER_SM)
         for ex, ey in [(-3, -1), (3, 2), (0, 4)]:
-            pygame.draw.circle(screen, (92, 62, 38), (cx + ex, cy + ey), 1)
+            pygame.draw.rect(screen, (92, 62, 38), (cx + ex - 1, cy + ey - 1, 2, 2))
         return
     if crop_key == "rice":
-        # 볍씨: 물 위에 흩뿌린 옅은 낟알
+        # 볍씨: 물 위에 흩뿌린 각진 낟알 도트
         for dx, dy in [(-6, 1), (-1, 5), (4, -1), (7, 4), (1, -3)]:
-            pygame.draw.ellipse(screen, (200, 186, 120), (cx + dx - 1, cy + dy - 3, 4, 8))
-            pygame.draw.ellipse(screen, (240, 232, 190), (cx + dx, cy + dy - 2, 2, 4))
+            pygame.draw.rect(screen, (200, 186, 120), (cx + dx - 1, cy + dy - 3, 3, 6))
+            pygame.draw.rect(screen, (240, 232, 190), (cx + dx, cy + dy - 2, 2, 3))
         return
     # carrot (기본): 픽셀 씨앗 스프라이트
     spr = sprites.get("seed")

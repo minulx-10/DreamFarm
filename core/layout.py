@@ -36,6 +36,15 @@ def set_viewport(win_w, win_h):
     safe_y = (canvas_h - SAFE_H) // 2
 
 
+def set_canvas(cw, ch):
+    """정수 배율 스냅용 — 캔버스 크기를 직접 지정하고 안전영역을 가운데로 재정렬한다.
+    (game_main._apply_scaling 이 고해상도에서 정수배로 창을 꽉 채우려고 캔버스를 다시 키울 때 사용.)"""
+    global canvas_w, canvas_h, safe_x, safe_y
+    canvas_w, canvas_h = cw, ch
+    safe_x = (canvas_w - SAFE_W) // 2
+    safe_y = (canvas_h - SAFE_H) // 2
+
+
 def safe_rect():
     import pygame
     return pygame.Rect(safe_x, safe_y, SAFE_W, SAFE_H)
@@ -97,11 +106,10 @@ def _avg_lum(surf):
 
 
 def bleed_edges(screen):
-    """안전영역(서브서피스) 밖 여백을 '자연스럽게' 채운다.
-    스트레치로 연속성만 잡은 뒤 (1) 소프트 블러로 뭉개짐을 지우고 (2) 어두운 씬은 꿈-어둠으로
-    페이드 + 떠다니는 빛, 밝은 씬(밭 등)은 부드러운 자연 연장만 남긴다(밝기 자동 감지).
-    배경 직후(UI 전)에 호출. 4:3(여백 0)이면 무동작.
-    (core.ui.draw_story_backdrop·core.assets.draw_tiled_background 끝에서 호출)"""
+    """여백 '깊이 마감'. 배경 함수(draw_story_backdrop·draw_tiled_background)가 이미 캔버스 전체 폭으로
+    실제 배경(하늘·산·땅)을 이어 그리므로, 여기선 스미어/워시 없이 은은한 깊이감만 더한다:
+    (1) 바깥 가장자리 비네트(초점) (2) 여백에 떠다니는 빛(어두운 씬). 4:3(여백 0)이면 무동작.
+    배경 직후(UI 전)에 호출."""
     import pygame
     import math
     parent = screen.get_parent()
@@ -112,59 +120,46 @@ def bleed_edges(screen):
     ox, oy = screen.get_offset()
     pw, ph = parent.get_size()
     sw, sh = screen.get_size()
+    if ox <= 0 and oy <= 0:
+        return
+    safe = pygame.Rect(ox, oy, sw, sh)
+    # 씬 밝기 감지 → 어두운 씬일수록 비네트·빛을 강하게(밝은 밭은 은은하게)
+    d = max(0.0, min(1.0, (78.0 - _avg_lum(screen)) / 60.0))
+    vig = 0.16 + 0.52 * d
 
-    # 좌/우 여백 — 가장자리 한 '열'에서 부드러운 세로 색 안개를 만들어 채운다(가로 디테일/줄무늬 없음).
-    sides = []                                  # (edge_x, mx0, mw, is_left)
+    # (1) 바깥 가장자리 비네트 — 캔버스 끝으로 갈수록 살짝 어둑(초점). 블러 아님.
     if ox > 0:
-        sides.append((0, 0, ox, True))
-    rw = pw - (ox + sw)
-    if rw > 0:
-        sides.append((sw - 1, ox + sw, rw, False))
+        band = min(ox, 170)
+        grad = pygame.Surface((band, ph), pygame.SRCALPHA)
+        amax = int(210 * vig)
+        for xi in range(0, band, 2):
+            a = int(amax * ((1 - xi / band) ** 1.5))
+            grad.fill((6, 6, 14, a), (xi, 0, 2, ph))
+        parent.blit(grad, (0, 0))
+        parent.blit(pygame.transform.flip(grad, True, False), (pw - band, 0))
+    if oy > 0:
+        band = min(oy, 150)
+        grad = pygame.Surface((pw, band), pygame.SRCALPHA)
+        amax = int(210 * vig)
+        for yi in range(0, band, 2):
+            a = int(amax * ((1 - yi / band) ** 1.5))
+            grad.fill((6, 6, 14, a), (0, yi, pw, 2))
+        parent.blit(grad, (0, 0))
+        parent.blit(pygame.transform.flip(grad, False, True), (0, ph - band))
 
-    for (edge_x, mx0, mw, is_left) in sides:
-        col = screen.subsurface((edge_x, 0, 1, sh)).copy()
-        lum = _avg_lum(col)
-        # (1) 가장자리 한 '열'만 뽑아 세로 색 그라데이션으로 확대 → 배경색은 이어지되 오브젝트(달·흙밭 등)는
-        #     복제되지 않는다(옆에 밭이 또 뜨는 문제 방지).
-        vsamp = max(4, sh // 90)
-        wash = pygame.transform.smoothscale(pygame.transform.smoothscale(col, (1, vsamp)), (mw, sh))
-        parent.blit(wash, (mx0, oy))
-        # (2) 경계 블렌드: 경계를 걸친 좁은 띠를 블러 → 선명한 화면 ↔ 그라데이션 여백을 부드럽게 이어줌(이음새 제거)
-        boundary_x = (mx0 + mw) if is_left else mx0
-        bx = max(0, boundary_x - 26)
-        bw = min(pw, boundary_x + 26) - bx
-        if bw > 4:
-            parent.blit(_blur(parent.subsurface((bx, oy, bw, sh)).copy(), 7), (bx, oy))
-        # (3) 은은한 비네트 → 가장자리가 자연스럽게 물러난다. 어두운 씬일수록 '강한 꿈-어둠'으로.
-        d = max(0.0, min(1.0, (78.0 - lum) / 60.0))            # lum<18→1, lum>78→0
-        darkness = 0.26 + 0.74 * d                             # 밝은 밭도 은은히(0.26), 밤은 강하게(1.0)
-        grad = pygame.Surface((mw, sh), pygame.SRCALPHA)
-        amax = int(238 * darkness)
-        for xi in range(0, mw, 2):
-            t = (1 - xi / mw) if is_left else (xi / mw)
-            grad.fill((8, 7, 18, int(amax * (t ** 0.9))), (xi, 0, 2, sh))
-        parent.blit(grad, (mx0, oy))
-        # (4) 떠다니는 빛(어두운 씬에서만 뚜렷 — 밝은 밭은 거의 없음)
-        mote_scale = 0.10 + 0.90 * d
-        for m in _MOTES:
-            if m["side"] != (0 if is_left else 1):
-                continue
-            px = mx0 + m["fx"] * mw + math.sin(_time * m["speed"] + m["phase"]) * m["amp"]
-            py = oy + m["fy"] * sh + math.cos(_time * m["speed"] * 0.7 + m["phase"]) * m["amp"] * 0.6
-            if not (mx0 <= px < mx0 + mw):
-                continue
-            a = int(150 * m["bright"] * mote_scale)
-            if a < 8:
-                continue
-            rr = m["size"]
-            glow = _MOTE_GLOW[rr]
-            glow.set_alpha(int(255 * a / 150))
-            parent.blit(glow, (int(px - rr * 3), int(py - rr * 3)))
-
-    # 상/하 여백(세로 화면) — 가장자리 한 '행'에서 가로 색 안개를 만들어 채운다
-    for (edge_y, my0, mh, is_top) in ([(0, 0, oy, True)] if oy > 0 else []) + \
-                                     ([(sh - 1, oy + sh, ph - (oy + sh), False)] if ph - (oy + sh) > 0 else []):
-        row = screen.subsurface((0, edge_y, sw, 1)).copy()
-        hsamp = max(10, sw // 32)
-        wash = pygame.transform.smoothscale(pygame.transform.smoothscale(row, (hsamp, 1)), (pw, mh))
-        parent.blit(wash, (0, my0))
+    # (2) 떠다니는 빛 — 여백 전체에 흩뿌리되 게임 화면(안전영역) 위에는 안 그림
+    mote_scale = 0.12 + 0.88 * d
+    if mote_scale < 0.06:
+        return
+    for m in _MOTES:
+        mx = m["fx"] * pw + math.sin(_time * m["speed"] + m["phase"]) * m["amp"]
+        my = m["fy"] * ph + math.cos(_time * m["speed"] * 0.7 + m["phase"]) * m["amp"] * 0.6
+        if safe.collidepoint(mx, my):
+            continue
+        a = int(150 * m["bright"] * mote_scale)
+        if a < 8:
+            continue
+        rr = m["size"]
+        glow = _MOTE_GLOW[rr]
+        glow.set_alpha(int(255 * a / 150))
+        parent.blit(glow, (int(mx - rr * 3), int(my - rr * 3)))

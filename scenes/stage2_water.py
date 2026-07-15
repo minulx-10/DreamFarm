@@ -6,6 +6,7 @@ from core.assets import *
 from core import audio
 from core import i18n
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 
 class Stage2Scene:
     """Interactive watering minigame.
@@ -160,12 +161,12 @@ class Stage2Scene:
 
             # Draw moisture progress bar (Enlarged for high visibility)
             bar_rect = pygame.Rect(x - 40, y + 26, 80, 12)
-            pygame.draw.rect(screen, (40, 35, 30), bar_rect, border_radius=4)
-            pygame.draw.rect(screen, (100, 95, 90), bar_rect, 1, border_radius=4) # Light outer border
+            pixel_rect(screen, (40, 35, 30), bar_rect, chamfer=CHAMFER_SM)
+            pixel_rect(screen, (100, 95, 90), bar_rect, width=1, chamfer=CHAMFER_SM)  # Light outer border
             fill_w = int(74 * (mound['moisture'] / 100.0))
             if fill_w > 0:
                 # Glowing blue/cyan moisture color
-                pygame.draw.rect(screen, (60, 160, 240), (bar_rect.x + 3, bar_rect.y + 3, fill_w, 6), border_radius=2)
+                pixel_rect(screen, (60, 160, 240), (bar_rect.x + 3, bar_rect.y + 3, fill_w, 6), chamfer=CHAMFER_SM)
 
         # Draw falling water drops particles
         for p in self.particles:

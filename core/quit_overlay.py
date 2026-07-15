@@ -8,6 +8,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font
 from core.ui import draw_wood_panel, draw_light_panel
+from core.pixelfx import pixel_rect, CHAMFER
 from core import audio
 
 
@@ -68,8 +69,8 @@ class QuitOverlay:
 
         # 예 버튼
         if self.yes_hover:
-            pygame.draw.rect(screen, (246, 222, 169), self.yes_btn, border_radius=6)
-            pygame.draw.rect(screen, (150, 100, 60), self.yes_btn, 2, border_radius=6)
+            pixel_rect(screen, (246, 222, 169), self.yes_btn, chamfer=CHAMFER)
+            pixel_rect(screen, (150, 100, 60), self.yes_btn, width=2, chamfer=CHAMFER)
         else:
             draw_light_panel(screen, self.yes_btn)
         font_btn = get_font(16)
@@ -78,8 +79,8 @@ class QuitOverlay:
 
         # 아니오 버튼
         if self.no_hover:
-            pygame.draw.rect(screen, (246, 222, 169), self.no_btn, border_radius=6)
-            pygame.draw.rect(screen, (150, 100, 60), self.no_btn, 2, border_radius=6)
+            pixel_rect(screen, (246, 222, 169), self.no_btn, chamfer=CHAMFER)
+            pixel_rect(screen, (150, 100, 60), self.no_btn, width=2, chamfer=CHAMFER)
         else:
             draw_light_panel(screen, self.no_btn)
         no_surf = font_btn.render("아니오", True, (60, 30, 10))

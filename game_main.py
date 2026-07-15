@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from core.platform import IS_ANDROID
 from core.game_state import game_state, apply_second_run
 from core import audio
+from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM  # 곡선 없음: 픽셀 챔퍼/원
 from core.settings_overlay import SettingsOverlay
 from scenes.title import TitleScene
 from scenes.crop_select import CropSelectScene
@@ -124,12 +125,24 @@ def main():
             return
         layout.set_viewport(actual_w, actual_h)
         cw, ch = layout.canvas_size()
+        scale = min(actual_w / cw, actual_h / ch)        # 캔버스를 창에 꽉 채우는 배율
+        iscale = int(scale)                              # 내림 정수 배율
+        if iscale >= 2:
+            # 정수 배율 스냅(2배 이상 고해상도 전용) — 비정수 배율(예:2.4)은 도트가 2~3px로
+            # 들쭉날쭉해진다. 캔버스를 '창을 정수배로 꽉 채우도록' 다시 키우고(살짝 오버스캔은
+            # 크롭), 안전영역(800x600)은 가운데 두며 남는 여백은 bleed_edges 블러가 채운다.
+            # → 화면 전체가 '균일한 큰 픽셀'. 720p·1080p(iscale=1)는 아래 분기로 기존과 동일(작아짐 없음).
+            cw = min(layout.MAX_W, max(layout.SAFE_W, math.ceil(actual_w / iscale)))
+            ch = min(layout.MAX_H, max(layout.SAFE_H, math.ceil(actual_h / iscale)))
+            layout.set_canvas(cw, ch)
+            target_w = cw * iscale
+            target_h = ch * iscale
+        else:
+            target_w = int(cw * scale)
+            target_h = int(ch * scale)
         if virtual_screen is None or virtual_screen.get_size() != (cw, ch):
             virtual_screen = pygame.Surface((cw, ch))
             safe_sub = virtual_screen.subsurface(layout.safe_rect())
-        scale = min(actual_w / cw, actual_h / ch)        # 캔버스를 창에 꽉 채우는 배율
-        target_w = int(cw * scale)
-        target_h = int(ch * scale)
         offset_x = (actual_w - target_w) // 2
         offset_y = (actual_h - target_h) // 2
 
@@ -466,8 +479,8 @@ def main():
             if hovered_ff:
                 from core.ui import mix_color
                 bg_ff = mix_color(bg_ff, (250, 246, 231), 0.2)
-            pygame.draw.rect(safe_sub, bg_ff, ff_btn, border_radius=7)
-            pygame.draw.rect(safe_sub, (229, 192, 124), ff_btn, 1, border_radius=7)
+            pixel_rect(safe_sub, bg_ff, ff_btn, chamfer=CHAMFER_SM)
+            pixel_rect(safe_sub, (229, 192, 124), ff_btn, width=1, chamfer=CHAMFER_SM)
 
             # 화살표 기호 '>>' 렌더링
             from core.assets import get_font
@@ -487,7 +500,7 @@ def main():
                 vbox = pygame.Rect(6, 4, ver_surf.get_width() + 12, ver_surf.get_height() + 6)
                 vbg = pygame.Surface(vbox.size, pygame.SRCALPHA)
                 vbg.fill((20, 24, 28, 200))
-                pygame.draw.rect(vbg, (120, 130, 120, 200), vbg.get_rect(), 1, border_radius=5)
+                pixel_rect(vbg, (120, 130, 120, 200), vbg.get_rect(), width=1, chamfer=CHAMFER_SM)
                 safe_sub.blit(vbg, vbox.topleft)
                 safe_sub.blit(ver_surf, (vbox.x + 6, vbox.y + 3))
         except Exception:
@@ -502,7 +515,7 @@ def main():
         if game_state.paused:
             pause_veil = pygame.Surface((800, 600), pygame.SRCALPHA)
             pause_veil.fill((12, 14, 20, 195))
-            pygame.draw.rect(pause_veil, (130, 105, 75, 230), (198, 248, 404, 104), 2, border_radius=12)
+            pixel_rect(pause_veil, (130, 105, 75, 230), (198, 248, 404, 104), width=2, chamfer=CHAMFER)
             from core.assets import get_font
             font_pause = get_font(23)
             font_sub = get_font(16)

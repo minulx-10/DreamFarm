@@ -6,6 +6,7 @@ from core.assets import *
 from core import audio
 from core import i18n
 from core.crops import current_crop
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
@@ -688,20 +689,20 @@ class Stage4Scene:
         # 4. Tension 게이지 (pulling 중에만 표시, 도정 단계에서는 미표시)
         if self.pull_phase == "pulling" and not self.stage_clear and (not self.is_rice or self.rice_phase == "thresh"):
             gx, gy, gw, gh = 250, 444, 300, 16
-            pygame.draw.rect(screen, (40, 35, 30), (gx, gy, gw, gh), border_radius=4)
+            pixel_rect(screen, (40, 35, 30), (gx, gy, gw, gh), chamfer=CHAMFER_SM)
             fill_w = int((gw - 4) * (self.tension / 100.0))
             if fill_w > 0:
                 # 초록 → 빨강 그라데이션
                 gauge_color = mix_color((80, 175, 110), (220, 60, 45), self.tension / 100.0)
-                pygame.draw.rect(screen, gauge_color, (gx + 2, gy + 2, fill_w, gh - 4), border_radius=3)
+                pixel_rect(screen, gauge_color, (gx + 2, gy + 2, fill_w, gh - 4), chamfer=CHAMFER_SM)
 
             # 감자: 흔들어 풀린 정도 게이지 (다 차면 쏙 뽑힌다)
             if self.is_potato:
                 lx, ly, lw, lh = 250, 428, 300, 13
-                pygame.draw.rect(screen, (40, 35, 30), (lx, ly, lw, lh), border_radius=4)
+                pixel_rect(screen, (40, 35, 30), (lx, ly, lw, lh), chamfer=CHAMFER_SM)
                 lfill = int((lw - 4) * (self.potato_loosen / 100.0))
                 if lfill > 0:
-                    pygame.draw.rect(screen, (210, 180, 90), (lx + 2, ly + 2, lfill, lh - 4), border_radius=3)
+                    pixel_rect(screen, (210, 180, 90), (lx + 2, ly + 2, lfill, lh - 4), chamfer=CHAMFER_SM)
                 cap = get_font(12).render("풀림", True, (236, 224, 200))
                 screen.blit(cap, (lx - cap.get_width() - 8, ly - 1))
 
@@ -720,7 +721,7 @@ class Stage4Scene:
             surf = font_t.render(txt, True, color)
             wx, wy = 400 - surf.get_width() // 2, gy + 22
             chip = pygame.Surface((surf.get_width() + 18, surf.get_height() + 7), pygame.SRCALPHA)
-            pygame.draw.rect(chip, (20, 16, 14, 195), chip.get_rect(), border_radius=9)
+            pixel_rect(chip, (20, 16, 14, 195), chip.get_rect(), chamfer=CHAMFER)
             screen.blit(chip, (wx - 9, wy - 4))
             screen.blit(surf, (wx, wy))
 

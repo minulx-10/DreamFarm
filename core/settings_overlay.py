@@ -10,6 +10,7 @@ import math
 from core import audio
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core.ui import draw_panel, mix_color
+from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM
 from core.game_state import game_state
 from core.platform import IS_ANDROID
 from core import save_system
@@ -292,8 +293,8 @@ class SettingsOverlay:
         bg = (60, 74, 74) if not self.open else (96, 120, 110)
         if hovered:
             bg = mix_color(bg, WHITE, 0.2)
-        pygame.draw.rect(screen, bg, b, border_radius=7)
-        pygame.draw.rect(screen, (229, 192, 124), b, 1, border_radius=7)
+        pixel_rect(screen, bg, b, chamfer=CHAMFER_SM)
+        pixel_rect(screen, (229, 192, 124), b, width=1, chamfer=CHAMFER_SM)
         self._draw_gear_icon(screen, b.centerx, b.centery, bg)
 
     @staticmethod
@@ -431,8 +432,8 @@ class SettingsOverlay:
             lx = modal.centerx - total // 2
             screen.blit(label, (lx, modal.y + 50))
             ib = pygame.Rect(lx + label.get_width() + 8, modal.y + 47, box_w, 22)
-            pygame.draw.rect(screen, (255, 249, 230), ib, border_radius=4)
-            pygame.draw.rect(screen, (60, 150, 70) if ok else (170, 120, 80), ib, 2, border_radius=4)
+            pixel_rect(screen, (255, 249, 230), ib, chamfer=CHAMFER_SM)
+            pixel_rect(screen, (60, 150, 70) if ok else (170, 120, 80), ib, width=2, chamfer=CHAMFER_SM)
             tt = get_font(14).render(typed, True, (50, 140, 60) if ok else TEXT_DARK)
             screen.blit(tt, (ib.x + 6, ib.centery - tt.get_height() // 2))
             yes_disabled = not ok
@@ -450,16 +451,17 @@ class SettingsOverlay:
         screen.blit(lab, (self.panel.x + 26, track.y - 7))
 
         muted = audio.is_muted()
-        pygame.draw.rect(screen, (206, 188, 158), track, border_radius=4)
+        pixel_rect(screen, (206, 188, 158), track, chamfer=CHAMFER_SM)
         fill_col = (150, 158, 150) if muted else (104, 164, 118)
         fill_w = int(track.w * value)
         if fill_w > 0:
-            pygame.draw.rect(screen, fill_col, (track.x, track.y, fill_w, track.h), border_radius=4)
-        
+            pixel_rect(screen, fill_col, (track.x, track.y, fill_w, track.h), chamfer=CHAMFER_SM)
+
         kx = track.x + int(track.w * value)
         ky = track.centery
-        pygame.draw.circle(screen, (121, 94, 68), (kx, ky), 9)
-        pygame.draw.circle(screen, WHITE if not muted else (224, 218, 206), (kx, ky), 6)
+        # 노브 — 각진 픽셀 사각(곡선 없음). 손잡이라 또렷하게.
+        pixel_rect(screen, (121, 94, 68), (kx - 8, ky - 8, 16, 16), chamfer=CHAMFER_SM)
+        pixel_rect(screen, WHITE if not muted else (224, 218, 206), (kx - 5, ky - 5, 10, 10), chamfer=CHAMFER_SM)
         
         pct = get_font(14).render(f"{int(round(value * 100))}%", True, TEXT_MUTED)
         screen.blit(pct, (track.right + 14, track.y - 6))

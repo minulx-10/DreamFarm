@@ -8,6 +8,7 @@ from core.game_state import (
 )
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites, draw_crop_food
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 from core.crops import current_crop, swap_crop_word
@@ -994,9 +995,9 @@ class EndingScene:
             screen.blit(prompt, (box.x + pad, box.y + pad - 1))
             gx, gy = box.x + pad, box.y + pad + prompt.get_height() + 1
             gw = box.w - pad * 2
-            pygame.draw.rect(screen, (48, 46, 40), (gx, gy, gw, gauge_h), border_radius=2)
+            pixel_rect(screen, (48, 46, 40), (gx, gy, gw, gauge_h), chamfer=CHAMFER_SM)
             if self.credit_hold > 0:
-                pygame.draw.rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), border_radius=2)
+                pixel_rect(screen, (232, 196, 110), (gx, gy, int(gw * self.credit_hold), gauge_h), chamfer=CHAMFER_SM)
 
     def _draw_journal(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")

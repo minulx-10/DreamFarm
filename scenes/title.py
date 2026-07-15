@@ -4,6 +4,7 @@ import math
 from core.game_state import game_state
 from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE
 from core.ui import draw_story_backdrop, draw_button
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core import audio
 from core import save_system
 from core import i18n, updater
@@ -175,8 +176,8 @@ class TitleScene:
             self._update_rect = rect
             hovered = rect.collidepoint(pygame.mouse.get_pos())
             bg = pygame.Surface(rect.size, pygame.SRCALPHA)
-            bg.fill((44, 78, 60, 235) if hovered else (32, 56, 46, 215))
-            pygame.draw.rect(bg, (150, 210, 170, 235), bg.get_rect(), 1, border_radius=8)
+            pixel_rect(bg, (44, 78, 60, 235) if hovered else (32, 56, 46, 215), bg.get_rect(), chamfer=CHAMFER)
+            pixel_rect(bg, (150, 210, 170, 235), bg.get_rect(), width=1, chamfer=CHAMFER)
             screen.blit(bg, rect.topleft)
             screen.blit(un, (rect.x + 11, rect.y + 4))
 
@@ -189,8 +190,8 @@ class TitleScene:
             draw_button(screen, self.load_btn, "이어 하기", self.font_button, hovered=self.hovered_load)
         else:
             # 비활성화된 모양 그리기
-            pygame.draw.rect(screen, (70, 70, 70), self.load_btn, border_radius=8)
-            pygame.draw.rect(screen, (100, 100, 100), self.load_btn, 1, border_radius=8)
+            pixel_rect(screen, (70, 70, 70), self.load_btn, chamfer=CHAMFER)
+            pixel_rect(screen, (100, 100, 100), self.load_btn, width=1, chamfer=CHAMFER)
             label = self.font_button.render("이어 하기", True, (130, 130, 130))
             screen.blit(label, (self.load_btn.centerx - label.get_width() // 2, self.load_btn.centery - label.get_height() // 2))
             

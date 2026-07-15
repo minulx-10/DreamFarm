@@ -2,6 +2,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_DARK, TEXT_MUTED, GOLD, WHITE
 from core.ui import draw_light_panel, draw_story_backdrop, draw_button
+from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
 from core.platform import IS_ANDROID
 from core import audio
 
@@ -142,8 +143,8 @@ class NameInputScene:
             screen.blit(prompt, (400 - prompt.get_width() // 2, 80))
 
         input_rect = self.input_rect
-        pygame.draw.rect(screen, (255, 249, 230), input_rect, border_radius=8)
-        pygame.draw.rect(screen, (109, 84, 60), input_rect, 2, border_radius=8)
+        pixel_rect(screen, (255, 249, 230), input_rect, chamfer=CHAMFER)
+        pixel_rect(screen, (109, 84, 60), input_rect, width=2, chamfer=CHAMFER)
 
         display_text = self.input_text + self.ime_text
         if not display_text:
