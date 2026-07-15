@@ -17,7 +17,7 @@ from core import i18n
 TEXT_DARK = (48, 38, 28)
 TEXT_MUTED = (123, 106, 92)
 PLOT = pygame.Rect(44, 140, 362, 318)
-DASH_TAB = pygame.Rect(0, 272, 22, 56)   # 안전영역 좌측 가장자리 — 대시보드 펼침/접힘 손잡이(safe-local 좌표)
+DASH_BTN = pygame.Rect(430, 70, 104, 19)   # 좁은 화면 '밭 수첩' 팝업 토글(날짜 패널·밭상태 패널 사이 여백)
 
 
 class FarmRenderer:
@@ -503,12 +503,12 @@ class FarmRenderer:
     def draw(self, screen, farm_scene):
         sim = farm_scene.sim
         sc = farm_scene.season_colors
-        # 적응형: 넓은 화면이면 여백에 사이드 대시보드(계절 수첩·밭 노트)를 띄운다(펼침/접힘 토글 가능).
+        # 적응형 대시보드: 넓은 화면이면 여백에 사이드 패널(상시), 좁은 화면이면 상단 팝업 토글(잠깐 띄움).
         parent = screen.get_parent()
         ox = screen.get_offset()[0] if parent else 0
-        dash_available = bool(parent) and ox >= 122
-        farm_scene._dash_available = dash_available   # 입력 처리(토글 클릭)에서 참조
-        dashboard = dash_available and getattr(game_state, "dashboard_open", True)
+        wide = bool(parent) and ox >= 122
+        overlay_open = (not wide) and getattr(game_state, "dashboard_open", False)
+        farm_scene._dash_wide = wide   # 입력 처리(좁은 화면 토글)에서 참조
         draw_tiled_background(screen, 800, 600, sc["grass"], sc["grass_dark"],
                               sc["dirt"], sc["dirt_dark"])
 
@@ -568,7 +568,7 @@ class FarmRenderer:
         action_title = get_font(20).render("오늘 할 일", True, TEXT_DARK)
         screen.blit(action_title, (450, 306))
 
-        if not dashboard:   # 대시보드가 켜지면 예보는 '계절 수첩'에서 보여주므로 여기선 뺀다(중복 제거)
+        if not (wide or overlay_open):   # 대시보드가 예보를 보여줄 땐 중앙 To-Do에선 뺀다(중복 제거)
             forecast_font = get_font(14)
             fc_text = i18n.tf("예보: {weather} ({turns}일 뒤)", weather=i18n.t(game_state.next_weather),
                               turns=game_state.weather_turns_left)
@@ -622,10 +622,13 @@ class FarmRenderer:
         if farm_scene.interaction:
             farm_scene.interaction.draw(screen)
 
-        if dash_available and not farm_scene.tutorial_active:
-            if dashboard:
-                self.draw_side_dashboard(parent, ox, farm_scene)
-            self._draw_dash_tab(screen, getattr(game_state, "dashboard_open", True))
+        if not farm_scene.tutorial_active:
+            if wide:
+                self.draw_side_dashboard(parent, ox, farm_scene)           # 넓은 화면: 사이드 상시
+            elif parent:
+                self._draw_dash_button(screen, overlay_open)               # 좁은 화면: 상단 팝업 토글
+                if overlay_open:
+                    self.draw_top_overlay(screen, farm_scene)
 
         if farm_scene.tutorial_active:
             self.draw_tutorial(screen, farm_scene)
@@ -691,15 +694,48 @@ class FarmRenderer:
         self._panel_card(parent, 14, 88, w, "계절 수첩", build_left)
         self._panel_card(parent, ox + 800 + 6, 88, w, "밭 노트", build_right)
 
-    def _draw_dash_tab(self, screen, is_open):
-        """안전영역 좌측 가장자리의 작은 손잡이 — 클릭하면 대시보드 펼침/접힘."""
-        r = DASH_TAB
-        tab = pygame.Surface((r.w, r.h), pygame.SRCALPHA)
-        pygame.draw.rect(tab, (44, 57, 58, 210), (0, 0, r.w, r.h), border_radius=6)
-        pygame.draw.rect(tab, (229, 192, 124, 210), (0, 0, r.w, r.h), 1, border_radius=6)
-        ch = get_font(16).render("‹" if is_open else "›", True, (240, 224, 190))
-        tab.blit(ch, (r.w // 2 - ch.get_width() // 2, r.h // 2 - ch.get_height() // 2))
-        screen.blit(tab, (r.x, r.y))
+    def _draw_dash_button(self, screen, is_open):
+        """좁은 화면용 '밭 수첩' 토글 버튼 — 클릭하면 상단 팝업이 열리고 닫힌다."""
+        r = DASH_BTN
+        draw_panel(screen, r, fill=(44, 57, 58), border=(229, 192, 124), radius=8)
+        label = i18n.t("밭 수첩") + ("  ▴" if is_open else "  ▾")
+        t = get_font(13).render(label, True, (240, 224, 190))
+        screen.blit(t, (r.centerx - t.get_width() // 2, r.centery - t.get_height() // 2))
+
+    def draw_top_overlay(self, screen, farm_scene):
+        """좁은 화면에서 '밭 수첩' 버튼을 누르면 상단에 잠깐 뜨는 가로형 요약 패널(계절 수첩 + 밭 노트)."""
+        sim = farm_scene.sim
+        panel = pygame.Rect(46, 74, 708, 110)
+        draw_light_panel(screen, panel)
+        f_l, f_b = get_font(12), get_font(13)
+        gold, brown = (150, 110, 60), (74, 92, 60)
+        # ── 왼쪽: 계절 · 날씨 · 예보 · 팁 ──
+        x = 66
+        season = get_season(sim.growth, sim.growth_goal)
+        screen.blit(f_b.render(i18n.tf("{season} · {day}일째", season=i18n.t(season), day=sim.day), True, brown), (x, 88))
+        draw_weather_icon(screen, game_state.weather, x + 8, 122, 16)
+        screen.blit(f_b.render(i18n.tf("오늘 · {w}", w=i18n.t(game_state.weather)), True, TEXT_DARK), (x + 26, 114))
+        draw_weather_icon(screen, game_state.next_weather, x + 8, 148, 16)
+        screen.blit(f_b.render(i18n.tf("{n}일 뒤 · {w}", n=game_state.weather_turns_left, w=i18n.t(game_state.next_weather)), True, TEXT_DARK), (x + 26, 140))
+        tip = self._WEATHER_TIP.get(game_state.next_weather)
+        if tip:
+            for i, ln in enumerate(wrap_text(i18n.t(tip), f_b, 210)):
+                screen.blit(f_b.render(ln, True, (110, 92, 66)), (x + 175, 114 + i * 18))
+        pygame.draw.rect(screen, (223, 200, 160), (452, 92, 1, 74))
+        # ── 오른쪽: 밭 노트 요약 ──
+        rx = 474
+        from core.game_state import get_understanding_stage
+        _, stage, _ = get_understanding_stage(game_state.understanding)
+        stats = [(i18n.t("이해"), i18n.t(stage)),
+                 (i18n.t("실수"), str(sim.mistakes)),
+                 (i18n.t("밭 상태"), i18n.t("평온" if sim.is_good_turn() else "손이 필요해"))]
+        sy = 92
+        for label, val in stats:
+            screen.blit(f_l.render(label, True, gold), (rx, sy))
+            for i, ln in enumerate(wrap_text(val, f_b, 210)[:1]):
+                screen.blit(f_b.render(ln, True, TEXT_DARK), (rx + 96, sy - 1))
+            sy += 24
+        self._draw_dash_button(screen, True)   # 버튼(닫기 ▴)을 오버레이 위에 다시 얹음
 
     def draw_tutorial(self, screen, farm_scene):
         overlay = pygame.Surface((800, 600), pygame.SRCALPHA)

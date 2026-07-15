@@ -155,12 +155,12 @@ class FarmScene:
             return
 
         for event in events:
-            # 대시보드 펼침/접힘 손잡이(넓은 화면에서만) — 다른 처리보다 먼저 소비
+            # 좁은 화면 '밭 수첩' 상단 팝업 토글 — 다른 처리보다 먼저 소비(넓은 화면엔 버튼 없음)
             if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                    and getattr(self, "_dash_available", False)):
-                from scenes.farm_renderer import DASH_TAB
-                if DASH_TAB.collidepoint(event.pos):
-                    game_state.dashboard_open = not getattr(game_state, "dashboard_open", True)
+                    and not getattr(self, "_dash_wide", True)):
+                from scenes.farm_renderer import DASH_BTN
+                if DASH_BTN.collidepoint(event.pos):
+                    game_state.dashboard_open = not getattr(game_state, "dashboard_open", False)
                     audio.play("click")
                     continue
 
