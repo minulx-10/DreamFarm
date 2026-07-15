@@ -122,24 +122,19 @@ def bleed_edges(screen):
         sides.append((sw - 1, ox + sw, rw, False))
 
     for (edge_x, mx0, mw, is_left) in sides:
-        # (1) 안전영역 가장자리를 '거울처럼' 뒤집어 여백에 채운다 → 경계에서 색이 정확히 이어지고(이음새 0)
-        #     배경이 자연스럽게 연장된다. 그 위에 블러를 먹여 부드럽게(늘린 티·줄무늬 없음).
-        strip_w = min(mw, sw)
-        if is_left:
-            strip = screen.subsurface((0, 0, strip_w, sh)).copy()
-            dest_x = mx0 + mw - strip_w
-        else:
-            strip = screen.subsurface((sw - strip_w, 0, strip_w, sh)).copy()
-            dest_x = mx0
-        mirrored = _blur(pygame.transform.flip(strip, True, False), 7)
-        parent.blit(mirrored, (dest_x, oy))
-        lum = _avg_lum(mirrored)
-        # (2) 경계 블렌드: 경계를 걸친 좁은 띠를 블러 → 선명한 화면 ↔ 블러 여백을 그라데이션으로 이어줌
+        col = screen.subsurface((edge_x, 0, 1, sh)).copy()
+        lum = _avg_lum(col)
+        # (1) 가장자리 한 '열'만 뽑아 세로 색 그라데이션으로 확대 → 배경색은 이어지되 오브젝트(달·흙밭 등)는
+        #     복제되지 않는다(옆에 밭이 또 뜨는 문제 방지).
+        vsamp = max(4, sh // 90)
+        wash = pygame.transform.smoothscale(pygame.transform.smoothscale(col, (1, vsamp)), (mw, sh))
+        parent.blit(wash, (mx0, oy))
+        # (2) 경계 블렌드: 경계를 걸친 좁은 띠를 블러 → 선명한 화면 ↔ 그라데이션 여백을 부드럽게 이어줌(이음새 제거)
         boundary_x = (mx0 + mw) if is_left else mx0
-        bx = max(0, boundary_x - 22)
-        bw = min(pw, boundary_x + 22) - bx
+        bx = max(0, boundary_x - 26)
+        bw = min(pw, boundary_x + 26) - bx
         if bw > 4:
-            parent.blit(_blur(parent.subsurface((bx, oy, bw, sh)).copy(), 6), (bx, oy))
+            parent.blit(_blur(parent.subsurface((bx, oy, bw, sh)).copy(), 7), (bx, oy))
         # (3) 은은한 비네트 → 가장자리가 자연스럽게 물러난다. 어두운 씬일수록 '강한 꿈-어둠'으로.
         d = max(0.0, min(1.0, (78.0 - lum) / 60.0))            # lum<18→1, lum>78→0
         darkness = 0.26 + 0.74 * d                             # 밝은 밭도 은은히(0.26), 밤은 강하게(1.0)
