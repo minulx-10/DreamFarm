@@ -125,7 +125,7 @@ def bleed_edges(screen):
         col = screen.subsurface((edge_x, 0, 1, sh)).copy()
         lum = _avg_lum(col)
         # (1) 세로로 아주 강하게 축약 → 디테일 없는 '부드러운 색 그라데이션'으로 확대(가로 줄무늬 제거)
-        vsamp = max(6, sh // 64)
+        vsamp = max(5, sh // 80)
         wash = pygame.transform.smoothscale(pygame.transform.smoothscale(col, (1, vsamp)), (mw, sh))
         parent.blit(wash, (mx0, oy))
         # (2) 경계 feather: 경계쪽 좁은 띠에만 원본(약블러)을 얹어 '장면이 잠깐 이어지다 녹게' → 이음새 제거
@@ -138,17 +138,17 @@ def bleed_edges(screen):
                 mask.fill((255, 255, 255, int(220 * max(0.0, 1 - dist / fw) ** 1.7)), (xi, 0, 1, sh))
             det.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
             parent.blit(det, ((mx0 + mw - fw) if is_left else mx0, oy))
-        # (3) 어두운 씬은 바깥으로 '강하게' 어두워져 늘린 디테일을 어둠에 묻는다(밝은 밭은 거의 유지).
-        darkness = max(0.0, min(1.0, (78.0 - lum) / 60.0))     # lum<18→1, lum>78→0
-        if darkness > 0.03:
-            grad = pygame.Surface((mw, sh), pygame.SRCALPHA)
-            amax = int(244 * darkness)
-            for xi in range(0, mw, 2):
-                t = (1 - xi / mw) if is_left else (xi / mw)
-                grad.fill((7, 6, 20, int(amax * (t ** 0.85))), (xi, 0, 2, sh))
-            parent.blit(grad, (mx0, oy))
-        # (4) 떠다니는 빛(어두운 씬에서 뚜렷)
-        mote_scale = 0.12 + 0.88 * darkness
+        # (3) 은은한 비네트 → 가장자리가 자연스럽게 물러난다. 어두운 씬일수록 '강한 꿈-어둠'으로.
+        d = max(0.0, min(1.0, (78.0 - lum) / 60.0))            # lum<18→1, lum>78→0
+        darkness = 0.26 + 0.74 * d                             # 밝은 밭도 은은히(0.26), 밤은 강하게(1.0)
+        grad = pygame.Surface((mw, sh), pygame.SRCALPHA)
+        amax = int(238 * darkness)
+        for xi in range(0, mw, 2):
+            t = (1 - xi / mw) if is_left else (xi / mw)
+            grad.fill((8, 7, 18, int(amax * (t ** 0.9))), (xi, 0, 2, sh))
+        parent.blit(grad, (mx0, oy))
+        # (4) 떠다니는 빛(어두운 씬에서만 뚜렷 — 밝은 밭은 거의 없음)
+        mote_scale = 0.10 + 0.90 * d
         for m in _MOTES:
             if m["side"] != (0 if is_left else 1):
                 continue

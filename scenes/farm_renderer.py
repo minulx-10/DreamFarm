@@ -502,6 +502,10 @@ class FarmRenderer:
     def draw(self, screen, farm_scene):
         sim = farm_scene.sim
         sc = farm_scene.season_colors
+        # 적응형: 넓은 화면이면 여백에 사이드 대시보드(계절 수첩·밭 노트)를 띄운다.
+        parent = screen.get_parent()
+        ox = screen.get_offset()[0] if parent else 0
+        dashboard = bool(parent) and ox >= 122
         draw_tiled_background(screen, 800, 600, sc["grass"], sc["grass_dark"],
                               sc["dirt"], sc["dirt_dark"])
 
@@ -561,13 +565,14 @@ class FarmRenderer:
         action_title = get_font(20).render("오늘 할 일", True, TEXT_DARK)
         screen.blit(action_title, (450, 306))
 
-        forecast_font = get_font(14)
-        fc_text = i18n.tf("예보: {weather} ({turns}일 뒤)", weather=i18n.t(game_state.next_weather),
-                          turns=game_state.weather_turns_left)
-        fc = forecast_font.render(fc_text, True, TEXT_MUTED)
-        fc_x = 738 - fc.get_width()
-        screen.blit(fc, (fc_x, 308))
-        draw_weather_icon(screen, game_state.next_weather, fc_x - 22, 306, 16)
+        if not dashboard:   # 대시보드가 켜지면 예보는 '계절 수첩'에서 보여주므로 여기선 뺀다(중복 제거)
+            forecast_font = get_font(14)
+            fc_text = i18n.tf("예보: {weather} ({turns}일 뒤)", weather=i18n.t(game_state.next_weather),
+                              turns=game_state.weather_turns_left)
+            fc = forecast_font.render(fc_text, True, TEXT_MUTED)
+            fc_x = 738 - fc.get_width()
+            screen.blit(fc, (fc_x, 308))
+            draw_weather_icon(screen, game_state.next_weather, fc_x - 22, 306, 16)
 
         for btn in farm_scene.buttons:
             btn.draw(screen)
@@ -614,8 +619,74 @@ class FarmRenderer:
         if farm_scene.interaction:
             farm_scene.interaction.draw(screen)
 
+        if dashboard and not farm_scene.tutorial_active:
+            self.draw_side_dashboard(parent, ox, farm_scene)
+
         if farm_scene.tutorial_active:
             self.draw_tutorial(screen, farm_scene)
+
+    _WEATHER_TIP = {
+        "비": "곧 비 예보 — 물주기는 아껴 두자.",
+        "가뭄": "가뭄이 온다 — 물을 넉넉히.",
+        "강풍": "강풍 예보 — 잡초·해충을 미리 정리.",
+        "흐림": "흐린 날엔 수분이 더디 마른다.",
+        "맑음": "맑을 땐 수분을 자주 살피자.",
+    }
+
+    def draw_side_dashboard(self, parent, ox, farm_scene):
+        """넓은 화면 여백에 뜨는 사이드 대시보드 — 왼쪽 '계절 수첩'(달력·예보), 오른쪽 '밭 노트'(기록)."""
+        sim = farm_scene.sim
+        pw = parent.get_width()
+        f_t = get_font(15)     # 패널 제목
+        f_l = get_font(12)     # 소제목/라벨
+        f_b = get_font(12)     # 본문
+        gold, brown, muted = (150, 110, 60), (74, 92, 60), TEXT_MUTED
+
+        def head(panel, text):
+            t = f_t.render(text, True, (92, 66, 42))
+            parent.blit(t, (panel.centerx - t.get_width() // 2, panel.y + 11))
+            pygame.draw.rect(parent, (203, 160, 96), (panel.x + 12, panel.y + 33, panel.w - 24, 2), border_radius=1)
+
+        y0, ph = 88, 424
+
+        # ── 왼쪽: 계절 수첩(달력 · 날씨 · 예보 · 팁) ──
+        lp = pygame.Rect(14, y0, ox - 22, ph)
+        draw_light_panel(parent, lp)
+        head(lp, i18n.t("계절 수첩"))
+        cx, y = lp.x + 12, lp.y + 46
+        season = get_season(sim.growth, sim.growth_goal)
+        for ln in wrap_text(i18n.tf("{season} · {day}일째", season=i18n.t(season), day=sim.day), f_b, lp.w - 22):
+            parent.blit(f_b.render(ln, True, brown), (cx, y)); y += 17
+        y += 9
+        parent.blit(f_l.render(i18n.t("날씨"), True, gold), (cx, y)); y += 20
+        draw_weather_icon(parent, game_state.weather, cx + 9, y + 8, 15)
+        parent.blit(f_b.render(i18n.tf("오늘 · {w}", w=i18n.t(game_state.weather)), True, TEXT_DARK), (cx + 26, y + 1)); y += 24
+        draw_weather_icon(parent, game_state.next_weather, cx + 9, y + 8, 15)
+        parent.blit(f_b.render(i18n.tf("{n}일 뒤 · {w}", n=game_state.weather_turns_left, w=i18n.t(game_state.next_weather)), True, TEXT_DARK), (cx + 26, y + 1)); y += 28
+        tip = self._WEATHER_TIP.get(game_state.next_weather)
+        if tip:
+            pygame.draw.rect(parent, (223, 200, 160), (cx, y, lp.w - 24, 1)); y += 9
+            for ln in wrap_text(i18n.t(tip), f_b, lp.w - 22):
+                parent.blit(f_b.render(ln, True, (110, 92, 66)), (cx, y)); y += 17
+
+        # ── 오른쪽: 밭 노트(한눈 요약 — 좁은 여백에도 안 넘치는 컴팩트 스탯) ──
+        rx = ox + 800 + 8
+        rp = pygame.Rect(rx, y0, pw - rx - 14, ph)
+        draw_light_panel(parent, rp)
+        head(rp, i18n.t("밭 노트"))
+        rcx, y = rp.x + 12, rp.y + 48
+        from core.game_state import get_understanding_stage
+        _, stage, _ = get_understanding_stage(game_state.understanding)
+        rows = [
+            (i18n.t("이해"), i18n.t(stage)),
+            (i18n.t("실수"), str(sim.mistakes)),
+            (i18n.t("밭 상태"), i18n.t("평온" if sim.is_good_turn() else "손이 필요해")),
+        ]
+        for label, val in rows:
+            parent.blit(f_l.render(label, True, gold), (rcx, y)); y += 16
+            for ln in wrap_text(val, f_b, rp.w - 24)[:2]:
+                parent.blit(f_b.render(ln, True, TEXT_DARK), (rcx + 6, y)); y += 15
+            y += 11
 
     def draw_tutorial(self, screen, farm_scene):
         overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
