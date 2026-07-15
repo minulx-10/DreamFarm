@@ -113,32 +113,42 @@ def bleed_edges(screen):
     pw, ph = parent.get_size()
     sw, sh = screen.get_size()
 
-    # 좌/우 여백 — 가장자리 한 열을 늘려 base 연속성 확보
-    sides = []
+    # 좌/우 여백 — 가장자리 한 '열'에서 부드러운 세로 색 안개를 만들어 채운다(가로 디테일/줄무늬 없음).
+    sides = []                                  # (edge_x, mx0, mw, is_left)
     if ox > 0:
-        col = screen.subsurface((0, 0, 1, sh)).copy()
-        parent.blit(pygame.transform.scale(col, (ox, sh)), (0, oy))
-        sides.append((0, ox, True))
+        sides.append((0, 0, ox, True))
     rw = pw - (ox + sw)
     if rw > 0:
-        col = screen.subsurface((sw - 1, 0, 1, sh)).copy()
-        parent.blit(pygame.transform.scale(col, (rw, sh)), (ox + sw, oy))
-        sides.append((ox + sw, rw, False))
+        sides.append((sw - 1, ox + sw, rw, False))
 
-    for (mx0, mw, is_left) in sides:
-        region = parent.subsurface((mx0, oy, mw, sh)).copy()
-        lum = _avg_lum(region)
-        parent.blit(_blur(region, 11), (mx0, oy))       # (1) 소프트 블러 → 뭉개짐 제거
-        # 어두운 씬일수록 바깥으로 강하게 어두워짐(밝은 밭은 거의 유지). lum<15→1, lum>70→0
-        darkness = max(0.0, min(1.0, (70.0 - lum) / 55.0))
-        if darkness > 0.03:                             # (2) 꿈-어둠 그라데이션
+    for (edge_x, mx0, mw, is_left) in sides:
+        col = screen.subsurface((edge_x, 0, 1, sh)).copy()
+        lum = _avg_lum(col)
+        # (1) 세로로 아주 강하게 축약 → 디테일 없는 '부드러운 색 그라데이션'으로 확대(가로 줄무늬 제거)
+        vsamp = max(6, sh // 64)
+        wash = pygame.transform.smoothscale(pygame.transform.smoothscale(col, (1, vsamp)), (mw, sh))
+        parent.blit(wash, (mx0, oy))
+        # (2) 경계 feather: 경계쪽 좁은 띠에만 원본(약블러)을 얹어 '장면이 잠깐 이어지다 녹게' → 이음새 제거
+        fw = min(40, mw)
+        if fw > 6:
+            det = _blur(pygame.transform.scale(col, (fw, sh)), 5)
+            mask = pygame.Surface((fw, sh), pygame.SRCALPHA)
+            for xi in range(fw):
+                dist = (fw - 1 - xi) if is_left else xi        # 경계로부터 거리(경계=0 → 불투명)
+                mask.fill((255, 255, 255, int(220 * max(0.0, 1 - dist / fw) ** 1.7)), (xi, 0, 1, sh))
+            det.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            parent.blit(det, ((mx0 + mw - fw) if is_left else mx0, oy))
+        # (3) 어두운 씬은 바깥으로 '강하게' 어두워져 늘린 디테일을 어둠에 묻는다(밝은 밭은 거의 유지).
+        darkness = max(0.0, min(1.0, (78.0 - lum) / 60.0))     # lum<18→1, lum>78→0
+        if darkness > 0.03:
             grad = pygame.Surface((mw, sh), pygame.SRCALPHA)
-            amax = int(210 * darkness)
+            amax = int(244 * darkness)
             for xi in range(0, mw, 2):
                 t = (1 - xi / mw) if is_left else (xi / mw)
-                grad.fill((9, 8, 26, int(amax * (t ** 1.5))), (xi, 0, 2, sh))
+                grad.fill((7, 6, 20, int(amax * (t ** 0.85))), (xi, 0, 2, sh))
             parent.blit(grad, (mx0, oy))
-        mote_scale = 0.12 + 0.88 * darkness             # (3) 떠다니는 빛(어두운 씬에서 뚜렷)
+        # (4) 떠다니는 빛(어두운 씬에서 뚜렷)
+        mote_scale = 0.12 + 0.88 * darkness
         for m in _MOTES:
             if m["side"] != (0 if is_left else 1):
                 continue
@@ -151,16 +161,13 @@ def bleed_edges(screen):
                 continue
             rr = m["size"]
             glow = _MOTE_GLOW[rr]
-            glow.set_alpha(int(255 * a / 150))        # 캐시된 스프라이트를 밝기만 조절해 재사용
+            glow.set_alpha(int(255 * a / 150))
             parent.blit(glow, (int(px - rr * 3), int(py - rr * 3)))
 
-    # 상/하 여백(세로 화면) — 행을 늘리고 부드럽게 블러
-    if oy > 0:
-        row = parent.subsurface((0, oy, pw, 1)).copy()
-        parent.blit(pygame.transform.scale(row, (pw, oy)), (0, 0))
-        parent.blit(_blur(parent.subsurface((0, 0, pw, oy)).copy(), 9), (0, 0))
-    bh = ph - (oy + sh)
-    if bh > 0:
-        row = parent.subsurface((0, oy + sh - 1, pw, 1)).copy()
-        parent.blit(pygame.transform.scale(row, (pw, bh)), (0, oy + sh))
-        parent.blit(_blur(parent.subsurface((0, oy + sh, pw, bh)).copy(), 9), (0, oy + sh))
+    # 상/하 여백(세로 화면) — 가장자리 한 '행'에서 가로 색 안개를 만들어 채운다
+    for (edge_y, my0, mh, is_top) in ([(0, 0, oy, True)] if oy > 0 else []) + \
+                                     ([(sh - 1, oy + sh, ph - (oy + sh), False)] if ph - (oy + sh) > 0 else []):
+        row = screen.subsurface((0, edge_y, sw, 1)).copy()
+        hsamp = max(10, sw // 32)
+        wash = pygame.transform.smoothscale(pygame.transform.smoothscale(row, (hsamp, 1)), (pw, mh))
+        parent.blit(wash, (0, my0))
