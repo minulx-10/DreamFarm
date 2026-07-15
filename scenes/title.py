@@ -6,6 +6,7 @@ from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE
 from core.ui import draw_story_backdrop, draw_button
 from core import audio
 from core import save_system
+from core import i18n, updater
 from core.ui_utils import FireflyEmitter
 
 class TitleScene:
@@ -52,6 +53,7 @@ class TitleScene:
         
         # 타이틀 화면의 반딧불이(꿈 입자) 리스트 생성
         self.firefly_emitter = FireflyEmitter(16)
+        self._update_rect = None   # 업데이트 알림 클릭 영역(있을 때만)
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -84,6 +86,11 @@ class TitleScene:
                 
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 업데이트 알림 클릭 → 다운로드(릴리스) 페이지 열기
+                if self._update_rect and self._update_rect.collidepoint(event.pos):
+                    audio.play("click")
+                    updater.open_download_page()
+                    continue
                 # 이스터에그: 달 4연타 → 악)몽중농원 토글
                 if self.moon_rect.collidepoint(event.pos):
                     self.moon_clicks += 1
@@ -158,7 +165,21 @@ class TitleScene:
         subtitle_shadow = self.font_subtitle.render("당근 한 뿌리의 시간", True, (38, 32, 34))
         screen.blit(subtitle_shadow, (400 - subtitle_surf.get_width() // 2 + 2, 147))
         screen.blit(subtitle_surf, (400 - subtitle_surf.get_width() // 2, 145))
-        
+
+        # 업데이트 알림 — 새 버전이 있으면 작은 알림(클릭하면 다운로드 페이지가 열린다)
+        self._update_rect = None
+        if updater.available:
+            un = get_font(14).render(i18n.tf("새 버전 {v} · 다운로드", v=updater.available), True, (255, 236, 176))
+            rect = pygame.Rect(0, 0, un.get_width() + 22, un.get_height() + 8)
+            rect.center = (400, 202)
+            self._update_rect = rect
+            hovered = rect.collidepoint(pygame.mouse.get_pos())
+            bg = pygame.Surface(rect.size, pygame.SRCALPHA)
+            bg.fill((44, 78, 60, 235) if hovered else (32, 56, 46, 215))
+            pygame.draw.rect(bg, (150, 210, 170, 235), bg.get_rect(), 1, border_radius=8)
+            screen.blit(bg, rect.topleft)
+            screen.blit(un, (rect.x + 11, rect.y + 4))
+
         # 4. 버튼들 그리기
         draw_button(screen, self.start_btn, "새 게임 시작", self.font_button, hovered=self.hovered_start)
         

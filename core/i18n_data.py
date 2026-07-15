@@ -1061,4 +1061,7 @@ EN = {
     "오늘": "Today",
     "{n}일 뒤": "In {n}d",
     "밭 수첩": "Field Book",
+    "새 버전 {v} · 다운로드": "New version {v} · Download",
+    "업데이트 확인: ON": "Update check: ON",
+    "업데이트 확인: OFF": "Update check: OFF",
 }

@@ -171,6 +171,10 @@ def main():
     from core import steam
     steam.init()
 
+    # 업데이트 알림 — 새 버전이 있으면 타이틀에 알림(백그라운드·논블로킹, 설정으로 끌 수 있음).
+    from core import updater
+    updater.check_async()
+
     # #14 Check for 2nd playthrough
     apply_second_run()
 

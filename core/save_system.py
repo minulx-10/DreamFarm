@@ -284,7 +284,7 @@ def nightmare_unlocked():
 
 # ────────────────────────────── 유저 설정 ──────────────────────────────
 
-_DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko"}
+_DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko", "update_check": True}
 
 
 def load_settings():
