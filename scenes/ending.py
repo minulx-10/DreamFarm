@@ -8,7 +8,7 @@ from core.game_state import (
 )
 from core.assets import BLACK, WHITE, TEXT_DARK, TEXT_MUTED, get_font, sprites, draw_crop_food
 from core.ui import draw_centered_lines, draw_light_panel, draw_story_backdrop, wrap_text, draw_button
-from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
+from core.pixelfx import pixel_rect, pixelate, glow_sprite, blit_glow, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 from core.crops import current_crop, swap_crop_word
@@ -112,9 +112,9 @@ class EndingScene:
         """현재 엔딩(last_ending)에 맞는 배경음으로 전환. 갤러리 감상에서도 곡이 바뀌도록 분리."""
         if game_state.nightmare or game_state.last_ending == "nightmare":
             audio.play_bgm("event")
-        elif game_state.last_ending in ("true", "happy", "growth"):
+        elif game_state.last_ending == "true":
             audio.play_bgm("ending_warm")
-        elif game_state.last_ending in ("rush", "bad", "wither"):
+        elif game_state.last_ending in ("bad", "wither"):
             audio.play_bgm("ending_sad")
         else:
             audio.play_bgm("ending")
@@ -133,6 +133,22 @@ class EndingScene:
                     f.write("- 아빠가")
         except Exception:
             pass
+
+    # 작물 서사 팩 — 엔딩 본문 끝에 붙는 작물별 한 줄 (당근은 기본 본문이 곧 당근 서사)
+    CROP_ENDING_LINES = {
+        "apple": {
+            "true": "몇 해를 기다려 처음 딴 사과였다. 기다림의 맛이 이렇게 달다.",
+            "normal": "사과 한 알에 몇 번의 계절이 들어 있는지, 이제 조금은 셀 수 있다.",
+        },
+        "potato": {
+            "true": "흙 속에서 굵어진 것은 감자만이 아니었다.",
+            "normal": "보이지 않는 곳에서 익는 것들이 있다는 걸, 감자가 가르쳐 주었다.",
+        },
+        "rice": {
+            "true": "밥 한 공기의 무게를 이제 두 손으로 안다.",
+            "normal": "물소리로 시작한 하루하루가 밥 한 공기에 담겨 있었다.",
+        },
+    }
 
     def get_ending(self, force_type=None):
         name = game_state.player_name
@@ -154,6 +170,13 @@ class EndingScene:
             from core import achievements
             achievements.on_ending(ending_type)
             save_system.delete_save()
+            # 회차 아카이브 + 누적 통계 (창고 탭) — 기록 뒤 메타 기반 업적 재평가
+            days = getattr(game_state, "final_day", 0)
+            save_system.record_run(game_state.crop, ending_type, days,
+                                   getattr(game_state, "year_seed", "평년"),
+                                   game_state.journal_entries,
+                                   getattr(game_state, "run_stats", {}))
+            achievements.on_run_recorded(days, ending_type)
 
         ck = game_state.crop
 
@@ -212,6 +235,11 @@ class EndingScene:
         }
 
         data = endings.get(ending_type, endings["normal"])
+        # 작물 서사 팩 — 작물별 마지막 한 줄 (당근이 아닌 작물의 회차에 고유한 여운을 남긴다)
+        extra = self.CROP_ENDING_LINES.get(ck, {}).get(ending_type)
+        if extra:
+            data = dict(data)
+            data["text"] = data["text"] + "\n" + X(extra)
         self.is_happy = ending_type == "true"
         return data
 
@@ -378,15 +406,13 @@ class EndingScene:
         return game_state.is_second_run
 
     # 각 엔딩에 이르게 한 까닭을 한 줄로 — 결과가 '왜' 나왔는지 보여준다
+    # (실존 엔딩 5종만 — happy/growth/skill/rush 는 옛 시스템의 죽은 키였다)
     ENDING_REASONS = {
         "true": "깊은 이해와 공감, 그리고 기다림이 모두 무르익었습니다.",
-        "happy": "밭을 건강하게 지켜냈고, 마음도 함께 자랐습니다.",
-        "growth": "서툴러 실수했지만, 매번 다시 흙을 만졌습니다.",
-        "skill": "솜씨는 좋았지만, 마음을 헤아리는 일은 아직 남았습니다.",
-        "rush": "조급함이 기다림을 앞질렀습니다.",
         "normal": "조금은 알 것 같은, 그런 하루였습니다.",
         "bad": "아직은 그 마음과의 거리를 좁히지 못했습니다.",
         "wither": "끝내 밭을 지켜내지 못했지만, 그 숱한 새벽은 남았습니다.",
+        "nightmare": "남기지 않고, 끝까지 비워냈습니다.",
     }
 
     # 게임이 끝난 화면에서 보이는 '메인으로' 버튼 (앱을 끄지 않고 타이틀로 돌아간다)
@@ -450,7 +476,7 @@ class EndingScene:
             elif self.phase == "carrot":
                 if click:
                     # 베어 무는 순간의 소리: 따뜻한 엔딩은 경쾌하게, 그 외엔 둔탁하게
-                    audio.play("harvest" if game_state.last_ending in ("true", "happy", "growth") else "break")
+                    audio.play("harvest" if game_state.last_ending == "true" else "break")
                     self.phase = "golden"
                     self.phase_timer = 0
             elif self.phase == "golden":
@@ -595,24 +621,28 @@ class EndingScene:
         def c(*v):
             return tuple(min(tc, x) for x in v)
         pw, ph = 138, 60
-        x, y = cx - pw // 2, cy - ph // 2
+        # 큰 픽셀: 백자 그릇(둥근 타원·호)을 임시 서피스에 그린 뒤 통째로 도트화 → 도트 정물로 통일
+        ox3, oy3 = 12, 4
+        TW, TH = pw + 24, ph + 44
+        plate = pygame.Surface((TW, TH), pygame.SRCALPHA)
+        x, y = ox3, oy3                       # 접시 본체 좌상단(로컬)
+        icx, icy = x + pw // 2, y + ph // 2
         # 바닥 그림자
-        sh = pygame.Surface((pw + 18, ph + 18), pygame.SRCALPHA)
-        pygame.draw.ellipse(sh, (0, 0, 0, min(95, tc)), (0, 0, pw + 14, ph + 14))
-        screen.blit(sh, (x - 7, y + 10))
+        pygame.draw.ellipse(plate, (0, 0, 0, min(95, tc)), (x - 7, y + 10, pw + 14, ph + 14))
         # 측벽(두께) — 살짝 아래로 깐 어두운 타원
-        pygame.draw.ellipse(screen, c(196, 187, 170), (x, y + 8, pw, ph))
+        pygame.draw.ellipse(plate, c(196, 187, 170), (x, y + 8, pw, ph))
         # 윗면(림)
-        pygame.draw.ellipse(screen, c(239, 234, 222), (x, y, pw, ph))
+        pygame.draw.ellipse(plate, c(239, 234, 222), (x, y, pw, ph))
         # 가는 청자색 띠
-        pygame.draw.ellipse(screen, c(150, 176, 173), (x + 10, y + 4, pw - 20, ph - 8), 1)
+        pygame.draw.ellipse(plate, c(150, 176, 173), (x + 10, y + 4, pw - 20, ph - 8), 1)
         # 우묵한 안면
         iw, ih = pw - 40, ph - 24
-        ix, iy = cx - iw // 2, cy - ih // 2
-        pygame.draw.ellipse(screen, c(212, 205, 189), (ix, iy, iw, ih))
+        ix, iy = icx - iw // 2, icy - ih // 2
+        pygame.draw.ellipse(plate, c(212, 205, 189), (ix, iy, iw, ih))
         # 윗 림 광택(위쪽 호) + 안쪽 바닥 그늘(아래쪽 호)
-        pygame.draw.arc(screen, c(253, 250, 241), (x + 8, y + 1, pw - 16, ph), 0.45, 2.7, 3)
-        pygame.draw.arc(screen, c(178, 169, 152), (ix, iy + 1, iw, ih), 3.5, 6.0, 3)
+        pygame.draw.arc(plate, c(253, 250, 241), (x + 8, y + 1, pw - 16, ph), 0.45, 2.7, 3)
+        pygame.draw.arc(plate, c(178, 169, 152), (ix, iy + 1, iw, ih), 3.5, 6.0, 3)
+        screen.blit(pixelate(plate, 3, smooth=False), (cx - pw // 2 - ox3, cy - ph // 2 - oy3))
 
     def _draw_chopsticks(self, screen, tc=255):
         """끝으로 갈수록 가늘어지는 나무젓가락 — 그릇 오른쪽에 자연스레 걸쳐 둠."""
@@ -658,13 +688,10 @@ class EndingScene:
 
         tc = min(255, self.table_alpha)
 
-        # 은은한 등불 조명 (Radial Warm Glow)
+        # 은은한 등불 조명 — '계단 알파' 도트 글로우(캐시, 밝기는 set_alpha)
         if tc > 50:
-            glow_surf = pygame.Surface((340, 340), pygame.SRCALPHA)
-            for r in range(160, 0, -8):
-                alpha = int(45 * (1.0 - r / 160.0) * (tc / 255.0))
-                pygame.draw.circle(glow_surf, (255, 210, 120, alpha), (170, 170), r)
-            screen.blit(glow_surf, (400 - 170, 320 - 170))
+            blit_glow(screen, glow_sprite(160, (255, 210, 120), px=5, steps=(13, 27, 45)),
+                      (400, 320), tc)
 
         if self.table_alpha > 50:
 
@@ -699,15 +726,19 @@ class EndingScene:
                         pygame.draw.polygon(screen, (min(tc, fill[0]), min(tc, fill[1]), min(tc, fill[2])), pts)
                         pygame.draw.polygon(screen, (min(tc, edge[0]), min(tc, edge[1]), min(tc, edge[2])), pts, 1)
                 elif crop_key == "rice":
-                    # 쌀밥: 그릇 위에 봉긋하게 솟아오른 소복한 흰 쌀밥 heap
-                    pygame.draw.ellipse(screen, (min(tc, 248), min(tc, 246), min(tc, 240)), (360, 322, 80, 32))
-                    pygame.draw.ellipse(screen, (min(tc, 255), min(tc, 255), min(tc, 255)), (370, 314, 60, 28))
+                    # 쌀밥: 그릇 위에 봉긋한 흰 쌀밥 heap — 큰 픽셀: 임시 서피스에 그린 뒤 통째로 도트화
+                    rice = pygame.Surface((96, 64), pygame.SRCALPHA)
+
+                    def rr(gx, gy, gw, gh):
+                        return (gx - 352, gy - 308, gw, gh)
+                    pygame.draw.ellipse(rice, (min(tc, 248), min(tc, 246), min(tc, 240)), rr(360, 322, 80, 32))
+                    pygame.draw.ellipse(rice, (min(tc, 255), min(tc, 255), min(tc, 255)), rr(370, 314, 60, 28))
                     for gx, gy in [(375, 330), (390, 322), (410, 325), (425, 332), (395, 334)]:
-                        pygame.draw.ellipse(screen, (min(tc, 240), min(tc, 238), min(tc, 230)), (gx, gy, 4, 3))
-                    # 사기 대접의 그릇 외벽을 그려 대접 안에 소복이 쌓인 모양으로 완성
-                    bowl = pygame.Rect(356, 330, 88, 38)
-                    pygame.draw.arc(screen, (min(tc, 208), min(tc, 214), min(tc, 224)), bowl, 3.30, 6.12, 5)
-                    pygame.draw.arc(screen, (min(tc, 150), min(tc, 176), min(tc, 190)), bowl, 3.30, 6.12, 2)
+                        pygame.draw.ellipse(rice, (min(tc, 240), min(tc, 238), min(tc, 230)), rr(gx, gy, 4, 3))
+                    # 사기 대접의 그릇 외벽
+                    pygame.draw.arc(rice, (min(tc, 208), min(tc, 214), min(tc, 224)), pygame.Rect(4, 22, 88, 38), 3.30, 6.12, 5)
+                    pygame.draw.arc(rice, (min(tc, 150), min(tc, 176), min(tc, 190)), pygame.Rect(4, 22, 88, 38), 3.30, 6.12, 2)
+                    screen.blit(pixelate(rice, 3, smooth=False), (352, 308))
                 else:
                     # 당근 반찬
                     chunks = [
@@ -732,12 +763,8 @@ class EndingScene:
         dark_overlay.fill((15, 10, 5, 140))
         screen.blit(dark_overlay, (0, 0))
 
-        # 은은한 등불 조명 (Radial Warm Glow)
-        glow_surf = pygame.Surface((340, 340), pygame.SRCALPHA)
-        for r in range(160, 0, -8):
-            alpha = int(45 * (1.0 - r / 160.0))
-            pygame.draw.circle(glow_surf, (255, 210, 120, alpha), (170, 170), r)
-        screen.blit(glow_surf, (400 - 170, 320 - 170))
+        # 은은한 등불 조명 — '계단 알파' 도트 글로우(캐시)
+        blit_glow(screen, glow_sprite(160, (255, 210, 120), px=5, steps=(13, 27, 45)), (400, 320))
         
         # 1. 나무 식탁
         self._draw_dining_table(screen)
@@ -785,7 +812,7 @@ class EndingScene:
         ending = game_state.last_ending
         
         crop = game_state.crop
-        if ending in ("true", "happy"):
+        if ending == "true":
             # Golden glow
             sound = "아삭."
             if crop == "rice":
@@ -793,39 +820,6 @@ class EndingScene:
             elif crop == "potato":
                 sound = "포슬."
             screen.fill((min(255, g), min(200, int(g * 0.78)), min(80, int(g * 0.3))))
-            if g > 200:
-                t = self.font.render(sound, True, WHITE)
-                screen.blit(t, (400 - t.get_width() // 2, 290))
-        elif ending == "growth":
-            # Warm brown glow
-            sound = "오도독."
-            if crop == "rice":
-                sound = "냠냠."
-            elif crop == "potato":
-                sound = "서걱."
-            screen.fill((min(200, int(g*0.8)), min(150, int(g * 0.6)), min(100, int(g * 0.4))))
-            if g > 200:
-                t = self.font.render(sound, True, WHITE)
-                screen.blit(t, (400 - t.get_width() // 2, 290))
-        elif ending == "skill":
-            # Cold white glow
-            sound = "사각."
-            if crop == "rice":
-                sound = "우물."
-            elif crop == "potato":
-                sound = "스근."
-            screen.fill((min(240, g), min(240, g), min(255, g)))
-            if g > 200:
-                t = self.font.render(sound, True, (100, 100, 100))
-                screen.blit(t, (400 - t.get_width() // 2, 290))
-        elif ending == "rush":
-            # Fast red flash
-            sound = "우적."
-            if crop == "rice":
-                sound = "쩝쩝."
-            elif crop == "potato":
-                sound = "우물."
-            screen.fill((min(200, g), min(50, int(g*0.2)), min(50, int(g*0.2))))
             if g > 200:
                 t = self.font.render(sound, True, WHITE)
                 screen.blit(t, (400 - t.get_width() // 2, 290))
@@ -851,22 +845,10 @@ class EndingScene:
         ending = game_state.last_ending
         a = self.dad_text_alpha
         
-        if ending in ("true", "happy"):
+        if ending == "true":
             screen.fill((255, 200, 80))
             color = (min(a, 80), min(a, 50), min(a, 20))
-            text = "...내일 새벽, 같이 가자." if ending == "true" else "...맛있냐?"
-        elif ending == "growth":
-            screen.fill((200, 150, 100))
-            color = (min(a, 60), min(a, 40), min(a, 20))
-            text = "...많이 컸네."
-        elif ending == "skill":
-            screen.fill((240, 240, 255))
-            color = (min(a, 100), min(a, 100), min(a, 120))
-            text = "...농사는 잘 지었구나. 그런데..."
-        elif ending == "rush":
-            screen.fill((200, 50, 50))
-            color = (min(a, 255), min(a, 200), min(a, 200))
-            text = "...급할 거 없다."
+            text = "...내일 새벽, 같이 가자."
         elif ending == "normal":
             screen.fill((150, 150, 100))
             color = (min(a, 50), min(a, 50), min(a, 30))
@@ -920,9 +902,11 @@ class EndingScene:
         if self.result_done:
             cont = self.font_small.render("계속하려면 클릭하거나 스페이스바를 누르세요", True, (208, 198, 170))
             screen.blit(cont, (400 - cont.get_width() // 2, 516))
-            sub = "R: 처음부터 다시"
-            sub_surf = att_font.render(sub, True, (140, 134, 116))
-            screen.blit(sub_surf, (400 - sub_surf.get_width() // 2, 548))
+            if not self.from_gallery:
+                # 갤러리 감상 중엔 R이 '갤러리로 복귀'라 '다시 시작' 라벨이 거짓말이 된다 → 숨김
+                sub = "R: 다시 시작"   # 우하단 '다시 시작' 버튼과 같은 동작 — 명칭도 통일
+                sub_surf = att_font.render(sub, True, (140, 134, 116))
+                screen.blit(sub_surf, (400 - sub_surf.get_width() // 2, 548))
             self._draw_exit_button(screen)
 
     def _draw_credits(self, screen):
@@ -1017,10 +1001,16 @@ class EndingScene:
         y = start_y
         from core.ui import wrap_text
         for entry in game_state.journal_entries:
-            for line in entry.split("\n"):
+            # 여러 줄 엔트리(엔딩 마무리 블록 등)는 카탈로그 키가 '블록 전체'라, \n 으로 조각내기 전에
+            # 통째로 번역해야 맞는다(HANDOFF 팁 #5). 회상 매칭은 원문(한국어) 줄 기준으로 유지한다.
+            disp_entry = _localize_journal_line(entry)
+            orig_lines = entry.split("\n")
+            disp_lines = disp_entry.split("\n")
+            block_ok = (disp_entry != entry and len(disp_lines) == len(orig_lines))
+            for li, line in enumerate(orig_lines):
                 is_head = line.startswith("[")
                 # 표시 시점에 현재 언어로 번역(일지는 한국어 원문 저장) + 패널 폭에 맞춰 줄바꿈(넘침 방지)
-                disp = _localize_journal_line(line)
+                disp = disp_lines[li] if block_ok else _localize_journal_line(line)
                 for sub in (wrap_text(disp, self.font_small, 560) if disp else [""]):
                     if view.top - 30 < y < view.bottom + 4:   # 보이는 범위만 그림
                         surf = self.font_small.render(sub, True, head_color if is_head else TEXT_DARK)
@@ -1051,6 +1041,14 @@ class EndingScene:
             sh = retro_font.render("드래그로 스크롤" if IS_ANDROID else "휠·드래그로 스크롤", True, (172, 152, 112))
             screen.blit(sh, (672 - sh.get_width(), 110))
 
-        prompt = self.font_small.render("오른쪽 아래 버튼으로 나가기  ·  R: 다시하기", True, (214, 204, 178))
-        screen.blit(prompt, (400 - prompt.get_width() // 2, 554))
+        # 하단 힌트 — 오른쪽의 버튼(다시 시작/메인으로)과 겹치지 않게 왼쪽 정렬 + 폭 맞춤(영어 넘침 방지)
+        # 갤러리 감상 중엔 R이 '갤러리로 복귀'라 '다시하기' 안내를 뺀다(라벨 거짓말 방지)
+        hint = ("오른쪽 아래 버튼으로 나가기" if self.from_gallery
+                else "오른쪽 아래 버튼으로 나가기  ·  R: 다시하기")
+        hs = 16
+        prompt = get_font(hs).render(hint, True, (214, 204, 178))
+        while prompt.get_width() > 340 and hs > 11:
+            hs -= 1
+            prompt = get_font(hs).render(hint, True, (214, 204, 178))
+        screen.blit(prompt, (120, 562))
         self._draw_exit_button(screen)

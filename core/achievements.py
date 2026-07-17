@@ -38,6 +38,14 @@ ACHIEVEMENTS = [
     {"id": "all_crops", "title": "사대(四大)를 아우르다", "desc": "네 작물을 모두 수확했다.", "tier": "gold"},
     {"id": "true_ending", "title": "마주 앉은 아침", "desc": "진엔딩에 이르렀다.", "tier": "gold"},
     {"id": "nightmare_clear", "title": "악몽에서 깨어나", "desc": "악)몽중농원을 끝까지 버텨 수확했다.", "tier": "platinum"},
+    {"id": "water_100", "title": "물의 무게", "desc": "물을 통틀어 백 번 주었다.", "tier": "bronze"},
+    {"id": "story_collector", "title": "밭이 들려준 이야기", "desc": "서로 다른 사건 열 가지를 겪었다.", "tier": "silver"},
+    {"id": "five_runs", "title": "해를 거듭하다", "desc": "다섯 번의 회차를 끝까지 지냈다.", "tier": "silver"},
+    {"id": "fast_clear", "title": "이레의 손", "desc": "여드레 안에 수확까지 마쳤다.", "tier": "gold"},
+    {"id": "gut_farmer", "title": "감으로 짓는 농사", "desc": "무일지 규칙으로 수확까지 마쳤다.", "tier": "gold"},
+    {"id": "dry_well", "title": "마른 해의 우물", "desc": "한발 규칙으로 수확까지 마쳤다.", "tier": "gold"},
+    {"id": "dawn_reply", "title": "새벽의 답장", "desc": "에필로그 '아버지의 새벽'을 끝까지 걸었다.", "tier": "platinum"},
+    {"id": "storehouse_full", "title": "아버지의 창고", "desc": "창고의 물건을 전부 되찾았다.", "tier": "platinum"},
 
     # 히든 업적 (hidden: True)
     {"id": "hundred_clears", "title": "백전노장", "desc": "작물을 통틀어 백 번 길러 거두었다.", "tier": "platinum", "hidden": True},
@@ -105,6 +113,29 @@ def on_ending(ending_type):
         unlock("true_ending")
     elif ending_type == "nightmare":
         unlock("nightmare_ending")
+
+
+def on_run_recorded(days, ending_type):
+    """회차 아카이브 기록 직후 — 메타 누적 기반 업적을 재평가한다."""
+    meta = save_system.load_meta()
+    if len(meta.get("stories_seen", [])) >= 10:
+        unlock("story_collector")
+    if meta.get("lifetime_stats", {}).get("물 주기", 0) >= 100:
+        unlock("water_100")
+    if meta.get("runs_completed", 0) >= 5:
+        unlock("five_runs")
+    if ending_type != "wither" and 0 < days <= 8:
+        unlock("fast_clear")
+    # 도전 규칙 클리어 (시듦이 아니면 성공으로 친다)
+    from core.game_state import game_state
+    if ending_type != "wither":
+        if getattr(game_state, "challenge", None) == "no_journal":
+            unlock("gut_farmer")
+        elif getattr(game_state, "challenge", None) == "drought":
+            unlock("dry_well")
+    from core import storehouse
+    if storehouse.is_complete():
+        unlock("storehouse_full")
 
 
 # 개발자 이름 이스터에그

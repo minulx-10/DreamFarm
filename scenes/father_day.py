@@ -2,6 +2,7 @@ import math
 import pygame
 from core.game_state import game_state, FATHER_DAY_NARRATIONS
 from core.assets import BLACK, WHITE, get_font
+from core.pixelfx import pixelate, glow_sprite, blit_glow
 from core.ui import wrap_text, draw_centered_lines, draw_story_backdrop
 from core import audio
 from core import i18n
@@ -39,6 +40,10 @@ class FatherDayScene:
         return list(FATHER_DAY_NARRATIONS.keys())[0]
 
     def _prepare(self, text):
+        # 통짜 블록을 '먼저' 번역한다 — 카탈로그 키가 블록 전체라, \n 으로 조각내 렌더하면
+        # 각 줄이 카탈로그와 안 맞아 번역이 안 된다(HANDOFF 팁 #5). 한국어에선 i18n.t 가 원문
+        # 그대로라 동작 무변화.
+        text = i18n.t(text)
         lines = []
         for p in text.split("\n"):
             if not p:
@@ -97,14 +102,11 @@ class FatherDayScene:
     def draw(self, screen):
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
 
-        # Warm amber glow in center
+        # Warm amber glow in center — '계단 알파' 도트 글로우(캐시).
+        # 예전 코드는 알파식이 뒤집혀 중앙이 비는 링이었다 → 중앙이 밝은 글로우로 복원.
         pulse = 0.8 + 0.2 * math.sin(self.glow_timer * 1.2)
-        glow_r = int(160 * pulse)
-        glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
-        for r in range(glow_r, 0, -4):
-            a = int((r / glow_r) * 18)
-            pygame.draw.circle(glow_surf, (200, 150, 60, a), (glow_r, glow_r), r)
-        screen.blit(glow_surf, (400 - glow_r, 300 - glow_r))
+        glow_r = (int(160 * pulse) // 8) * 8
+        blit_glow(screen, glow_sprite(glow_r, (200, 150, 60), px=5, steps=(6, 12, 19)), (400, 300))
 
         if self.phase in ("narration", "fade_to_farm"):
             # Title

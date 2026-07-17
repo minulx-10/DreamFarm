@@ -36,10 +36,23 @@ class CropSelectScene:
         # 뒤로가기 버튼 (좌상단)
         self.back_btn = pygame.Rect(24, 22, 104, 34)
 
+        # 도전 규칙 (기본 엔딩 3종 수집 시 해금) — 클릭 순환 버튼 (좌하단)
+        self.challenge = getattr(game_state, "challenge", None)
+        self.challenge_btn = pygame.Rect(40, 506, 220, 36)
+        self.CHALLENGES = [None, "no_journal", "drought", "seven_days"]
+        self.CHALLENGE_NAMES = {None: "없음", "no_journal": "무일지",
+                                "drought": "한발", "seven_days": "이레"}
+        self.CHALLENGE_DESCS = {
+            "no_journal": "여섯 스탯이 보이지 않는다. 손끝의 감으로 밭을 읽어야 한다.",
+            "drought": "가뭄이 걷히지 않는 해. 물이 곧 생명이다.",
+            "seven_days": "여드레 안에 수확까지. 짧고 뜨거운 한 해.",
+        }
+
         self.hovered_card = None
         self.hovered_nightmare = False
         self.hovered_confirm = False
         self.hovered_back = False
+        self.hovered_challenge = False
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -54,6 +67,7 @@ class CropSelectScene:
         self.hovered_nightmare = self.nightmare_rect.collidepoint(mouse_pos)
         self.hovered_confirm = self.confirm_btn.collidepoint(mouse_pos)
         self.hovered_back = self.back_btn.collidepoint(mouse_pos)
+        self.hovered_challenge = self.challenge_btn.collidepoint(mouse_pos)
 
         for event in events:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -74,11 +88,17 @@ class CropSelectScene:
                 elif self.hovered_nightmare and (save_system.nightmare_unlocked() or self.nightmare_mode):
                     audio.play("click")
                     self.nightmare_mode = not self.nightmare_mode
+                # 도전 규칙 순환 (해금 시에만)
+                elif self.hovered_challenge and save_system.challenge_unlocked():
+                    audio.play("click")
+                    idx = self.CHALLENGES.index(self.challenge)
+                    self.challenge = self.CHALLENGES[(idx + 1) % len(self.CHALLENGES)]
                 # 확인 버튼 클릭
                 elif self.hovered_confirm:
                     audio.play("success")
                     game_state.crop = self.selected_crop
                     game_state.nightmare = self.nightmare_mode
+                    game_state.challenge = self.challenge
                     game_state.current_scene = "name_input"
 
     def update(self, dt):
@@ -178,7 +198,18 @@ class CropSelectScene:
             lock_surf = get_font(13).render("(진엔딩 클리어 시 악)몽중농원 지옥 모드가 개방됩니다)", True, TEXT_MUTED)
             screen.blit(lock_surf, (400 - lock_surf.get_width() // 2, 430))
 
-        # 5. 확인 버튼
+        # 5. 도전 규칙 (해금 시) — 순환 버튼 + 활성 시 설명 한 줄
+        if save_system.challenge_unlocked():
+            draw_button(screen, self.challenge_btn,
+                        i18n.tf("도전 규칙: {mode}", mode=i18n.t(self.CHALLENGE_NAMES[self.challenge])),
+                        get_font(15), hovered=self.hovered_challenge,
+                        selected=(self.challenge is not None))
+            if self.challenge:
+                d = self.CHALLENGE_DESCS.get(self.challenge, "")
+                ds = get_font(12).render(d, True, (255, 226, 180))
+                screen.blit(ds, (self.challenge_btn.x + 2, self.challenge_btn.y - 20))
+
+        # 6. 확인 버튼
         draw_button(screen, self.confirm_btn, "선택 완료", self.font_btn, hovered=self.hovered_confirm)
 
         # 6. 뒤로가기 버튼 (좌상단)

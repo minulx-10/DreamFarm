@@ -104,6 +104,27 @@ WEATHER_DATA = {
     "강풍": {"pests": -5, "stress": 5, "desc": "바람이 세차게 분다."},
 }
 
+# ── '해(年)의 성격' — 회차마다 그 해의 날씨 기질이 달라진다 ─────────────────────
+# w: 날씨 추첨 가중치 배수(없으면 1.0). desc: 첫날 일지/밭 안내에 실리는 한 줄.
+YEAR_SEEDS = {
+    "평년": {"w": {}, "desc": "올해는 무던한 해가 되겠다."},
+    "가뭄해": {"w": {"가뭄": 2.4, "비": 0.5},
+               "desc": "올해는 비가 귀하겠다. 물을 아껴 다뤄야 한다."},
+    "장마해": {"w": {"비": 2.4, "가뭄": 0.4},
+               "desc": "올해는 비가 잦겠다. 물길을 미리 봐 두자."},
+    "풍년해": {"w": {"맑음": 1.8, "강풍": 0.6},
+               "desc": "볕이 좋은 해다. 하늘이 절반은 거들어 준다."},
+    "바람 많은 해": {"w": {"강풍": 2.2, "흐림": 1.3},
+                    "desc": "바람 잘 날이 드문 해다. 잎이 상하지 않게 살피자."},
+}
+
+
+def roll_year_seed():
+    """새 회차의 '해의 성격'을 뽑는다 — 평년이 살짝 흔하고 나머지는 고르게."""
+    names = list(YEAR_SEEDS.keys())
+    weights = [2.0 if n == "평년" else 1.0 for n in names]
+    return random.choices(names, weights=weights, k=1)[0]
+
 SILENT_GIFTS = [
     "밭 옆에 물통이 미리 채워져 있다.",
     "흙 위에 장갑이 놓여 있다. 내 사이즈다.",
@@ -266,6 +287,165 @@ STORY_EVENTS = [
                      "fail_text": "녹이 조금 남았지만, 쓰기엔 충분했다."},
         }),
     },
+    # ── 범용 이벤트 확장 (회차 반복감 완화) ──────────────────────────────────
+    {
+        "title": "무너진 돌담",
+        "text": "간밤 바람에 돌담 한 켠이 무너져\n이랑까지 돌이 굴러 들어왔다.\n그대로 두면 호미 날이 상한다.",
+        "choice_a": ("눈에 띄는 큰 돌만 치운다", {
+            "understanding": 1,
+            "result_text": "큰 돌은 치웠지만, 흙 속 잔돌이 자꾸 밟힌다.",
+            "impact_text": "잔돌이 남은 이랑에서는 뿌리가 자꾸 비껴 자랐다.",
+        }),
+        "choice_b": ("허리 숙여 잔돌까지 골라낸다", {
+            "understanding": 6,
+            "result_text": "허리는 아팠지만, 골라낸 자리의 흙이 한결 곱다.",
+            "impact_text": "돌 없는 이랑에서 뿌리가 곧게 내렸다.",
+            "task": {"kind": "tap", "prompt": "이랑에 굴러온 돌을 주워 내세요!", "count": 5, "time": 9.0,
+                     "fail_text": "잔돌 몇 개는 끝내 못 찾았다."},
+        }),
+    },
+    {
+        "not_crop": "apple",   # 과수원(나무)에는 물꼬·이랑 서사가 어울리지 않는다
+        "title": "막힌 물꼬",
+        "text": "낙엽과 검불이 물꼬를 막았다.\n고인 물이 이랑 사이로 번지고 있다.\n장화 속까지 물이 스며드는 날이다.",
+        "choice_a": ("물길이 알아서 뚫리길 기다린다", {
+            "understanding": 1,
+            "result_text": "물은 조금씩 빠졌지만, 반나절을 잃었다.",
+            "impact_text": "물이 오래 고였던 자리는 며칠 내내 질척였다.",
+        }),
+        "choice_b": ("소매를 걷고 손으로 걷어낸다", {
+            "understanding": 7,
+            "result_text": "검불을 걷어내자 물이 시원하게 빠져나갔다.\n손은 시렸지만 개운했다.",
+            "impact_text": "물길이 잡힌 이랑은 비 온 뒤에도 무르지 않았다.",
+            "task": {"kind": "hold", "theme": "water", "prompt": "막힌 물꼬를 꾹 눌러 터 주세요!", "count": 3, "time": 8.0,
+                     "fail_text": "한 군데는 덜 뚫렸지만 물은 흘렀다."},
+        }),
+    },
+    {
+        "title": "읍내 장날",
+        "text": "오늘은 읍내 장날.\n아버지가 다니던 종묘상이 문을 여는 날이다.\n다녀오면 한나절이 빈다.",
+        "choice_a": ("자리를 뜰 수 없어 가지 않는다", {
+            "understanding": 2,
+            "result_text": "일은 밀리지 않았지만, 종묘상 골목이 자꾸 눈에 밟힌다.",
+            "impact_text": "장날을 거른 대신, 이랑은 하루 종일 손길을 받았다.",
+        }),
+        "choice_b": ("한나절 비워 두고 장에 다녀온다", {
+            "understanding": 5,
+            "result_text": "종묘상 주인이 아버지의 안부를 물었다.\n'그 어른 단골이었지.' 그 말이 오래 남았다.",
+            "impact_text": "장에서 얻어 온 볍씨 봉투 하나가 창고에 놓였다.",
+        }),
+    },
+    {
+        "title": "낡은 라디오",
+        "text": "창고 선반에서 지지직거리는 라디오를 찾았다.\n주파수를 맞추니 일기예보가 흘러나온다.\n아버지가 새벽마다 듣던 소리다.",
+        "choice_a": ("그냥 꺼 둔다", {
+            "understanding": 1,
+            "result_text": "조용한 게 편하다. 그래도 어딘가 허전하다.",
+            "impact_text": "라디오는 다시 선반 구석에서 먼지를 썼다.",
+        }),
+        "choice_b": ("고쳐서 일하는 옆에 둔다", {
+            "understanding": 5,
+            "result_text": "지지직 소리 사이로 예보가 또렷해졌다.\n하늘을 미리 헤아리는 습관이 이렇게 시작됐구나.",
+            "impact_text": "일하는 내내 라디오가 나직하게 곁을 지켰다.",
+        }),
+    },
+    # ── 작물 서사 팩 — 그 작물을 기를 때만 나온다 ("crop" 키) ─────────────────
+    {
+        "crop": "apple",
+        "title": "무거워진 가지",
+        "text": "열매 무게로 가지 하나가 축 처졌다.\n이대로 두면 찢어질지도 모른다.\n나무는 제 무게를 말하지 못한다.",
+        "choice_a": ("열매를 몇 개 솎아낸다", {
+            "understanding": 3,
+            "result_text": "솎아낸 자리의 가지가 한결 가벼워 보인다.\n남은 열매가 그만큼 굵어질 것이다.",
+            "impact_text": "솎아낸 풋열매는 거름이 되어 나무 밑으로 돌아갔다.",
+        }),
+        "choice_b": ("받침목을 괴어 가지를 받친다", {
+            "understanding": 6,
+            "result_text": "받침을 괴자 가지가 숨을 돌렸다.\n지탱해 주는 일은 티가 나지 않는다.",
+            "impact_text": "받침목을 얻은 가지는 열매를 끝까지 지켜냈다.",
+            "task": {"kind": "tap", "prompt": "가지를 받칠 돌과 굄목을 모으세요!", "count": 5, "time": 9.0,
+                     "fail_text": "받침이 조금 낮았지만 가지는 버텼다."},
+        }),
+    },
+    {
+        "crop": "apple",
+        "title": "첫 낙과",
+        "text": "밤사이 바람에 풋사과 몇 알이 떨어졌다.\n아직 시고 떫은 열매들이다.\n버리자니 아깝고, 두자니 벌레가 꼬인다.",
+        "choice_a": ("아깝지만 거름으로 묻는다", {
+            "understanding": 6,
+            "result_text": "떨어진 것은 흙으로 돌려보낸다.\n아버지도 그렇게 했을 것이다.",
+            "impact_text": "묻은 자리의 흙이 다음 해를 위해 깊어졌다.",
+        }),
+        "choice_b": ("주워서 식초를 담가 본다", {
+            "understanding": 4,
+            "result_text": "떫은 열매도 쓰임이 있다.\n항아리에서 천천히 익어 갈 것이다.",
+            "impact_text": "창고 구석 항아리에서 사과 식초가 익어 갔다.",
+        }),
+    },
+    {
+        "crop": "potato",
+        "title": "두더지 굴",
+        "text": "이랑 아래로 두더지 굴이 지나갔다.\n흙이 들떠 뿌리가 마르기 쉽다.\n굴 입구가 여기저기 뚫려 있다.",
+        "choice_a": ("소리 나는 바람개비를 꽂아 둔다", {
+            "understanding": 2,
+            "result_text": "바람개비가 돌 때만 조용하다.\n바람 없는 날이 문제다.",
+            "impact_text": "두더지는 바람 없는 밤에 다시 다녀갔다.",
+        }),
+        "choice_b": ("굴 입구를 찾아 하나하나 메운다", {
+            "understanding": 6,
+            "result_text": "입구를 메우자 들뜬 흙이 가라앉았다.\n발밑을 살피는 눈이 조금 자랐다.",
+            "impact_text": "메운 이랑의 감자가 마르지 않고 굵어졌다.",
+            "task": {"kind": "hold", "prompt": "굴 입구를 꾹 눌러 메우세요!", "count": 4, "time": 8.0,
+                     "fail_text": "한 군데는 다시 뚫렸지만 큰 굴은 막았다."},
+        }),
+    },
+    {
+        "crop": "potato",
+        "title": "북주기 가르침",
+        "text": "지나가던 이웃 어른이 북주기를 보고 걸음을 멈췄다.\n'자네 아버지는 북을 더 높이 줬지.'\n낯선 손놀림이 눈에 밟히셨나 보다.",
+        "choice_a": ("하던 방식대로 마저 한다", {
+            "understanding": 2,
+            "result_text": "내 속도로 하는 게 편하다.\n그래도 그 말이 귓가에 남는다.",
+            "impact_text": "이랑 몇 줄은 북이 낮아 초록 감자가 몇 알 나왔다.",
+        }),
+        "choice_b": ("어른의 방식을 따라 해 본다", {
+            "understanding": 6,
+            "result_text": "북을 높이자 이랑이 듬직해졌다.\n아버지의 손놀림을 흉내 낸 셈이다.",
+            "impact_text": "높이 준 북 덕에 감자가 볕에 상하지 않았다.",
+        }),
+    },
+    {
+        "crop": "rice",
+        "title": "물꼬 순서",
+        "text": "위 논과 물 대는 순서가 겹쳤다.\n물은 한 줄기, 논은 여럿.\n먼저 대면 편하지만, 이웃 논이 마른다.",
+        "choice_a": ("우리 논부터 물을 댄다", {
+            "understanding": 1,
+            "result_text": "논은 찰랑해졌지만, 위 논 어른의 헛기침이 들린 것 같다.",
+            "impact_text": "그날 위 논 모서리가 하루 늦게 물을 받았다.",
+        }),
+        "choice_b": ("순서를 양보하고 물길을 같이 손본다", {
+            "understanding": 7,
+            "result_text": "함께 손본 물길로 두 논이 나란히 찰랑해졌다.\n물은 나눠도 줄지 않았다.",
+            "impact_text": "물길을 같이 손본 뒤로, 위 논 어른이 먼저 물을 밀어 주곤 했다.",
+            "task": {"kind": "hold", "theme": "water", "prompt": "물길을 꾹 눌러 다잡으세요!", "count": 4, "time": 8.0,
+                     "fail_text": "물길 한 곳이 덜 잡혔지만 물은 고루 갔다."},
+        }),
+    },
+    {
+        "crop": "rice",
+        "title": "우렁이 손님",
+        "text": "논물 속을 우렁이 몇 마리가 기어간다.\n잎을 갉는 건지, 잡초를 먹는 건지\n아직은 알 수 없다.",
+        "choice_a": ("해가 될까 봐 걷어낸다", {
+            "understanding": 2,
+            "result_text": "걷어낸 우렁이를 도랑에 놓아주었다.\n영 개운치가 않다.",
+            "impact_text": "우렁이가 사라진 자리엔 잡풀이 조금 더 올라왔다.",
+        }),
+        "choice_b": ("잡초를 먹게 그냥 둔다", {
+            "understanding": 6,
+            "result_text": "우렁이는 어린 잡풀만 골라 먹었다.\n논은 생각보다 많은 손을 빌리고 있었다.",
+            "impact_text": "우렁이 덕에 김매기가 한결 수월해졌다.",
+        }),
+    },
 ]
 
 # --- Helper Functions ---
@@ -402,10 +582,19 @@ def get_season_colors(growth, growth_goal):
 
 def advance_weather():
     from core.game_state import game_state
+    # 도전 '한발' — 가뭄이 걷히지 않는다
+    if getattr(game_state, "challenge", None) == "drought":
+        game_state.weather = "가뭄"
+        game_state.next_weather = "가뭄"
+        game_state.weather_turns_left = 99
+        return
     weathers = list(WEATHER_DATA.keys())
     game_state.weather = game_state.next_weather
     candidates = [w for w in weathers if w != game_state.weather]
-    game_state.next_weather = random.choice(candidates)
+    # '해의 성격'이 그 해의 날씨 기질을 만든다 (가뭄해엔 가뭄이 잦고 비가 귀한 식)
+    seed = YEAR_SEEDS.get(getattr(game_state, "year_seed", "평년"), YEAR_SEEDS["평년"])
+    weights = [seed["w"].get(w, 1.0) for w in candidates]
+    game_state.next_weather = random.choices(candidates, weights=weights, k=1)[0]
     game_state.weather_turns_left = random.randint(2, 3)
 
 

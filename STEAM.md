@@ -71,3 +71,29 @@
 
 > 요약: **엔진/빌드/저장 경로는 이미 스팀 배포에 맞게 준비**되어 있다. 지금 막힌 유일한 관문은
 > **Steam App ID(파트너 등록)** 이며, 그것만 확보되면 도전과제·클라우드까지 코드로 마무리할 수 있다.
+
+## Steam Cloud (Auto-Cloud 설정 — 코드 수정 불필요)
+
+세이브는 이미 사용자별 폴더에 저장되므로 Steamworks의 **Auto-Cloud**만 켜면 된다:
+
+- **Root**: `WinAppDataRoaming` / **Path**: `MongjungNongwon`
+- **포함 패턴**: `save_slot.json`, `save_data.json`, `user_settings.json`
+- **제외**: `screenshots/` (F12 스크린샷 — 용량 낭비 방지)
+- 권장 쿼터: 파일 3개 · 1MB 이면 충분 (모두 수 KB JSON)
+
+주의: `user_settings.json`에는 언어·볼륨 등 기기 취향이 섞여 있다. 기기 간 동기화가
+싫다는 피드백이 오면 설정 파일만 Auto-Cloud 패턴에서 빼면 된다(코드 무수정).
+
+## 데모(체험판) 빌드
+
+`core/version.py`의 `DEMO = True`로 바꿔 빌드하면 체험판이 된다:
+- 작물 당근 고정(작물 선택 화면 건너뜀), 악몽 모드·에필로그 잠금
+- 타이틀에 체험판 안내 문구 + 버전 표기에 " DEMO"
+- 세이브 포맷은 정식판과 동일 → 정식판 전환 시 이어하기 호환
+
+## 일본어 등 추가 언어
+
+런타임은 `core/locales/<lang>.json`을 자동 병합하므로(부분 번역은 영어 폴백)
+코드 수정 없이 언어를 늘릴 수 있다: `python tools/i18n_export.py --add ja` 로 스캐폴드를
+만들고 커뮤니티/전문 번역 PR을 받는다(LOCALIZATION.md 참고). 서정적 문장이 많아
+기계 번역 일괄 적용은 권장하지 않는다.

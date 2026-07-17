@@ -6,7 +6,7 @@ from core.assets import *
 from core import audio
 from core import i18n
 from core.crops import current_crop
-from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
+from core.pixelfx import pixel_rect, pixelate, CHAMFER, CHAMFER_SM
 from core.ui import draw_top_bar, draw_bottom_bar, draw_wood_panel, mix_color
 
 
@@ -96,6 +96,22 @@ class Stage4Scene:
         self.stage_clear = False
         self.clear_timer = 2.0
         self.dirt_particles = []
+        self.flash_timer = 0.0   # 수확 성공 순간의 황금빛 플래시
+
+    def _harvest_burst(self, x, y):
+        """수확 성공 순간 — 황금빛 플래시 + 흙·빛 파티클 분출 (클라이맥스 강조)."""
+        self.flash_timer = 0.45
+        for _ in range(16):
+            self.dirt_particles.append({
+                'x': random.uniform(x - 30, x + 30),
+                'y': random.uniform(y - 10, y + 20),
+                'vx': random.uniform(-160, 160),
+                'vy': random.uniform(-220, -60),
+                'color': random.choice([(120, 82, 54), (150, 100, 62),
+                                        (245, 208, 110), (255, 232, 160)]),
+                'size': random.randint(3, 6),
+                'life': random.uniform(0.5, 0.9),
+            })
 
     def handle_events(self, events):
         if self.stage_clear or self.phase == "intro":
@@ -249,6 +265,8 @@ class Stage4Scene:
                     self.dragging = False
 
     def update(self, dt):
+        if self.flash_timer > 0:
+            self.flash_timer = max(0.0, self.flash_timer - dt)
         if self.phase == "intro":
             self.intro_timer -= dt
             if self.intro_timer <= 0:
@@ -319,6 +337,7 @@ class Stage4Scene:
                     if self.hull_progress >= 100.0:
                         self.pull_phase = "feedback"
                         self.feedback_text = "툭! 탈곡과 도정을 마쳤다."
+                        self._harvest_burst(400, 280)
                         self.feedback_timer = 2.0
                         audio.play("harvest")
                         self.results.append("perfect")
@@ -377,6 +396,7 @@ class Stage4Scene:
                         self.feedback_text = "쏙! 완벽하게 캐냈다."
                         self.feedback_timer = 2.0
                         audio.play("harvest")
+                        self._harvest_burst(self.potato_x, 360)
                         self.results.append("perfect")
                         self.attempts += 1
                         game_state.score += 300
@@ -431,6 +451,7 @@ class Stage4Scene:
                             self.feedback_text = "쏙! 완벽하게 뽑혔다."
                         self.feedback_timer = 2.0
                         audio.play("harvest")
+                        self._harvest_burst(self.center_x, int(self.carrot_y))
                         self.results.append("perfect")
                         self.attempts += 1
                         game_state.score += 300
@@ -556,6 +577,13 @@ class Stage4Scene:
         for p in self.dirt_particles:
             pygame.draw.rect(screen, p['color'], (int(p['x'] + sx), int(p['y']), p['size'], p['size']))
 
+        # 수확 성공 플래시 — 짧은 황금빛 섬광 (연출 강조, 알파는 SRCALPHA 서피스 경유)
+        if self.flash_timer > 0:
+            fa = int(140 * (self.flash_timer / 0.45))
+            fl = pygame.Surface((800, 600), pygame.SRCALPHA)
+            fl.fill((255, 236, 170, fa))
+            screen.blit(fl, (0, 0))
+
         # 3. 작물별 수확물 그리기 (당근=스프라이트, 그 외=고유 도형)
         broken = self.pull_phase == "feedback" and "상했다" in self.feedback_text
         if game_state.crop == "carrot":
@@ -596,9 +624,12 @@ class Stage4Scene:
             screen.blit(withered, (px - withered.get_width() // 2, py - 20 - withered.get_height() // 2))
             
             if broken:
-                # 감자알 상함 표시 (어두운 멍자국)
-                pygame.draw.ellipse(screen, (70, 30, 20, 190), (px - 22, py + 12, 18, 12))
-                pygame.draw.ellipse(screen, (70, 30, 20, 190), (px + 4, py + 14, 20, 14))
+                # 감자알 상함 표시 (어두운 멍자국) — screen 직접 draw 는 알파를 무시하므로
+                # SRCALPHA 서피스에 그려 반투명을 살리고, 도트 톤으로 스냅한다
+                bruise = pygame.Surface((48, 20), pygame.SRCALPHA)
+                pygame.draw.ellipse(bruise, (70, 30, 20, 190), (0, 0, 18, 12))
+                pygame.draw.ellipse(bruise, (70, 30, 20, 190), (26, 2, 20, 14))
+                screen.blit(pixelate(bruise, 3, smooth=False), (px - 22, py + 12))
         elif game_state.crop == "rice":
             if self.rice_phase == "thresh":
                 # 벼: 황금빛 벼 이삭과 노랗게 물든 벼 포기
@@ -682,7 +713,10 @@ class Stage4Scene:
             # 사과나무 등
             if broken:
                 draw_crop_food(screen, self.center_x + sx, int(self.carrot_y + 6), game_state.crop, r=24)
-                pygame.draw.ellipse(screen, (110, 60, 45, 185), (self.center_x + sx - 16, int(self.carrot_y) - 6, 32, 24))
+                # 멍자국 반투명 — screen 직접 draw 는 알파를 무시함 (SRCALPHA + 도트화)
+                bruise = pygame.Surface((32, 24), pygame.SRCALPHA)
+                pygame.draw.ellipse(bruise, (110, 60, 45, 185), (0, 0, 32, 24))
+                screen.blit(pixelate(bruise, 3, smooth=False), (self.center_x + sx - 16, int(self.carrot_y) - 6))
             else:
                 draw_crop_food(screen, self.center_x + sx, int(self.carrot_y + 6), game_state.crop, r=24)
 

@@ -106,6 +106,7 @@ _GS_FIELDS = [
     "is_second_run", "prev_ending", "prev_understanding",
     "last_ending", "play_time",
     "crop", "nightmare",
+    "year_seed", "run_stats", "challenge",
 ]
 # set → list 변환이 필요한 필드
 _GS_SET_FIELDS = ["epiphanies_seen", "father_day_seen"]
@@ -119,6 +120,7 @@ _FARM_FIELDS = [
     "special_cooldown", "special_done",
     "withers", "weak_turns", "mistakes",
     "story_cooldown", "crop_offsets", "turns_since_wait",
+    "last_season",
 ]
 _FARM_SET_FIELDS = ["memories_seen", "stories_seen"]
 
@@ -254,6 +256,36 @@ def crop_clears():
     return load_meta().get("crop_clears", {})
 
 
+def record_run(crop, ending, days, seed, journal, stats):
+    """완주한 회차를 아카이브에 남긴다 (창고 탭 '지난 회차' + 누적 통계).
+    일지는 한국어 원문 그대로 저장하고 표시 시점에 번역한다(엔딩 일지와 동일 규칙)."""
+    meta = load_meta()
+    n = meta.get("runs_completed", 0) + 1
+    runs = meta.get("run_archive", [])
+    runs.append({
+        "n": n, "crop": crop, "ending": ending, "days": days, "seed": seed,
+        "challenge": getattr(game_state, "challenge", None),
+        "journal": list(journal)[-24:],
+    })
+    meta["run_archive"] = runs[-20:]     # 최근 20회차만 보관
+    meta["runs_completed"] = n
+    life = meta.get("lifetime_stats", {})
+    for k, v in (stats or {}).items():
+        life[k] = life.get(k, 0) + v
+    life["총 재배일"] = life.get("총 재배일", 0) + max(0, days)
+    meta["lifetime_stats"] = life
+    _write_json(META_PATH, meta)
+    return n
+
+
+def run_archive():
+    return load_meta().get("run_archive", [])
+
+
+def lifetime_stats():
+    return load_meta().get("lifetime_stats", {})
+
+
 def record_achievement(aid):
     """해제된 업적 id를 메타에 남긴다 (중복은 무시)."""
     meta = load_meta()
@@ -282,9 +314,20 @@ def nightmare_unlocked():
     return "true" in endings_seen()
 
 
+def challenge_unlocked():
+    """기본 엔딩(진·노멀·배드·시듦) 중 3종을 모으면 도전 규칙이 열린다."""
+    return len({"true", "normal", "bad", "wither"} & set(endings_seen())) >= 3
+
+
+def epilogue_unlocked():
+    """진엔딩을 보면 에필로그 '아버지의 새벽'이 열린다."""
+    return "true" in endings_seen()
+
+
 # ────────────────────────────── 유저 설정 ──────────────────────────────
 
-_DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko", "update_check": True}
+_DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko", "update_check": True,
+                     "text_speed": "normal"}   # 타자기 텍스트 속도: slow | normal | fast
 
 
 def load_settings():

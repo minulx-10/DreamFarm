@@ -105,6 +105,75 @@ scenes/
 
 ## 4. 개발 작업 로그 (최근 업데이트가 위)
 
+- **2026-07-18 새벽** (v2.5 — IDEAS_STEAM 로드맵 완주 · 미출시):
+  - **에필로그**: `scenes/epilogue.py` — BEATS 스크립트(라벨·본문·인터랙션·틴트). 내부에
+    실제 FarmScene을 배경 호스트로 만들어 `draw_tiled_background`+`draw_farm_plot`만 빌려
+    그리고(HUD 없음), 손맛 인터랙션(WaterPour·WeedPull·SoilMound)을 그대로 꽂는다.
+    끝나면 `update_meta(epilogue_seen=True)`+업적. game_main 등록: SCENE_FACTORIES/
+    FRESH_ON_ENTER/BGM("night")/FF_SCENES. 해금은 `save_system.epilogue_unlocked()`.
+  - **도전 규칙**: `game_state.challenge`(None|no_journal|drought|seven_days, 세이브 포함,
+    reset 시 보존 — 작물과 동일 취급). 적용 지점: FarmSimulator.__init__(시드·목표·안내),
+    `advance_weather`(한발 고정), `apply_field_pressure`(이레 8일 초과 강제 종료),
+    `inspect_message`+`draw_compact_meter`/건강 요약(무일지 가림). 해금
+    `challenge_unlocked()`(기본 엔딩 3종). UI는 crop_select 좌하단 순환 버튼.
+  - **연출**: 계절 배너(sim.last_season 비교→season_banner_timer, 세이브에 last_season 포함),
+    수확 플래시(stage4 `_harvest_burst` — 성공 3경로에서 호출), 첫 회상 보장(try_trigger_memory
+    `first_due`), 미니게임 변형(WaterPour 후반 밴드 축소·PestTap windy).
+  - **데모**: `version.DEMO` — title 4곳 게이트(새 게임 2경로·달 이스터에그·에필로그)+안내 문구.
+  - **주의**: 새 씬을 만들면 game_main의 4개 테이블(팩토리/FRESH/BGM/FF·PAUSE 해당 시)을
+    모두 확인할 것. 도전 규칙을 늘리면 crop_select.CHALLENGES와 achievements 훅도 함께.
+
+- **2026-07-17 심야** (v2.4 콘텐츠 확장 — IDEAS_STEAM 로드맵 1차 · 미출시):
+  - **구조 요점**: '해의 성격'은 `narrative_data.YEAR_SEEDS`+`roll_year_seed()`(FarmSimulator.__init__에서
+    추첨, `game_state.year_seed`, 세이브 포함) → `advance_weather`가 가중 추첨. 회상은
+    `farm_simulator.MEMORY_POOLS`/`CROP_MEMORY_POOLS`(모듈 데이터)로 이사 — 갤러리 목록은
+    `all_memory_titles()`로 자동 동기화. 이벤트는 `STORY_EVENTS`에 `"crop"`/`"not_crop"` 키,
+    비반복은 메타 `stories_seen`(이제 **정본 제목**으로 기록 — `story_choice.canon_title`) 대조.
+    엔딩 작물 문단은 `EndingScene.CROP_ENDING_LINES`(기존 본문 카탈로그 키를 건드리지 않도록
+    번역 후 별도 문장을 이어 붙임).
+  - **창고**: `core/storehouse.py`(ITEMS+unlocked_ids — 메타 파생 상태, 별도 저장 없음),
+    아이콘은 assets `item_*` 9종. 회차 아카이브·누적 통계는 `save_system.record_run`
+    (엔딩 실플레이 경로에서 호출, `game_state.final_day`/`run_stats` 사용) → 업적 재평가는
+    `achievements.on_run_recorded`. 갤러리 탭은 4~5개 동적(`tab_rects`), 목록들은 휠 스크롤.
+  - **밸런스 확인**: playtest 곡선 유지(잘함/보통→true, 못함→wither/normal) — 시드가 승패를
+    뒤집지 않음. 통합 테스트 `scratch/qa_v24.py`(시드 편향·필터·비반복·기록·해금·렌더 8종).
+  - **주의**: 새 이벤트/회상/창고 텍스트를 추가하면 반드시 i18n_data에 EN을 함께 넣고
+    `tools/i18n_export.py` 재생성. 범용 이벤트 본문에는 '밭/당근' 단어를 피할 것(벼 치환 이슈).
+
+- **2026-07-17 밤** (일시정지 완화 · 스팀 아이디어 문서 · 미출시):
+  - **자동 일시정지**: `game_main.PAUSE_SCENES`(farm·stage1~4·star_connect·story_choice)에서만,
+    `WINDOWFOCUSLOST`(키보드 포커스 상실)일 때만 발동. 마우스 이탈로는 더 이상 멈추지 않는다.
+    새 씬에 시간 압박을 넣으면 PAUSE_SCENES에 추가할 것.
+  - **`IDEAS_STEAM.md` 신설**: 플레이타임·흥미 확장 아이디어와 우선순위 로드맵(팀 논의용).
+    콘텐츠 실측 수치(이벤트 6·회상 14·업적 16·완주 3~5h)가 담겨 있으니 콘텐츠 추가 시 갱신.
+
+- **2026-07-17 저녁** (모자이크 근절 · 앰비언트 · 신기능 3종 · 미출시):
+  - **글로우 렌더 규칙 변경(중요)**: 소프트 글로우는 이제 `pixelfx.glow_sprite(radius, color, px, steps,
+    core)` + `blit_glow`(캐시·계단 알파 링)로 그린다. 균일 알파 선화·오브젝트는 `pixelate(surf, block,
+    smooth=False)`(최근접 서브샘플). **평균 축소 pixelate를 소프트 원에 쓰면 '모자이크 검열'처럼 보인다** —
+    새 글로우는 반드시 glow_sprite로. 맥동 글로우는 반경을 몇 px 단위로 양자화해 캐시 폭주 방지.
+  - **날씨 앰비언트**: `farm_renderer._ambient_init/update_ambient/_draw_ambient` — FarmScene.update가
+    매 프레임 굴린다. 날씨 문자열이 바뀌면 자동 재초기화.
+  - **신기능**: 텍스트 속도 설정(`text_speed`: slow/normal/fast — `ui_utils.text_speed_factor()`가
+    Typewriter에 곱함), 밭 일지 열람(J / `farm_renderer.JOURNAL_BTN` — ESC 처리를 위해 game_main의
+    ESC 분기에 farm_journal 예외 있음), F12 스크린샷(game_main 루프, 세이브 폴더/screenshots).
+  - **QA 도구**: `scratch/qa_ratios.py`(종횡비 매트릭스), `scratch/loop_test.py`를 game_main 기준으로
+    복구(+F12·J·ESC 경로 포함 실루프 54프레임 검증). 스윕은 156장.
+
+- **2026-07-17** (전 씬 정밀 QA 2차 · 미출시):
+  - **QA 방법**: `scratch/qa_sweep.py`(신설)로 전 씬/상태 154장(KO/EN·악몽·창 비율별 캔버스 포함)을 실제 게임
+    그리기 순서(캔버스→안전영역→씬→크롬)로 캡처해 시각 검수 + 코드 리뷰 + 헤드리스 클릭/로직 플레이 병행.
+    `smoke_test.py`·`playtest.py`는 farm 삼분할 이후 API(`farm.sim.do_action(action, farm)`)로 복구해 통과.
+  - **주요 수정**(상세는 CHANGELOG 미출시 섹션): 날씨 미니게임 5종·QTE 일러스트 도트화(+ RGBA 알파 무시 버그
+    3곳 — `pygame.draw`를 screen에 직접 쓰면 알파가 무시되는 함정, HANDOFF 팁#2 재확인), '밭 수첩' 토글 위치
+    이동(패널 겹침), 배속 버튼을 타자기 씬 6곳으로 한정(`game_main.FF_SCENES`), 튜토리얼 중 크롬 숨김+차단,
+    존재하지 않는 엔딩 4종(happy/growth/skill/rush) 죽은 분기 제거, i18n 카탈로그 중복 키 14건·유령 키 정리,
+    갤러리 업적 카드 EN 겹침 수정, `draw_button` 넘침 시 폰트 자동 축소(전역), 타이틀 Enter 진행 보호.
+  - **주의(회귀 방지)**: ① 라벨을 문자열 연결로 조립하면("✕ "+라벨) EN 카탈로그 매칭이 깨진다 — 조각을 먼저
+    `i18n.t()` 하고 붙일 것. ② `i18n_data.py`에 같은 KO 키를 다시 넣으면 앞 항목이 조용히 무시된다 —
+    `scratch/dedupe_i18n.py` 참고. ③ 엔딩 타입은 nightmare/true/normal/bad/wither 5종뿐. ④ 스크린샷 스윕은
+    `python scratch/qa_sweep.py` (출력: `scratch/qa/sweep/`).
+
 - **2026-07-14** (v2.2.0 정식 배포 이후 · 미출시):
   - **화면 비율 적응형 UI**: 고정 800×600(4:3) 레터박스 → **적응형 캔버스**. `core/layout.py`가 창 비율에 맞춰
     캔버스 크기(안전영역 800×600 + 여백)를 정하고, `game_main`이 캔버스 버퍼 + 안전영역 서브서피스(`safe_sub`)를

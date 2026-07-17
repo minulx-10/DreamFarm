@@ -28,6 +28,12 @@ class GameState:
         self.weather = "맑음"
         self.weather_turns_left = 3
         self.next_weather = "흐림"
+        self.year_seed = "평년"     # '해의 성격' — 회차 시작 시 FarmSimulator가 새로 뽑는다
+        self.challenge = None       # 도전 규칙: None | no_journal | drought | seven_days
+        self.final_day = 0          # 회차가 끝난 날 (수확/시듦 시점 — 회차 아카이브용)
+
+        # 이번 회차의 손길 통계 (창고 탭 누적 통계의 원천 — 엔딩에서 메타로 합산)
+        self.run_stats = {}
 
         # Journal system
         self.journal_entries = []
@@ -121,6 +127,7 @@ class GameState:
             "prev_understanding": self.prev_understanding,
             "crop": self.crop,
             "nightmare": self.nightmare,
+            "challenge": self.challenge,   # '다시 시작'은 같은 규칙으로 (작물·악몽과 동일 취급)
         }
         self.__init__()
         for key, value in preserved.items():

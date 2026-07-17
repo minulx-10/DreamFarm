@@ -8,6 +8,7 @@ from core.game_state import (
     track_attitude, get_season_colors, get_season,
     check_father_day,
 )
+from core.narrative_data import YEAR_SEEDS, roll_year_seed
 from core import audio
 from core import save_system
 from core import i18n
@@ -39,6 +40,128 @@ STAR_CONNECT_INTROS = [
     "[고요한 새벽]\n\n잠 못 든 밤, 하늘에 북두칠성이 또렷하다.\n아버지가 늘 올려다보던 그 별이다.\n순서대로 이어 본다.",
 ]
 
+# ── 회상 조각 — 이해도 구간별 공용 풀 (key, 제목, 본문) ────────────────────────
+# 본문은 tnar 로 이름 조사({name_eun}·{name_ga})와 작물 치환이 적용된다.
+# key 는 회차 안 중복 방지용 — 'first'/'second'는 구간이 올라도 같은 슬롯(식탁 서사)이라
+# 회차당 하나만 나온다(의도).
+MEMORY_POOLS = {
+    "low": [
+        (
+            "first",
+            "희미한 식탁",
+            "식탁 위에 당근 반찬이 놓여 있다.\n{name_eun} 젓가락으로 그릇을 밀어냈고, 아버지는 잠깐 말을 멈췄다.\n그때는 그 침묵이 왜 길게 느껴졌는지 몰랐다.",
+        ),
+        (
+            "low_market",
+            "장바구니 소리",
+            "비닐봉지가 문고리에 부딪히는 소리가 난다.\n아버지는 흙 묻은 당근을 꺼내며 '오늘 건 달다'고 말했다.\n{name_eun} 대답 대신 물컵만 만지작거렸다.",
+        ),
+        (
+            "second",
+            "남긴 접시",
+            "싱크대 옆에 남은 반찬 그릇이 보인다.\n작은 주황색 조각들이 물에 젖어 천천히 가라앉는다.\n어쩐지 꿈속의 흙냄새가 더 짙어진다.",
+        ),
+    ],
+    "mid": [
+        (
+            "first",
+            "다시 보이는 식탁",
+            "당근 반찬을 밀어내던 손이 떠오른다.\n{name_eun} 그때 아버지의 표정보다 자기 입맛만 먼저 생각했다는 걸 알아차린다.",
+        ),
+        (
+            "mid_field",
+            "이른 아침",
+            "아버지는 아직 어두운 시간에 밭으로 나갔다.\n흙을 털어내는 손등에는 잔금이 많았다.\n그 손이 식탁 위 반찬을 만들었다는 생각이 뒤늦게 따라온다.",
+        ),
+        (
+            "second",
+            "한 조각의 무게",
+            "젓가락 끝에 걸린 당근 한 조각이 이상하게 무겁다.\n맛보다 먼저 떠오르는 건, 누군가의 기다림이었다.",
+        ),
+    ],
+    "high": [
+        (
+            "first",
+            "따뜻한 식탁",
+            "식탁 위의 당근 반찬이 떠오른다.\n이번에는 밀어내고 싶다는 생각보다, 한 번쯤 제대로 맛보고 싶다는 마음이 먼저 든다.",
+        ),
+        (
+            "high_field",
+            "손등의 흙",
+            "아버지가 웃으며 손등의 흙을 털어낸다.\n그 모습은 무겁기보다 다정하다.\n꿈속의 밭도 조금은 덜 낯설게 느껴진다.",
+        ),
+        (
+            "second",
+            "짧은 고개 끄덕임",
+            "{name_ga} 말없이 고개를 끄덕인다.\n무언가를 완전히 알게 된 건 아니지만, 이제 외면하고 싶지는 않다.",
+        ),
+    ],
+}
+
+# ── 작물 서사 팩 — 작물별 고유 회상 (그 작물을 기를 때만 풀에 섞인다) ─────────────
+CROP_MEMORY_POOLS = {
+    "apple": {
+        "low": [(
+            "apple_low",
+            "심긴 지 오래된 나무",
+            "이 나무는 내가 태어나기 전부터 있었다고 했다.\n아버지는 나무 나이를 셀 때 꼭 내 나이를 같이 셌다.\n그때는 그게 무슨 뜻인지 몰랐다.",
+        )],
+        "mid": [(
+            "apple_mid",
+            "그늘의 크기",
+            "사과나무 그늘이 해마다 조금씩 넓어졌다고 했다.\n{name_eun} 그 그늘 아래서 낮잠만 잤다.\n그늘을 키운 시간은 생각하지 못했다.",
+        )],
+        "high": [(
+            "apple_high",
+            "기다림의 나이테",
+            "열매는 심은 해에 열리지 않는다.\n몇 해를 그냥 물만 주는 시간이 있다.\n아버지의 기다림도 그런 것이었을까.",
+        )],
+    },
+    "potato": {
+        "low": [(
+            "potato_low",
+            "흙 속의 일",
+            "감자밭은 겉보기엔 아무 일도 없어 보였다.\n{name_ga} 왜 매일 나가느냐고 물으면, 아버지는 웃기만 했다.",
+        )],
+        "mid": [(
+            "potato_mid",
+            "보이지 않는 성실",
+            "흙 위로는 잎만 보인다.\n정작 굵어지는 것은 보이지 않는 곳에 있다.\n아버지의 하루도 그랬다.",
+        )],
+        "high": [(
+            "potato_high",
+            "캐 보기 전에는",
+            "캐 보기 전에는 모른다고, 아버지가 말했다.\n믿고 북돋는 수밖에 없다고.\n그 말이 감자 얘기만은 아니었음을 이제 안다.",
+        )],
+    },
+    "rice": {
+        "low": [(
+            "rice_low",
+            "물 대는 소리",
+            "새벽마다 물꼬 트는 소리가 났다.\n{name_eun} 그 소리를 자장가처럼 들으며 다시 잠들었다.",
+        )],
+        "mid": [(
+            "rice_mid",
+            "이웃의 논",
+            "논일은 혼자 하는 일이 아니라고 했다.\n물은 위 논에서 아래 논으로 흐르니까.\n아버지가 이웃 어른들과 나누던 인사가 떠오른다.",
+        )],
+        "high": [(
+            "rice_high",
+            "밥 한 공기",
+            "밥 한 공기가 되기까지 아흔아홉 번 손이 간다고 했다.\n남긴 밥알을 보던 아버지의 눈을,\n이제 조금은 마주할 수 있을 것 같다.",
+        )],
+    },
+}
+
+
+def all_memory_titles():
+    """갤러리 '기억' 컬럼에 보일 전체 회상 제목 (공용 + 작물 팩, 정의 순서대로)."""
+    titles = [t for tier in ("low", "mid", "high") for _, t, _ in MEMORY_POOLS[tier]]
+    for crop_pools in CROP_MEMORY_POOLS.values():
+        for tier in ("low", "mid", "high"):
+            titles += [t for _, t, _ in crop_pools.get(tier, [])]
+    return titles
+
 
 class FarmSimulator:
     def __init__(self):
@@ -60,6 +183,30 @@ class FarmSimulator:
         self.last_action = ""
         self.message = self._cropify("낯선 밭에서 눈을 떴다.")
         self.notice = self._cropify("밭의 상태부터 천천히 살펴보자.")
+
+        # '해의 성격' — 이 회차의 날씨 기질. 평년이 아니면 첫 안내로 귀띔한다.
+        game_state.year_seed = roll_year_seed()
+        game_state.run_stats = {}
+        if game_state.year_seed != "평년":
+            self.notice = YEAR_SEEDS[game_state.year_seed]["desc"]
+
+        # 도전 규칙 (crop_select 에서 선택 — 없으면 None)
+        ch = getattr(game_state, "challenge", None)
+        if ch == "drought":
+            game_state.year_seed = "가뭄해"
+            game_state.weather = "가뭄"
+            game_state.next_weather = "가뭄"
+            self.notice = "한발 — 이 해엔 가뭄이 걷히지 않는다. 물이 곧 생명이다."
+        elif ch == "seven_days":
+            self.growth_goal = max(10, int(self.growth_goal * 0.55))
+            self.notice = "이레 — 여드레 안에 수확까지 마쳐야 한다."
+        elif ch == "no_journal":
+            self.notice = "무일지 — 밭의 상태는 손끝의 감으로만 읽어야 한다."
+
+        # 계절 전환 배너 상태
+        self.last_season = get_season(self.growth, self.growth_goal)
+        self.season_banner = ""
+        self.season_banner_timer = 0.0
         self.memory_cooldown = 1
         self.minigame_cooldown = 3       # '밭 정리' 돌발 상황 사이의 최소 간격
         self.weather_minigame_cooldown = 2  # 날씨 미니게임 쿨다운 (2턴 후부터 발동 가능)
@@ -170,6 +317,7 @@ class FarmSimulator:
                 game_state.understanding += 12
                 game_state.final_health = self.health
                 game_state.farm_mistakes = self.mistakes
+                game_state.final_day = self.day   # 회차 아카이브용 (며칠 만에 수확했나)
                 game_state.transition_text = (
                     "[수확의 시간]\n\n"
                     "이 한 뿌리를 위해 여기까지 왔다.\n"
@@ -210,6 +358,8 @@ class FarmSimulator:
             game_state.water_count += 1
         elif action == "잡초 뽑기":
             game_state.weed_count += 1
+        # 손길 통계 (창고 탭 누적 통계의 원천)
+        game_state.run_stats[action] = game_state.run_stats.get(action, 0) + 1
         difficulty = 1 + self.growth // 6
         result, is_fail = self.apply_action(action, difficulty, quality)
         self.apply_field_pressure(difficulty, farm_scene)
@@ -272,6 +422,14 @@ class FarmSimulator:
             self.weak_turns = 0
 
         farm_scene.season_colors = get_season_colors(self.growth, self.growth_goal)
+
+        # 계절이 넘어가는 턴 — 잔잔한 전환 배너 (모든 계절 이름이 받침으로 끝나 '이'로 고정)
+        cur_season = get_season(self.growth, self.growth_goal)
+        if cur_season != self.last_season:
+            self.last_season = cur_season
+            self.season_banner = cur_season
+            self.season_banner_timer = 3.2
+            audio.play("page")
 
         if self.day % 5 == 0:
             self._write_journal()
@@ -436,6 +594,22 @@ class FarmSimulator:
 
     def apply_field_pressure(self, difficulty, farm_scene):
         self.day += 1
+        # 도전 '이레' — 여드레를 넘기면 밭이 계절을 놓친다 (시듦 엔딩)
+        if (getattr(game_state, "challenge", None) == "seven_days"
+                and self.day > 8 and not self.is_harvest_ready()):
+            game_state.crop_failed = True
+            game_state.final_health = max(0, self.health)
+            game_state.farm_mistakes = self.mistakes
+            game_state.final_day = self.day
+            game_state.transition_text = (
+                "[여드레가 지났다]\n\n"
+                "짧은 해는 기다려 주지 않았다.\n"
+                "다음에는 더 빠르고, 더 정확해야 한다."
+            )
+            game_state.transition_next = "ending"
+            game_state.is_clear_transition = False
+            game_state.current_scene = "transition"
+            return
         self.moisture -= random.randint(4, 7 + difficulty)
         if not self.no_weeds:
             self.weeds += random.randint(4, 7 + difficulty)
@@ -484,10 +658,18 @@ class FarmSimulator:
                 return
             if random.random() > 0.32:
                 return
-        available = [e for i, e in enumerate(STORY_EVENTS) if i not in self.stories_seen]
+        # 작물 전용 이벤트("crop" 키)는 그 작물을 기를 때만, "not_crop"은 그 작물이 아닐 때만
+        available = [e for i, e in enumerate(STORY_EVENTS)
+                     if i not in self.stories_seen
+                     and e.get("crop") in (None, game_state.crop)
+                     and e.get("not_crop") != game_state.crop]
         if not available:
             return
-        event = random.choice(available)
+        # 회차 간 비반복 — 지난 회차들(갤러리 기록)에서 아직 안 겪은 이벤트를 우선한다
+        meta_seen = set(save_system.load_meta().get("stories_seen", []))
+        fresh = [e for e in available
+                 if e["title"] not in meta_seen and self._cropify(e["title"]) not in meta_seen]
+        event = random.choice(fresh or available)
         self.stories_seen.add(STORY_EVENTS.index(event))
         self.story_cooldown = 4
         game_state.choice_data = event
@@ -498,6 +680,9 @@ class FarmSimulator:
         # 일지는 한국어 원문으로 저장하고 '표시 시점'에 현재 언어로 번역한다(엔딩에서 언어를 바꿔도
         # 즉시 반영되도록 — ending._localize_journal_line 참고).
         lines = [f"[{self.day}일째 · {season} · {game_state.weather}]"]
+        if not game_state.journal_entries and game_state.year_seed != "평년":
+            # 첫 장에는 그 해의 기질을 적어 둔다 (가뭄해·장마해 …)
+            lines.append(YEAR_SEEDS[game_state.year_seed]["desc"])
         if self.moisture > 75:
             lines.append("오늘 물을 너무 많이 줬다.")
         elif self.moisture < 25:
@@ -548,6 +733,9 @@ class FarmSimulator:
         )
 
     def inspect_message(self):
+        # 도전 '무일지' — 정밀 진단이 없다. 감으로 읽으라는 안내만.
+        if getattr(game_state, "challenge", None) == "no_journal":
+            return "밭이 무슨 말을 하는지, 오늘은 손끝의 감으로 읽어야 한다."
         warnings = []
         if self.moisture < 30:
             warnings.append("수분 부족")
@@ -628,7 +816,9 @@ class FarmSimulator:
 
         u = game_state.understanding
         chance = 0.24 if u < 18 else 0.14 if u < 45 else 0.06
-        if forced_key is None and random.random() >= chance:
+        # 첫인상 밀도 보장 — 3일째까지 회상을 한 번도 못 만났으면 반드시 한 편을 띄운다
+        first_due = (not self.memories_seen) and self.day >= 3
+        if forced_key is None and not first_due and random.random() >= chance:
             return
 
         memory = self.pick_memory(forced_key)
@@ -647,65 +837,11 @@ class FarmSimulator:
         game_state.current_scene = "memory"
 
     def pick_memory(self, forced_key):
-        name = game_state.player_name
-        name_eun = append_josa(name, "은/는")
-        name_ga = append_josa(name, "이/가")
         u = game_state.understanding
-
-        if u < 18:
-            memories = [
-                (
-                    "first",
-                    "희미한 식탁",
-                    "식탁 위에 당근 반찬이 놓여 있다.\n{name_eun} 젓가락으로 그릇을 밀어냈고, 아버지는 잠깐 말을 멈췄다.\n그때는 그 침묵이 왜 길게 느껴졌는지 몰랐다.",
-                ),
-                (
-                    "low_market",
-                    "장바구니 소리",
-                    "비닐봉지가 문고리에 부딪히는 소리가 난다.\n아버지는 흙 묻은 당근을 꺼내며 '오늘 건 달다'고 말했다.\n{name_ga}는 대답 대신 물컵만 만지작거렸다.",
-                ),
-                (
-                    "second",
-                    "남긴 접시",
-                    "싱크대 옆에 남은 반찬 그릇이 보인다.\n작은 주황색 조각들이 물에 젖어 천천히 가라앉는다.\n어쩐지 꿈속의 흙냄새가 더 짙어진다.",
-                ),
-            ]
-        elif u < 45:
-            memories = [
-                (
-                    "first",
-                    "다시 보이는 식탁",
-                    "당근 반찬을 밀어내던 손이 떠오른다.\n{name_eun} 그때 아버지의 표정보다 자기 입맛만 먼저 생각했다는 걸 알아차린다.",
-                ),
-                (
-                    "mid_field",
-                    "이른 아침",
-                    "아버지는 아직 어두운 시간에 밭으로 나갔다.\n흙을 털어내는 손등에는 잔금이 많았다.\n그 손이 식탁 위 반찬을 만들었다는 생각이 뒤늦게 따라온다.",
-                ),
-                (
-                    "second",
-                    "한 조각의 무게",
-                    "젓가락 끝에 걸린 당근 한 조각이 이상하게 무겁다.\n맛보다 먼저 떠오르는 건, 누군가의 기다림이었다.",
-                ),
-            ]
-        else:
-            memories = [
-                (
-                    "first",
-                    "따뜻한 식탁",
-                    "식탁 위의 당근 반찬이 떠오른다.\n이번에는 밀어내고 싶다는 생각보다, 한 번쯤 제대로 맛보고 싶다는 마음이 먼저 든다.",
-                ),
-                (
-                    "high_field",
-                    "손등의 흙",
-                    "아버지가 웃으며 손등의 흙을 털어낸다.\n그 모습은 무겁기보다 다정하다.\n꿈속의 밭도 조금은 덜 낯설게 느껴진다.",
-                ),
-                (
-                    "second",
-                    "짧은 고개 끄덕임",
-                    "{name_ga} 말없이 고개를 끄덕인다.\n무언가를 완전히 알게 된 건 아니지만, 이제 외면하고 싶지는 않다.",
-                ),
-            ]
+        tier = "low" if u < 18 else "mid" if u < 45 else "high"
+        memories = list(MEMORY_POOLS[tier])
+        # 작물 서사 팩 — 지금 기르는 작물의 고유 회상이 같은 구간 풀에 섞인다
+        memories += CROP_MEMORY_POOLS.get(game_state.crop, {}).get(tier, [])
 
         if forced_key:
             for memory in memories:
@@ -763,6 +899,7 @@ class FarmSimulator:
             game_state.crop_failed = True
             game_state.final_health = 0
             game_state.farm_mistakes = self.mistakes + 3
+            game_state.final_day = self.day
             game_state.transition_text = (
                 "[밭이 시들어 버렸다]\n\n"
                 "아무리 다독여도 당근은 다시 일어서지 못했다.\n"

@@ -24,8 +24,8 @@ class SettingsOverlay:
         # 오른쪽 위 고정 버튼
         self.button = pygame.Rect(746, 27, 28, 28)
 
-        # 가운데 모달 패널 (전체화면·언어 토글 행이 들어가 세로로 늘림: 360x500)
-        self.panel = pygame.Rect(220, 46, 360, 500)
+        # 가운데 모달 패널 (전체화면·언어·텍스트 속도 토글 행이 들어가 세로로 늘림: 360x536)
+        self.panel = pygame.Rect(220, 30, 360, 536)
         pad = 26
         self._track_w = 160
         track_x = self.panel.x + pad + 72
@@ -45,11 +45,12 @@ class SettingsOverlay:
         # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
         self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
 
-        # 하단 2×2 토글 그리드: [전체화면][언어] / [버전 표시][닫기]
+        # 하단 토글 그리드: [전체화면][언어] / [버전 표시][텍스트 속도] / [닫기(전체폭)]
         self._fullscreen_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 388, 140, 36)
         self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 388, 140, 36)
         self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 432, 140, 36)
-        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
+        self._text_speed_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
+        self._close_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 476, self.panel.width - 2 * pad, 32)
 
         self.show_message = ""
         self.message_timer = 0.0
@@ -262,6 +263,13 @@ class SettingsOverlay:
             current_show = save_system.get_setting("show_version")
             save_system.set_setting("show_version", not current_show)
             audio.play("click")
+        elif self._text_speed_btn.collidepoint(pos):
+            # 텍스트 속도 순환: 보통 → 빠름 → 느림 → 보통
+            order = ["normal", "fast", "slow"]
+            cur = save_system.get_setting("text_speed")
+            nxt = order[(order.index(cur) + 1) % len(order)] if cur in order else "normal"
+            save_system.set_setting("text_speed", nxt)
+            audio.play("click")
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
             self.open = False
         elif not self.panel.collidepoint(pos):
@@ -373,12 +381,21 @@ class SettingsOverlay:
 
         show_ver = save_system.get_setting("show_version")
         self._draw_text_button(screen, self._version_btn, f"버전 표시: {'ON' if show_ver else 'OFF'}", active=show_ver)
+
+        # 텍스트 속도 (느림/보통/빠름 순환) — 타자기 서사 연출의 속도
+        from core import i18n
+        speed_names = {"slow": "느림", "normal": "보통", "fast": "빠름"}
+        cur_speed = save_system.get_setting("text_speed")
+        self._draw_text_button(screen, self._text_speed_btn,
+                               i18n.tf("텍스트 속도: {v}", v=i18n.t(speed_names.get(cur_speed, "보통"))),
+                               active=(cur_speed != "normal"))
+
         self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
         # 알림 메시지 출력
         if self.show_message:
             msg_surf = get_font(14).render(self.show_message, True, (139, 69, 19))
-            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 476))
+            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 514))
 
         if not audio.is_enabled():
             warn = get_font(13).render("(이 기기에서는 소리를 낼 수 없어요)", True, TEXT_MUTED)

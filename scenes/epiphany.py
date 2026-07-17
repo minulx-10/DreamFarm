@@ -2,6 +2,7 @@ import math
 import pygame
 from core.game_state import game_state
 from core.assets import BLACK, get_font
+from core.pixelfx import pixelate, glow_sprite, blit_glow
 from core import audio
 
 class EpiphanyScene:
@@ -54,14 +55,13 @@ class EpiphanyScene:
 
         ratio = self.alpha / 255.0
 
-        # Warm golden glow in center
+        # Warm golden glow in center — '계단 알파' 도트 글로우(캐시).
+        # 예전 코드는 알파식이 뒤집혀(작은 원일수록 옅게 덮어씀) 중앙이 비고 가장자리만
+        # 밝은 링이었다 → 의도대로 중앙이 가장 밝은 글로우로 복원. 반경은 8px 양자화(캐시 상한).
         glow_pulse = 0.85 + 0.15 * math.sin(self.glow_timer * 1.5)
-        glow_radius = int(200 * glow_pulse)
-        glow_surf = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
-        for r in range(glow_radius, 0, -3):
-            a = int((r / glow_radius) * 30 * ratio)
-            pygame.draw.circle(glow_surf, (255, 200, 80, a), (glow_radius, glow_radius), r)
-        screen.blit(glow_surf, (400 - glow_radius, 300 - glow_radius))
+        glow_radius = (int(200 * glow_pulse) // 8) * 8
+        blit_glow(screen, glow_sprite(glow_radius, (255, 200, 80), px=5, steps=(9, 18, 30)),
+                  (400, 300), int(255 * ratio))
 
         # Main text with alpha
         color = (

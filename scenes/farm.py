@@ -33,7 +33,8 @@ class Button:
             r = self.rect
             pixel_rect(screen, base, r, chamfer=CHAMFER)
             pixel_rect(screen, (150, 138, 126), r, width=1, chamfer=CHAMFER)
-            surf = self.font.render("✕ " + self.text, True, (236, 228, 214))
+            # "✕ "를 먼저 붙이면 통짜 문자열이 카탈로그와 안 맞아 EN에서 미번역 → 라벨만 먼저 번역
+            surf = self.font.render("✕ " + i18n.t(self.text), True, (236, 228, 214))
             screen.blit(surf, (r.centerx - surf.get_width() // 2,
                                r.centery - surf.get_height() // 2))
             return
@@ -54,10 +55,10 @@ class FarmScene:
          "그때그때 화면이 방법을 알려줍니다."),
         ("정답은 알려주지 않습니다",
          "아래 '농장 일지'는 밭의 증상만 알려줄 뿐, 무엇을 할지는 직접 판단해야 합니다. "
-         "막막하면 '살펴보기'로 정밀 진단과 날씨 예보를 받을 수 있어요."),
+         "막막하면 '살펴보기'로 정밀 진단과 날씨 예보를 받을 수 있습니다."),
         ("서두르지 마세요",
          "작물은 제대로 된 돌봄과, 밭이 평온할 때의 '기다리기'에서 자랍니다. "
-         "조급함은 당근을 상하게 합니다.  (M 키: 음소거)"),
+         "조급함은 당근을 상하게 합니다.\n(M 키: 음소거)"),
     ]
 
     def __init__(self):
@@ -80,6 +81,9 @@ class FarmScene:
         
         self.forced_wait_active = False
         self.forced_wait_timer = 0.0
+
+        self.journal_open = False      # 지난 일지 팝업 (J 키 / 하단 바 버튼)
+        self.journal_scroll = 0
         
         self.fireflies = []
         for _ in range(18):
@@ -144,6 +148,25 @@ class FarmScene:
                 self.interaction.handle(event)
             return
 
+        # 지난 일지 팝업이 열려 있으면 입력을 전부 소비 (닫기/스크롤만)
+        if self.journal_open:
+            from scenes.farm_renderer import JOURNAL_PANEL
+            for event in events:
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_j):
+                    audio.play("click")
+                    self.journal_open = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 \
+                        and not JOURNAL_PANEL.collidepoint(event.pos):
+                    audio.play("click")
+                    self.journal_open = False
+                elif event.type == pygame.MOUSEWHEEL:
+                    self.journal_scroll = max(0, self.journal_scroll - event.y * 44)
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                    self.journal_scroll += 44
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                    self.journal_scroll = max(0, self.journal_scroll - 44)
+            return
+
         if self.tutorial_active:
             for event in events:
                 advance = (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or (
@@ -156,6 +179,22 @@ class FarmScene:
             return
 
         for event in events:
+            # J 키 — 지난 일지 열기
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_j:
+                audio.play("page")
+                self.journal_open = True
+                self.journal_scroll = 0
+                continue
+
+            # 하단 바 '지난 일지' 버튼
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                from scenes.farm_renderer import JOURNAL_BTN
+                if JOURNAL_BTN.collidepoint(event.pos):
+                    audio.play("page")
+                    self.journal_open = True
+                    self.journal_scroll = 0
+                    continue
+
             # 좁은 화면 '밭 수첩' 상단 팝업 토글 — 다른 처리보다 먼저 소비(넓은 화면엔 버튼 없음)
             if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                     and not getattr(self, "_dash_wide", True)):
@@ -221,6 +260,9 @@ class FarmScene:
                 self.rebuild_buttons()
 
     def update(self, dt):
+        # 날씨 앰비언트(비·잎·먼지·구름 그림자·나비)는 어떤 상태에서든 살아 움직인다
+        self.renderer.update_ambient(dt, game_state.weather)
+
         if self.forced_wait_active:
             self.forced_wait_timer -= dt
             if self.forced_wait_timer <= 0:
@@ -288,6 +330,9 @@ class FarmScene:
                 f['speed_x'] *= -1
             if f['y'] < 20 or f['y'] > 160:
                 f['speed_y'] *= -1
+
+        if getattr(self.sim, "season_banner_timer", 0) > 0:
+            self.sim.season_banner_timer -= dt
 
         if self.sim.thought_timer > 0:
             self.sim.thought_timer -= dt

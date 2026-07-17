@@ -11,7 +11,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_MUTED
 from core.ui import draw_story_backdrop
-from core.pixelfx import pixel_rect, CHAMFER, CHAMFER_SM
+from core.pixelfx import pixel_rect, pixelate, glow_sprite, blit_glow, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 
@@ -139,7 +139,7 @@ class StarConnectScene:
                 ring = pygame.Surface((r * 2 + 6, r * 2 + 6), pygame.SRCALPHA)
                 pygame.draw.circle(ring, (255, 236, 170, int(60 + 90 * p)),
                                    (r + 3, r + 3), r, 2)
-                screen.blit(ring, (x - r - 3, y - r - 3))
+                screen.blit(pixelate(ring, 3, smooth=False), (x - r - 3, y - r - 3))   # 큰 픽셀
                 self._star(screen, x, y, 6, (255, 240, 190), halo=int(18 + 10 * p))
                 num = self.font_small.render(str(i + 1), True, (255, 244, 210))
                 screen.blit(num, (x - num.get_width() // 2, y + 14))
@@ -151,17 +151,16 @@ class StarConnectScene:
             r = int(26 * (1 - life / 0.5)) + 4
             su = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
             pygame.draw.circle(su, (255, 240, 190, int(180 * (life / 0.5))), (r, r), r, 2)
-            screen.blit(su, (sx - r, sy - r))
+            screen.blit(pixelate(su, 3, smooth=False), (sx - r, sy - r))   # 큰 픽셀
 
         self._hud(screen)
 
     def _star(self, screen, x, y, size, color, halo=0):
         if halo:
-            h = pygame.Surface((halo * 2, halo * 2), pygame.SRCALPHA)
-            for r in range(halo, 0, -2):
-                a = int(70 * (1 - r / halo))
-                pygame.draw.circle(h, (color[0], color[1], color[2], a), (halo, halo), r)
-            screen.blit(h, (x - halo, y - halo))
+            # '계단 알파' 도트 헤일로(캐시) — 평균축소 pixelate 는 모자이크 블러로 보였다.
+            # 반경 2px 양자화(맥동 헤일로의 캐시 상한).
+            halo_q = max(4, (halo // 2) * 2)
+            blit_glow(screen, glow_sprite(halo_q, color[:3], px=3, steps=(20, 42, 68)), (x, y))
         pygame.draw.circle(screen, color, (x, y), size)
         pygame.draw.circle(screen, (255, 255, 255), (x, y), max(1, size - 3))
 

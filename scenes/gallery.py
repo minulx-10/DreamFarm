@@ -1,6 +1,6 @@
 import pygame
 from core.game_state import game_state
-from core.assets import get_font, TEXT_DARK, TEXT_MUTED, WHITE, GOLD, PANEL_WARM, PANEL_EDGE
+from core.assets import get_font, sprites, TEXT_DARK, TEXT_MUTED, WHITE, GOLD, PANEL_WARM, PANEL_EDGE
 from core.ui import draw_light_panel, draw_story_backdrop, draw_button, wrap_text, mix_color, draw_panel
 from core import audio
 from core import save_system
@@ -15,13 +15,10 @@ class GalleryScene:
         self.font_small = get_font(13)
         self.font_btn = get_font(16)
         
-        self.active_tab = "endings" # "endings" | "stories"
-        
+        self.active_tab = "endings"  # endings | stories | achievements | storehouse | hidden_achievements
+
         self.back_rect = pygame.Rect(30, 24, 100, 32)
-        self.tab1_rect = None
-        self.tab2_rect = None
-        self.tab3_rect = None
-        self.tab4_rect = None
+        self.tab_rects = []          # [(rect, tab_id, label)] — _update_tab_rects 가 채운다
         self._update_tab_rects()
         
         # 엔딩 슬롯 Rects (제목 2줄 + 설명 3줄 + 버튼이 겹치지 않도록 높이 확보)
@@ -55,30 +52,39 @@ class GalleryScene:
         self.endings_seen = save_system.endings_seen()
         self.stories_seen = save_system.load_meta().get("stories_seen", [])
         self.memories_seen = save_system.load_meta().get("memories_seen", {})
-        
+
+        # 스크롤 상태 (사건/기억 컬럼·업적 그리드·지난 회차 목록·모달 본문)
+        self.stories_scroll = 0
+        self.memories_scroll = 0
+        self.ach_scroll = 0
+        self.runs_scroll = 0
+        self.reading_scroll = 0
+        self.reading_journal = None      # 창고 '지난 회차' 열람 — 일지 원문 리스트(표시 시점 번역)
+        self.storehouse_item_rects = []
+        self.run_item_rects = []
+
         self.hovered_back = False
-        self.hovered_tab1 = False
-        self.hovered_tab2 = False
-        self.hovered_tab3 = False
-        self.hovered_tab4 = False
+        self.hovered_tab = None          # 호버 중인 탭 id
         self.hovered_modal_close = False
 
     def _update_tab_rects(self):
         from core import achievements
         hidden_unlocked = achievements.has_any_hidden_unlocked()
+        tabs = [("endings", "엔딩"), ("stories", "이야기·기억"),
+                ("achievements", "일반 업적" if hidden_unlocked else "업적"),
+                ("storehouse", "창고")]
         if hidden_unlocked:
-            # 히든이 열리면 4개 탭을 대칭 정렬
-            self.tab1_rect = pygame.Rect(78, 105, 150, 34)
-            self.tab2_rect = pygame.Rect(234, 105, 150, 34)
-            self.tab3_rect = pygame.Rect(390, 105, 150, 34)
-            self.tab4_rect = pygame.Rect(546, 105, 150, 34)
-        else:
-            # 기존 3개 탭 대칭 정렬
-            self.tab1_rect = pygame.Rect(158, 105, 158, 34)
-            self.tab2_rect = pygame.Rect(322, 105, 158, 34)
-            self.tab3_rect = pygame.Rect(486, 105, 158, 34)
-            self.tab4_rect = None
-        
+            tabs.append(("hidden_achievements", "히든 업적"))
+        # 탭 수(4~5)에 맞춰 대칭 정렬
+        n = len(tabs)
+        gap = 8
+        w = 150 if n <= 4 else 138
+        x = (800 - (w * n + gap * (n - 1))) // 2
+        self.tab_rects = []
+        for tid, label in tabs:
+            self.tab_rects.append((pygame.Rect(x, 105, w, 34), tid, label))
+            x += w + gap
+
         # 리스트 아이템 마우스 오버용 위치 매핑 리스트
         self.story_item_rects = []
         self.memory_item_rects = []
@@ -91,30 +97,46 @@ class GalleryScene:
             self.hovered_modal_close = self.modal_close_btn.collidepoint(mouse_pos)
             replay_ev = self._find_replay_event(self.reading_title)
             for event in events:
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if event.type == pygame.MOUSEWHEEL:
+                    self.reading_scroll = max(0, self.reading_scroll - event.y * 40)
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    audio.play("click")
+                    self._close_modal()
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if replay_ev is not None and self.modal_replay_btn.collidepoint(event.pos):
                         # 그 이벤트(선택형 미니게임)를 다시 플레이 — 끝나면 갤러리로 복귀
                         audio.play("click")
                         game_state.choice_data = replay_ev
                         game_state.event_replay = True
-                        self.reading_title = None
-                        self.reading_text = None
+                        self._close_modal()
                         game_state.current_scene = "story_choice"
                         return
-                    if self.hovered_modal_close or not self.modal_rect.collidepoint(pos := event.pos):
+                    if self.hovered_modal_close or not self.modal_rect.collidepoint(event.pos):
                         audio.play("click")
-                        self.reading_title = None
-                        self.reading_text = None
+                        self._close_modal()
             return
 
         self._update_tab_rects()
         self.hovered_back = self.back_rect.collidepoint(mouse_pos)
-        self.hovered_tab1 = self.tab1_rect.collidepoint(mouse_pos)
-        self.hovered_tab2 = self.tab2_rect.collidepoint(mouse_pos)
-        self.hovered_tab3 = self.tab3_rect.collidepoint(mouse_pos)
-        self.hovered_tab4 = self.tab4_rect.collidepoint(mouse_pos) if self.tab4_rect else False
+        self.hovered_tab = None
+        for rect, tid, _label in self.tab_rects:
+            if rect.collidepoint(mouse_pos):
+                self.hovered_tab = tid
 
         for event in events:
+            # 휠 스크롤 — 사건/기억 컬럼(마우스가 올라간 쪽)·지난 회차 목록
+            if event.type == pygame.MOUSEWHEEL:
+                if self.active_tab == "stories":
+                    if self.stories_area.collidepoint(mouse_pos):
+                        self.stories_scroll = max(0, self.stories_scroll - event.y * 40)
+                    elif self.memories_area.collidepoint(mouse_pos):
+                        self.memories_scroll = max(0, self.memories_scroll - event.y * 40)
+                elif self.active_tab == "storehouse":
+                    self.runs_scroll = max(0, self.runs_scroll - event.y * 30)
+                elif self.active_tab == "achievements":
+                    self.ach_scroll = max(0, self.ach_scroll - event.y * 40)
+                continue
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 뒤로가기
                 if self.hovered_back:
@@ -122,19 +144,12 @@ class GalleryScene:
                     game_state.current_scene = "title"
                     return
                 # 탭 전환
-                elif self.hovered_tab1:
-                    audio.play("click")
-                    self.active_tab = "endings"
-                elif self.hovered_tab2:
-                    audio.play("click")
-                    self.active_tab = "stories"
-                elif self.hovered_tab3:
-                    audio.play("click")
-                    self.active_tab = "achievements"
-                elif self.hovered_tab4 and self.tab4_rect:
-                    audio.play("click")
-                    self.active_tab = "hidden_achievements"
-                
+                for rect, tid, _label in self.tab_rects:
+                    if rect.collidepoint(event.pos):
+                        audio.play("click")
+                        self.active_tab = tid
+                        break
+
                 # 콘텐츠별 클릭
                 if self.active_tab == "endings":
                     for key, btn_rect in self.replay_btns.items():
@@ -167,6 +182,7 @@ class GalleryScene:
                             audio.play("click")
                             self.reading_title = title
                             self.reading_text = text
+                            self.reading_scroll = 0
                             return
                     # 기억목록 클릭
                     for rect, title, text in self.memory_item_rects:
@@ -174,7 +190,35 @@ class GalleryScene:
                             audio.play("click")
                             self.reading_title = title
                             self.reading_text = text
+                            self.reading_scroll = 0
                             return
+                elif self.active_tab == "storehouse":
+                    # 물건 클릭 — 해금된 것만 사연 모달
+                    for rect, item, unlocked in self.storehouse_item_rects:
+                        if rect.collidepoint(event.pos):
+                            if unlocked:
+                                audio.play("click")
+                                self.reading_title = item["name"]
+                                self.reading_text = item["story"]
+                                self.reading_scroll = 0
+                            else:
+                                audio.play("break")
+                            return
+                    # 지난 회차 클릭 — 그 회차의 일지 열람
+                    for rect, run in self.run_item_rects:
+                        if rect.collidepoint(event.pos):
+                            audio.play("page")
+                            self.reading_title = i18n.tf("{n}회차의 일지", n=run.get("n", 0))
+                            self.reading_text = ""
+                            self.reading_journal = list(run.get("journal", []))
+                            self.reading_scroll = 0
+                            return
+
+    def _close_modal(self):
+        self.reading_title = None
+        self.reading_text = None
+        self.reading_journal = None
+        self.reading_scroll = 0
 
     def update(self, dt):
         pass
@@ -193,16 +237,10 @@ class GalleryScene:
         # 뒤로가기 버튼
         draw_button(screen, self.back_rect, "돌아가기", self.font_small, hovered=self.hovered_back)
         
-        # 3. 탭 바 그리기
-        draw_button(screen, self.tab1_rect, "엔딩", self.font_btn,
-                    hovered=self.hovered_tab1, selected=(self.active_tab == "endings"))
-        draw_button(screen, self.tab2_rect, "이야기·기억", self.font_btn,
-                    hovered=self.hovered_tab2, selected=(self.active_tab == "stories"))
-        draw_button(screen, self.tab3_rect, "일반 업적" if self.tab4_rect else "업적", self.font_btn,
-                    hovered=self.hovered_tab3, selected=(self.active_tab == "achievements"))
-        if self.tab4_rect:
-            draw_button(screen, self.tab4_rect, "히든 업적", self.font_btn,
-                        hovered=self.hovered_tab4, selected=(self.active_tab == "hidden_achievements"))
+        # 3. 탭 바 그리기 (4~5탭 동적)
+        for rect, tid, label in self.tab_rects:
+            draw_button(screen, rect, label, self.font_btn,
+                        hovered=(self.hovered_tab == tid), selected=(self.active_tab == tid))
 
         # 4. 콘텐츠 그리기
         if self.active_tab == "endings":
@@ -211,6 +249,8 @@ class GalleryScene:
             self._draw_achievements_tab(screen)
         elif self.active_tab == "hidden_achievements":
             self._draw_hidden_achievements_tab(screen)
+        elif self.active_tab == "storehouse":
+            self._draw_storehouse_tab(screen)
         else:
             self._draw_stories_tab(screen)
             
@@ -283,16 +323,25 @@ class GalleryScene:
         pygame.draw.line(screen, (200, 180, 150), (area.x + 20, area.y + 44),
                          (area.right - 20, area.y + 44), 1)
 
-        # 2열 그리드
+        # 2열 그리드 — 업적이 늘어 세로로 넘치면 휠 스크롤
         col_w = (area.w - 50) // 2
         cell_h = 58
-        ox, oy = area.x + 18, area.y + 54
+        rows_n = (len(items) + 1) // 2
+        content_h = rows_n * (cell_h + 4)
+        view = pygame.Rect(area.x + 6, area.y + 50, area.w - 12, area.h - 60)
+        max_scroll = max(0, content_h - view.h)
+        self.ach_scroll = min(self.ach_scroll, max_scroll)
+        old_clip = screen.get_clip()
+        screen.set_clip(view)
+        ox, oy = area.x + 18, area.y + 54 - self.ach_scroll
         for i, (ach, unlocked) in enumerate(items):
             col = i % 2
             row = i // 2
             cx = ox + col * (col_w + 14)
             cy = oy + row * (cell_h + 4)
             cell = pygame.Rect(cx, cy, col_w, cell_h)
+            if cell.bottom < view.y or cell.y > view.bottom:
+                continue
 
             base = (250, 240, 214) if unlocked else (222, 216, 206)
             edge = mix_color(achievements.TIER_COLORS.get(ach["tier"], (180, 170, 150)),
@@ -302,12 +351,15 @@ class GalleryScene:
             mcx, mcy = cell.x + 26, cell.centery
             if unlocked:
                 achievements._draw_medal(screen, mcx, mcy, ach["tier"], r=15)
-                title = self.font_body.render(ach["title"], True, TEXT_DARK)
-                screen.blit(title, (cell.x + 52, cell.y + 7))
                 # 등급(브론즈/실버/골드/플래티넘) 라벨
                 rank = achievements.TIER_LABELS.get(ach["tier"], "")
                 rk = get_font(11).render(rank, True, achievements.TIER_COLORS.get(ach["tier"], (150, 150, 150)))
-                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                rank_x = cell.right - rk.get_width() - 10
+                # 제목은 등급 라벨 앞까지만 — 긴 영어 제목이 라벨과 겹치지 않게 폭 맞춰 축소
+                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                                         base=15, color=TEXT_DARK, min_size=11)
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                screen.blit(rk, (rank_x, cell.y + 8))
                 for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 62, max_lines=2)):
                     ds = self.font_small.render(line, True, TEXT_MUTED)
                     screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))
@@ -316,31 +368,44 @@ class GalleryScene:
                 pygame.draw.circle(screen, (140, 134, 124), (mcx, mcy), 15, 2)
                 q = self.font_body.render("?", True, (120, 114, 104))
                 screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
-                # 잠겼어도 이름은 보여줘 무엇을 노려야 할지 유추할 수 있게 (설명만 감춘다)
-                title = self.font_body.render(ach["title"], True, (150, 144, 134))
-                screen.blit(title, (cell.x + 52, cell.y + 7))
                 rank = achievements.TIER_LABELS.get(ach["tier"], "")
                 rk = get_font(11).render(rank, True, (170, 164, 154))
-                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                rank_x = cell.right - rk.get_width() - 10
+                # 잠겼어도 이름은 보여줘 무엇을 노려야 할지 유추할 수 있게 (설명만 감춘다)
+                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                                         base=15, color=(150, 144, 134), min_size=11)
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                screen.blit(rk, (rank_x, cell.y + 8))
                 ds = self.font_small.render("아직 잠긴 업적 · 조건은 비밀", True, (160, 154, 144))
                 screen.blit(ds, (cell.x + 52, cell.y + 30))
+        screen.set_clip(old_clip)
+        self._draw_column_scrollbar(screen, area, view, content_h, self.ach_scroll)
+
+    def _fit_render(self, text, max_w, base=20, color=TEXT_DARK, min_size=12):
+        """텍스트를 max_w 안에 들어가도록 폰트를 줄여 렌더한다(영어 등 긴 문구 넘침 방지)."""
+        size = base
+        surf = get_font(size).render(text, True, color)
+        while surf.get_width() > max_w and size > min_size:
+            size -= 1
+            surf = get_font(size).render(text, True, color)
+        return surf
 
     def _draw_stories_tab(self, screen):
         # 텃밭 사건 목록
         draw_light_panel(screen, self.stories_area)
-        title1 = self.font_section.render("목격한 밭의 사건들", True, TEXT_DARK)
+        title1 = self._fit_render("목격한 밭의 사건들", self.stories_area.w - 32)
         screen.blit(title1, (self.stories_area.x + 16, self.stories_area.y + 12))
         pygame.draw.line(screen, (200, 180, 150), (self.stories_area.x + 16, self.stories_area.y + 36), (self.stories_area.right - 16, self.stories_area.y + 36), 1)
-        
+
         # 회상 조각 목록
         draw_light_panel(screen, self.memories_area)
-        title2 = self.font_section.render("되찾은 기억 조각", True, TEXT_DARK)
+        title2 = self._fit_render("되찾은 기억 조각", self.memories_area.w - 32)
         screen.blit(title2, (self.memories_area.x + 16, self.memories_area.y + 12))
         pygame.draw.line(screen, (200, 180, 150), (self.memories_area.x + 16, self.memories_area.y + 36), (self.memories_area.right - 16, self.memories_area.y + 36), 1)
         
         mouse_pos = pygame.mouse.get_pos()
-        
-        # 1. 사건들 렌더링
+
+        # 1. 사건들 렌더링 — 16종으로 늘어 휠 스크롤 (컬럼에 마우스 올리고 휠)
         self.story_item_rects = []
         story_choice_descriptions = {
             "이웃 밭의 물난리": "이웃 밭에서 갑작스레 흘러드는 거센 물살을 막아내던 사건.",
@@ -348,87 +413,264 @@ class GalleryScene:
             "길 잃은 벌": "밭가에 힘없이 지친 채 누워있던 꿀벌 한 마리를 꽃밭으로 이송한 기억.",
             "무너진 이랑": "비바람에 주저앉은 이랑을 마른 손바닥으로 두둑하게 고쳐 쌓던 일.",
             "새벽의 고라니": "울타리 틈새로 고라니가 밭을 헤집지 않도록 틈을 단단히 메우던 밤.",
-            "아버지의 낡은 호미": "창고 먼지 쌓인 구석에서 발견해 녹을 문질러 길들였던 손때 묻은 아버지의 호미."
+            "아버지의 낡은 호미": "창고 먼지 쌓인 구석에서 발견해 녹을 문질러 길들였던 손때 묻은 아버지의 호미.",
+            "무너진 돌담": "바람에 무너진 돌담에서 굴러온 돌을 허리 숙여 하나하나 골라내던 일.",
+            "막힌 물꼬": "낙엽과 검불에 막힌 물꼬를 맨손으로 걷어내 물길을 되살린 날.",
+            "읍내 장날": "아버지의 단골 종묘상이 문을 여는 읍내 장날의 기억.",
+            "낡은 라디오": "창고 선반에서 찾아낸, 아버지의 새벽을 열던 지지직거리는 라디오.",
+            "무거워진 가지": "열매 무게로 처진 사과나무 가지를 받침목으로 받쳐 준 일.",
+            "첫 낙과": "밤바람에 떨어진 풋사과들을 흙으로, 혹은 항아리로 돌려보낸 날.",
+            "두더지 굴": "감자 이랑 밑을 지나간 두더지 굴 입구를 하나하나 메우던 오후.",
+            "북주기 가르침": "이웃 어른에게서 아버지의 북주기 손놀림을 건네받은 날.",
+            "물꼬 순서": "위 논과 물 대는 순서가 겹친 날, 물길을 함께 손본 기억.",
+            "우렁이 손님": "논물 속 우렁이 손님을 두고 볼지 말지 고민하던 일.",
         }
-        
-        y = self.stories_area.y + 50
-        for i, title in enumerate(list(story_choice_descriptions.keys())):
-            unlocked = (title in self.stories_seen)
-            rect = pygame.Rect(self.stories_area.x + 12, y, self.stories_area.w - 24, 46)
-            
-            if unlocked:
-                hovered = rect.collidepoint(mouse_pos)
-                bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
-                draw_panel(screen, rect, fill=bg, border=PANEL_EDGE, radius=6, shadow=False)
-                
-                txt = self.font_body.render(title, True, TEXT_DARK)
-                screen.blit(txt, (rect.x + 10, rect.y + 6))
-                
-                sub = self.font_small.render("선택 결과 읽기", True, TEXT_MUTED)
-                screen.blit(sub, (rect.x + 10, rect.y + 24))
-                
-                desc = story_choice_descriptions.get(title, "목격한 사건의 상세한 대화 내용입니다.")
-                self.story_item_rects.append((rect, title, desc))
-            else:
-                draw_panel(screen, rect, fill=(225, 220, 212), border=(190, 185, 175), radius=6, shadow=False)
-                txt = self.font_body.render("아직 겪지 않은 일", True, (150, 145, 135))
-                screen.blit(txt, (rect.x + 10, rect.y + 14))
-            y += 50
 
-        # 2. 기억 조각들 렌더링
+        story_titles = list(story_choice_descriptions.keys())
+        row_h = 50
+        view_s = pygame.Rect(self.stories_area.x + 6, self.stories_area.y + 44,
+                             self.stories_area.w - 12, self.stories_area.h - 56)
+        max_s = max(0, len(story_titles) * row_h - view_s.h)
+        self.stories_scroll = min(self.stories_scroll, max_s)
+        old_clip = screen.get_clip()
+        screen.set_clip(view_s)
+        y = view_s.y + 4 - self.stories_scroll
+        for title in story_titles:
+            rect = pygame.Rect(self.stories_area.x + 12, y, self.stories_area.w - 30, 46)
+            if rect.bottom >= view_s.y and rect.y <= view_s.bottom:
+                unlocked = (title in self.stories_seen)
+                if unlocked:
+                    hovered = rect.collidepoint(mouse_pos) and view_s.collidepoint(mouse_pos)
+                    bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
+                    draw_panel(screen, rect, fill=bg, border=PANEL_EDGE, radius=6, shadow=False)
+                    txt = self.font_body.render(title, True, TEXT_DARK)
+                    screen.blit(txt, (rect.x + 10, rect.y + 6))
+                    sub = self.font_small.render("선택 결과 읽기", True, TEXT_MUTED)
+                    screen.blit(sub, (rect.x + 10, rect.y + 24))
+                    desc = story_choice_descriptions.get(title, "목격한 사건의 상세한 대화 내용입니다.")
+                    self.story_item_rects.append((rect, title, desc))
+                else:
+                    draw_panel(screen, rect, fill=(225, 220, 212), border=(190, 185, 175), radius=6, shadow=False)
+                    txt = self.font_body.render("아직 겪지 않은 일", True, (150, 145, 135))
+                    screen.blit(txt, (rect.x + 10, rect.y + 14))
+            y += row_h
+        screen.set_clip(old_clip)
+        self._draw_column_scrollbar(screen, self.stories_area, view_s, len(story_titles) * row_h,
+                                    self.stories_scroll)
+
+        # 2. 기억 조각들 렌더링 — 작물 서사 팩 포함 18편, 휠 스크롤
         self.memory_item_rects = []
-        memory_titles = ["희미한 식탁", "장바구니 소리", "남긴 접시", "다시 보이는 식탁", "이른 아침", "한 조각의 무게", "따뜻한 식탁", "손등의 흙", "짧은 고개 끄덕임"]
-        
-        y = self.memories_area.y + 50
+        from scenes.farm_simulator import all_memory_titles
+        memory_titles = all_memory_titles()
+
+        mem_h = 33
+        view_m = pygame.Rect(self.memories_area.x + 6, self.memories_area.y + 44,
+                             self.memories_area.w - 12, self.memories_area.h - 56)
+        max_m = max(0, len(memory_titles) * mem_h - view_m.h)
+        self.memories_scroll = min(self.memories_scroll, max_m)
+        screen.set_clip(view_m)
+        y = view_m.y + 4 - self.memories_scroll
         for title in memory_titles:
-            unlocked = (title in self.memories_seen)
-            rect = pygame.Rect(self.memories_area.x + 12, y, self.memories_area.w - 24, 30)
-            
-            if unlocked:
-                hovered = rect.collidepoint(mouse_pos)
-                bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
-                draw_panel(screen, rect, fill=bg, border=PANEL_EDGE, radius=5, shadow=False)
-                
-                txt = self.font_small.render(title, True, TEXT_DARK)
-                screen.blit(txt, (rect.x + 10, rect.y + 8))
-                
-                text_content = self.memories_seen.get(title, "기억의 조각을 찾았습니다.")
-                self.memory_item_rects.append((rect, title, text_content))
-            else:
-                draw_panel(screen, rect, fill=(225, 220, 212), border=(190, 185, 175), radius=5, shadow=False)
-                txt = self.font_small.render("잃어버린 기억", True, (150, 145, 135))
-                screen.blit(txt, (rect.x + 10, rect.y + 8))
-            y += 33
+            rect = pygame.Rect(self.memories_area.x + 12, y, self.memories_area.w - 30, 30)
+            if rect.bottom >= view_m.y and rect.y <= view_m.bottom:
+                unlocked = (title in self.memories_seen)
+                if unlocked:
+                    hovered = rect.collidepoint(mouse_pos) and view_m.collidepoint(mouse_pos)
+                    bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
+                    draw_panel(screen, rect, fill=bg, border=PANEL_EDGE, radius=5, shadow=False)
+                    txt = self.font_small.render(title, True, TEXT_DARK)
+                    screen.blit(txt, (rect.x + 10, rect.y + 8))
+                    text_content = self.memories_seen.get(title, "기억의 조각을 찾았습니다.")
+                    self.memory_item_rects.append((rect, title, text_content))
+                else:
+                    draw_panel(screen, rect, fill=(225, 220, 212), border=(190, 185, 175), radius=5, shadow=False)
+                    txt = self.font_small.render("잃어버린 기억", True, (150, 145, 135))
+                    screen.blit(txt, (rect.x + 10, rect.y + 8))
+            y += mem_h
+        screen.set_clip(old_clip)
+        self._draw_column_scrollbar(screen, self.memories_area, view_m, len(memory_titles) * mem_h,
+                                    self.memories_scroll)
 
         # 특별 미니게임 '별 잇기' 다시 하기 (아래 여백에 배치)
         hov = self.star_replay_btn.collidepoint(mouse_pos)
         draw_button(screen, self.star_replay_btn, "★ 별 잇기 다시 하기", self.font_btn, hovered=hov)
+
+    def _draw_column_scrollbar(self, screen, area, view, content_h, scroll):
+        """리스트 컬럼 우측의 가는 스크롤바 (내용이 넘칠 때만)."""
+        if content_h <= view.h:
+            return
+        from core.pixelfx import pixel_rect, CHAMFER_SM
+        track = pygame.Rect(area.right - 10, view.y, 5, view.h)
+        pixel_rect(screen, (206, 188, 158), track, chamfer=CHAMFER_SM)
+        th = max(20, int(view.h * view.h / content_h))
+        max_scroll = content_h - view.h
+        ty = track.y + int((track.h - th) * (scroll / max_scroll))
+        pixel_rect(screen, (123, 92, 65), (track.x, ty, 5, th), chamfer=CHAMFER_SM)
+
+    def _draw_storehouse_tab(self, screen):
+        """아버지의 창고 — 물건 컬렉션 + 지난 회차 일지 아카이브 + 손길의 기록(누적 통계)."""
+        from core import storehouse
+        from core.crops import CROPS
+        got = storehouse.unlocked_ids()
+        self.storehouse_item_rects = []
+        self.run_item_rects = []
+        mouse_pos = pygame.mouse.get_pos()
+
+        # 1) 아버지의 물건 — 3×3 그리드
+        items_area = pygame.Rect(90, 150, 620, 238)
+        draw_light_panel(screen, items_area)
+        head = self.font_section.render(
+            i18n.tf("아버지의 물건  {got} / {total}", got=len(got), total=len(storehouse.ITEMS)),
+            True, TEXT_DARK)
+        screen.blit(head, (items_area.x + 20, items_area.y + 10))
+        pygame.draw.line(screen, (200, 180, 150), (items_area.x + 20, items_area.y + 38),
+                         (items_area.right - 20, items_area.y + 38), 1)
+        cw, chh = 196, 58
+        gx, gy = items_area.x + 14, items_area.y + 46
+        for i, item in enumerate(storehouse.ITEMS):
+            col, row = i % 3, i // 3
+            cell = pygame.Rect(gx + col * (cw + 6), gy + row * (chh + 4), cw, chh)
+            unlocked = item["id"] in got
+            if unlocked:
+                hovered = cell.collidepoint(mouse_pos)
+                bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
+                draw_panel(screen, cell, fill=bg, border=PANEL_EDGE, radius=6, shadow=False)
+                spr = sprites.get(item["icon"])
+                if spr:
+                    screen.blit(spr, (cell.x + 22 - spr.get_width() // 2,
+                                      cell.centery - spr.get_height() // 2))
+                name = self._fit_render(item["name"], cw - 56, base=15)
+                screen.blit(name, (cell.x + 46, cell.y + 10))
+                sub = self.font_small.render("사연 읽기", True, TEXT_MUTED)
+                screen.blit(sub, (cell.x + 46, cell.y + 32))
+            else:
+                draw_panel(screen, cell, fill=(225, 220, 212), border=(190, 185, 175), radius=6, shadow=False)
+                q = self.font_body.render("?", True, (150, 145, 135))
+                screen.blit(q, (cell.x + 22 - q.get_width() // 2, cell.centery - q.get_height() // 2))
+                for j, ln in enumerate(wrap_text(item["hint"], self.font_small, cw - 56, max_lines=2)):
+                    hs = self.font_small.render(ln, True, (150, 145, 135))
+                    screen.blit(hs, (cell.x + 46, cell.y + 12 + j * 16))
+            self.storehouse_item_rects.append((cell, item, unlocked))
+
+        # 2) 지난 회차 — 완주한 회차의 일지 아카이브 (클릭해 열람, 휠 스크롤)
+        runs_area = pygame.Rect(90, 396, 380, 138)
+        draw_light_panel(screen, runs_area)
+        rt = self.font_section.render("지난 회차", True, TEXT_DARK)
+        screen.blit(rt, (runs_area.x + 16, runs_area.y + 8))
+        pygame.draw.line(screen, (200, 180, 150), (runs_area.x + 16, runs_area.y + 34),
+                         (runs_area.right - 16, runs_area.y + 34), 1)
+        runs = list(reversed(save_system.run_archive()))   # 최신이 위
+        ENDING_SHORT = {"true": "진엔딩", "normal": "노멀", "bad": "배드",
+                        "wither": "시듦", "nightmare": "악몽"}
+        view_r = pygame.Rect(runs_area.x + 10, runs_area.y + 40, runs_area.w - 20, runs_area.h - 50)
+        row_h = 30
+        max_r = max(0, len(runs) * row_h - view_r.h)
+        self.runs_scroll = min(self.runs_scroll, max_r)
+        if not runs:
+            es = self.font_small.render("아직 끝까지 지낸 회차가 없습니다.", True, TEXT_MUTED)
+            screen.blit(es, (runs_area.centerx - es.get_width() // 2, runs_area.centery + 8))
+        old_clip = screen.get_clip()
+        screen.set_clip(view_r)
+        y = view_r.y + 2 - self.runs_scroll
+        for run in runs:
+            rect = pygame.Rect(view_r.x + 2, y, view_r.w - 14, 27)
+            if rect.bottom >= view_r.y and rect.y <= view_r.bottom:
+                hovered = rect.collidepoint(mouse_pos) and view_r.collidepoint(mouse_pos)
+                bg = mix_color(PANEL_WARM, WHITE, 0.3) if hovered else (248, 235, 210)
+                draw_panel(screen, rect, fill=bg, border=PANEL_EDGE, radius=5, shadow=False)
+                crop_name = CROPS.get(run.get("crop", "carrot"), CROPS["carrot"])["name"]
+                label = i18n.tf("{n}회차 · {crop} · {ending} · {days}일",
+                                n=run.get("n", 0), crop=i18n.t(crop_name),
+                                ending=i18n.t(ENDING_SHORT.get(run.get("ending"), "노멀")),
+                                days=run.get("days", 0))
+                seed = run.get("seed", "평년")
+                if seed != "평년":
+                    label += " · " + i18n.t(seed)
+                ls = self._fit_render(label, rect.w - 16, base=13, min_size=11)
+                screen.blit(ls, (rect.x + 8, rect.centery - ls.get_height() // 2))
+                self.run_item_rects.append((rect, run))
+            y += row_h
+        screen.set_clip(old_clip)
+        self._draw_column_scrollbar(screen, runs_area, view_r, len(runs) * row_h, self.runs_scroll)
+
+        # 3) 손길의 기록 — 누적 통계
+        stats_area = pygame.Rect(478, 396, 232, 138)
+        draw_light_panel(screen, stats_area)
+        st = self.font_section.render("손길의 기록", True, TEXT_DARK)
+        screen.blit(st, (stats_area.x + 16, stats_area.y + 8))
+        pygame.draw.line(screen, (200, 180, 150), (stats_area.x + 16, stats_area.y + 34),
+                         (stats_area.right - 16, stats_area.y + 34), 1)
+        life = save_system.lifetime_stats()
+        meta = save_system.load_meta()
+        rows = [
+            ("완주한 회차", meta.get("runs_completed", 0)),
+            ("총 재배일", life.get("총 재배일", 0)),
+            ("물 주기", life.get("물 주기", 0)),
+            ("잡초 뽑기", life.get("잡초 뽑기", 0)),
+            ("해충 살피기", life.get("해충 살피기", 0)),
+        ]
+        y = stats_area.y + 42
+        for label, val in rows:
+            ls = self.font_small.render(label, True, TEXT_MUTED)
+            vs = self.font_small.render(str(val), True, TEXT_DARK)
+            screen.blit(ls, (stats_area.x + 16, y))
+            screen.blit(vs, (stats_area.right - 16 - vs.get_width(), y))
+            y += 18
 
     def _draw_modal_popup(self, screen):
         # 반투명 장막
         veil = pygame.Surface((800, 600), pygame.SRCALPHA)
         veil.fill((0, 0, 0, 130))
         screen.blit(veil, (0, 0))
-        
+
         draw_light_panel(screen, self.modal_rect)
-        
+
         # 모달 타이틀
         title_surf = self.font_section.render(self.reading_title, True, GOLD)
         screen.blit(title_surf, (self.modal_rect.centerx - title_surf.get_width() // 2, self.modal_rect.y + 24))
-        
+
         pygame.draw.line(screen, (200, 180, 150), (self.modal_rect.x + 40, self.modal_rect.y + 60), (self.modal_rect.right - 40, self.modal_rect.y + 60), 2)
-        
-        # 글 내용 렌더링
-        y = self.modal_rect.y + 85
-        for paragraph in self.reading_text.split("\n"):
+
+        # 본문 — 회차 일지(reading_journal)면 표시 시점 번역, 아니면 저장 텍스트.
+        # 길면 휠로 스크롤 (본문 영역 클리핑)
+        if self.reading_journal is not None:
+            from scenes.ending import _localize_journal_line
+            paragraphs = []
+            for entry in self.reading_journal:
+                paragraphs.extend(_localize_journal_line(raw) for raw in entry.split("\n"))
+                paragraphs.append("")
+        else:
+            paragraphs = self.reading_text.split("\n")
+
+        view = pygame.Rect(self.modal_rect.x + 40, self.modal_rect.y + 72,
+                           self.modal_rect.w - 80, self.modal_rect.h - 130)
+        lines = []
+        for paragraph in paragraphs:
             if not paragraph:
+                lines.append(None)
+                continue
+            lines.extend(wrap_text(paragraph, self.font_body, view.w))
+        content_h = sum(18 if l is None else 24 for l in lines)
+        max_scroll = max(0, content_h - view.h)
+        self.reading_scroll = min(self.reading_scroll, max_scroll)
+
+        old_clip = screen.get_clip()
+        screen.set_clip(view)
+        y = view.y - self.reading_scroll
+        for line in lines:
+            if line is None:
                 y += 18
                 continue
-            for line in wrap_text(paragraph, self.font_body, self.modal_rect.w - 80):
+            if y + 24 >= view.y and y <= view.bottom:
                 line_surf = self.font_body.render(line, True, TEXT_DARK)
-                screen.blit(line_surf, (self.modal_rect.x + 40, y))
-                y += 24
-                
+                screen.blit(line_surf, (view.x, y))
+            y += 24
+        screen.set_clip(old_clip)
+        if max_scroll > 0:
+            self._draw_column_scrollbar(screen, pygame.Rect(self.modal_rect.x, view.y,
+                                                            self.modal_rect.w - 14, view.h),
+                                        view, content_h, self.reading_scroll)
+
         # 다시 하기 버튼 (선택형 이벤트인 경우만) + 닫기 버튼
         if self._find_replay_event(self.reading_title) is not None:
             hov = self.modal_replay_btn.collidepoint(pygame.mouse.get_pos())
@@ -474,12 +716,14 @@ class GalleryScene:
                 draw_panel(screen, cell, fill=base, border=edge, radius=8, shadow=False)
                 
                 achievements._draw_medal(screen, cell.x + 26, cell.centery, ach["tier"], r=15)
-                title = self.font_body.render(ach["title"], True, (90, 20, 20))
-                screen.blit(title, (cell.x + 52, cell.y + 7))
-                
                 rank = "히든"
                 rk = get_font(11).render(rank, True, (190, 48, 48))
-                screen.blit(rk, (cell.right - rk.get_width() - 10, cell.y + 8))
+                rank_x = cell.right - rk.get_width() - 10
+                # 제목은 등급 라벨 앞까지만 (긴 영어 제목 겹침 방지 — 일반 업적 탭과 동일)
+                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                                         base=15, color=(90, 20, 20), min_size=11)
+                screen.blit(title, (cell.x + 52, cell.y + 7))
+                screen.blit(rk, (rank_x, cell.y + 8))
                 
                 for j, line in enumerate(wrap_text(ach["desc"], self.font_small, col_w - 74, max_lines=2)):
                     ds = self.font_small.render(line, True, (120, 80, 80))

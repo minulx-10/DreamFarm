@@ -10,9 +10,13 @@
 여기 VERSION은 '안정 채널' 표기용이다. Git 태그 이름이 실제 배포 채널(안정/프리릴리스)을 정한다.
 """
 
-VERSION = "2.3.0-dev.1"
+VERSION = "2.5.0-dev.1"
 
+# 데모(체험판) 빌드 스위치 — 스팀 Next Fest 등 배포용.
+# True로 빌드하면: 작물은 당근 고정(작물 선택 건너뜀), 악몽·에필로그 잠금,
+# 타이틀에 체험판 안내가 표시된다. (자세한 빌드 절차는 RELEASING.md)
+DEMO = False
 
 
 def display_version():
-    return f"v{VERSION}"
+    return f"v{VERSION}" + (" DEMO" if DEMO else "")

@@ -28,6 +28,7 @@ from scenes.epiphany import EpiphanyScene
 from scenes.story_choice import StoryChoiceScene
 from scenes.father_day import FatherDayScene
 from scenes.credits import CreditsScene
+from scenes.epilogue import EpilogueScene
 
 
 def setup_window_icon():
@@ -59,6 +60,14 @@ def setup_window_icon():
 # 미니게임 씬 — 자체 상단바(점수·타이머)를 그리므로 배속·설정 버튼을 겹쳐 그리지 않는다
 # (배속 버튼이 점수 박스 오른쪽을 가리던 문제). 짧은 미니게임이라 배속·설정도 필요 없다.
 MINIGAME_SCENES = {"stage1", "stage2", "stage3", "stage4", "star_connect"}
+
+# 배속(») 버튼이 실제로 뭔가를 빨리 감는 씬 — 타자기 연출이 있는 씬들.
+# 타이틀·밭·갤러리 등에서는 눌러도 아무 일도 없는 '죽은 버튼'이라 그리지 않는다.
+FF_SCENES = {"intro", "memory", "story_choice", "epiphany", "father_day", "ending", "epilogue"}
+
+# 포커스를 잃으면 자동 일시정지할 씬 — '시간 압박'이 있는 곳만.
+# (타이틀·갤러리·서사 씬은 멈출 이유가 없는데도 멈춰서 복귀 때마다 클릭을 강요했다.)
+PAUSE_SCENES = MINIGAME_SCENES | {"farm", "story_choice"}
 
 
 def main():
@@ -212,6 +221,7 @@ def main():
         "name_input": "night", "intro": "night", "credits": "night",
         "memory": None, "story_choice": "event", "father_day": None,
         "farm": "farm", "stage1": "event", "stage2": "farm",
+        "epilogue": "night",
         "stage3": "farm", "stage4": "farm", "star_connect": None,
         "ending": None,
         "transition": None, "epiphany": None,
@@ -236,12 +246,13 @@ def main():
         "story_choice": StoryChoiceScene,
         "father_day": FatherDayScene,
         "credits": CreditsScene,
+        "epilogue": EpilogueScene,
     }
 
     FRESH_ON_ENTER = {
         "title", "crop_select", "gallery", "name_input", "intro", "memory", "epiphany",
         "story_choice", "father_day", "stage1", "stage2", "stage3",
-        "stage4", "star_connect", "ending", "credits",
+        "stage4", "star_connect", "ending", "credits", "epilogue",
     }
 
     # 씬 지연 초기화 (Lazy Initialization) 적용
@@ -260,6 +271,8 @@ def main():
     game_state.paused = False
     game_state.fast_forward = False
     fullscreen_cooldown = 0.0
+    screenshot_request = False   # F12 — 이번 프레임 캔버스를 PNG로 저장
+    screenshot_flash = 0.0       # 저장 알림 표시 남은 시간(초)
 
     # 안드로이드 생명주기/뒤로가기 상수. 데스크톱 pygame-ce 에도 존재하나 발생하지 않으며,
     # 구버전 classic pygame 폴백을 대비해 getattr 로 안전하게 얻는다.
@@ -273,6 +286,8 @@ def main():
         getattr(pygame, "WINDOWSIZECHANGED", None),
         getattr(pygame, "VIDEORESIZE", None),
     ) if e is not None}
+    # 키보드 포커스 상실(자동 일시정지 판정용) — pygame 2 전용 이벤트, 없으면 ACTIVEEVENT 폴백
+    WINDOW_FOCUS_LOST = getattr(pygame, "WINDOWFOCUSLOST", None)
 
     while game_state.running:
         dt = clock.tick(60) / 1000.0
@@ -395,10 +410,23 @@ def main():
                 is_fullscreen = not is_fullscreen
                 update_display_mode()
                 fullscreen_cooldown = 0.6  # 전체화면 시 포커스 감지 쿨타임 작동
-            elif not IS_ANDROID and event.type == pygame.ACTIVEEVENT:
-                # 윈도우 포커스 분실 감지 (gain이 0이고, 전체화면 쿨다운이 없을 때만 발동)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F12:
+                screenshot_request = True   # 이번 프레임을 그린 뒤 저장
+            elif (not IS_ANDROID and WINDOW_FOCUS_LOST is not None
+                    and event.type == WINDOW_FOCUS_LOST):
+                # 자동 일시정지 — '키보드 포커스'를 정말 잃었을 때만(WINDOWFOCUSLOST),
+                # 그리고 시간 압박이 있는 씬(PAUSE_SCENES)에서만.
+                # (예전 ACTIVEEVENT 방식은 마우스 커서가 창 밖으로 나가기만 해도(state=1)
+                #  일시정지돼, 듀얼 모니터/창모드에서 복귀 클릭을 계속 강요했다.)
+                if fullscreen_cooldown <= 0 and game_state.current_scene in PAUSE_SCENES:
+                    game_state.paused = True
+            elif (not IS_ANDROID and WINDOW_FOCUS_LOST is None
+                    and event.type == pygame.ACTIVEEVENT):
+                # 구버전 pygame 폴백 — state 비트 2(입력 포커스)가 꺼질 때만. 마우스 이탈(비트 1)은 무시.
                 # 안드로이드에서는 ACTIVEEVENT 가 부정확해 APP_* 생명주기 이벤트로 대체한다.
-                if getattr(event, "gain", 1) == 0 and fullscreen_cooldown <= 0:
+                if (getattr(event, "gain", 1) == 0 and (getattr(event, "state", 0) & 2)
+                        and fullscreen_cooldown <= 0
+                        and game_state.current_scene in PAUSE_SCENES):
                     game_state.paused = True
             
             # 마우스 입력 좌표 역배율 보정 (레터박스/필러박스 여백 감산 및 가변 배율 적용)
@@ -425,8 +453,13 @@ def main():
                     game_state.paused = False
                     audio.play("click")
         else:
-            # 배속 버튼 터치 선처리 (설정창이나 종료창이 닫혀 있을 때만 작동)
-            if not game_state.request_quit and not settings_overlay.open:
+            # 밭 튜토리얼(모달 딤) 중에는 배속·설정 크롬을 숨기고 입력도 막는다 —
+            # 딤 위에 크롬만 밝게 떠 보이고 클릭까지 되던 문제(시각 위계·포커스 붕괴) 방지.
+            farm_tutorial = (current_key == "farm"
+                             and getattr(current_scene_obj, "tutorial_active", False))
+            # 배속 버튼 터치 선처리 (설정창·종료창이 닫혀 있고, 배속이 의미 있는 씬일 때만 작동)
+            if (not game_state.request_quit and not settings_overlay.open and not farm_tutorial
+                    and game_state.current_scene in FF_SCENES):
                 ff_btn = pygame.Rect(708, 27, 28, 28)
                 filtered_events = []
                 for event in mapped_events:
@@ -440,16 +473,21 @@ def main():
             # 종료 확인 오버레이, 소리 설정 overlay 또는 인게임 설정(esc/m) 처리 포함
             if not quit_overlay.handle_events(mapped_events):
                 if not settings_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm"),
-                                                      button_enabled=game_state.current_scene not in MINIGAME_SCENES) \
+                                                      button_enabled=(game_state.current_scene not in MINIGAME_SCENES
+                                                                      and not farm_tutorial)) \
                         and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
                     for event in mapped_events:
                         if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                             audio.toggle_mute()
                     # ESC로 설정 오버레이 열기 — 여기까지 왔다는 건 설정이 닫혀 있다는 뜻(열려 있으면
-                    # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면은 예외.
+                    # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면과
+                    # 밭 '지난 일지' 팝업(ESC=닫기)이 열려 있을 땐 씬에 넘긴다.
                     esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
                                       for e in mapped_events)
-                    if esc_pressed and current_key not in ("crop_select", "name_input", "credits"):
+                    farm_journal = (current_key == "farm"
+                                    and getattr(current_scene_obj, "journal_open", False))
+                    if (esc_pressed and not farm_journal
+                            and current_key not in ("crop_select", "name_input", "credits")):
                         settings_overlay.open = True
                     else:
                         current_scene_obj.handle_events(mapped_events)
@@ -469,9 +507,11 @@ def main():
         virtual_screen.fill((0, 0, 0))
         current_scene_obj.draw(safe_sub)
 
-        # 배속 토글 버튼 그리기 (설정창·종료창이 닫혀 있고, 미니게임 씬이 아닐 때만 — 점수 가림 방지)
+        # 배속 토글 버튼 그리기 (설정창·종료창이 닫혀 있고, 배속이 의미 있는 씬일 때만)
+        chrome_tutorial = (current_key == "farm"
+                           and getattr(current_scene_obj, "tutorial_active", False))
         if (not game_state.request_quit and not settings_overlay.open
-                and game_state.current_scene not in MINIGAME_SCENES):
+                and game_state.current_scene in FF_SCENES):
             ff_btn = pygame.Rect(708, 27, 28, 28)
             hovered_ff = ff_btn.collidepoint(pygame.mouse.get_pos())
             ff_active = getattr(game_state, "fast_forward_toggle", False)
@@ -506,10 +546,36 @@ def main():
         except Exception:
             pass
 
-        settings_overlay.draw(safe_sub, show_button=game_state.current_scene not in MINIGAME_SCENES)
+        settings_overlay.draw(safe_sub, show_button=(game_state.current_scene not in MINIGAME_SCENES
+                                                     and not chrome_tutorial))
         quit_overlay.draw(safe_sub)
         dev_overlay.draw(safe_sub)
         achievements.draw(safe_sub)   # 업적 토스트는 항상 맨 위에
+
+        # F12 스크린샷 — 알림(플래시)이 찍히기 전, 지금 프레임의 캔버스를 그대로 저장
+        if screenshot_request:
+            screenshot_request = False
+            try:
+                import time as _time
+                shot_dir = os.path.join(os.path.dirname(_ss.SETTINGS_PATH), "screenshots")
+                os.makedirs(shot_dir, exist_ok=True)
+                fname = _time.strftime("dreamfarm_%Y%m%d_%H%M%S") + ".png"
+                pygame.image.save(virtual_screen, os.path.join(shot_dir, fname))
+                screenshot_flash = 1.4
+                audio.play("click")
+            except Exception:
+                pass
+        if screenshot_flash > 0:
+            screenshot_flash = max(0.0, screenshot_flash - dt)
+            from core.assets import get_font
+            fs = get_font(14).render("스크린샷 저장됨 (F12)", True, (244, 236, 214))
+            box = pygame.Rect(0, 0, fs.get_width() + 24, fs.get_height() + 10)
+            box.midtop = (400, 64)
+            flash_bg = pygame.Surface(box.size, pygame.SRCALPHA)
+            pixel_rect(flash_bg, (20, 24, 28, 205), flash_bg.get_rect(), chamfer=CHAMFER_SM)
+            pixel_rect(flash_bg, (150, 210, 170, 220), flash_bg.get_rect(), width=1, chamfer=CHAMFER_SM)
+            safe_sub.blit(flash_bg, box.topleft)
+            safe_sub.blit(fs, (box.x + 12, box.y + 5))
 
         # 창 포커스 분실 일시정지 오버레이 반사
         if game_state.paused:

@@ -9,6 +9,16 @@ import math
 from core import audio
 
 
+# 텍스트 속도 설정(설정창에서 변경) — 타자기 char_delay 에 곱해지는 배속
+_TEXT_SPEED_FACTORS = {"slow": 0.6, "normal": 1.0, "fast": 1.75}
+
+
+def text_speed_factor():
+    """현재 텍스트 속도 설정의 배속 (설정은 캐시돼 있어 매 프레임 호출해도 가볍다)."""
+    from core import save_system
+    return _TEXT_SPEED_FACTORS.get(save_system.get_setting("text_speed"), 1.0)
+
+
 class Typewriter:
     """텍스트가 한 글자씩 타이핑 효과음과 함께 출력되는 클래스."""
     def __init__(self, char_delay=0.065):
@@ -38,6 +48,7 @@ class Typewriter:
         if self.finished:
             return
         effective_dt = dt * 6.0 if fast_forward else dt
+        effective_dt *= text_speed_factor()   # 설정창 '텍스트 속도' 반영 (느림/보통/빠름)
         self.char_timer += effective_dt
         while self.char_timer >= self.char_delay and not self.finished:
             self.char_timer -= self.char_delay
@@ -84,26 +95,12 @@ class FireflyEmitter:
                 f['y'] = max(self.bounds_y[0], min(self.bounds_y[1], f['y']))
 
     def draw(self, screen):
-        """화면에 알파 블렌딩된 글로우 효과를 가진 반딧불이 렌더링."""
+        """반딧불이 렌더링 — '계단 알파' 도트 글로우(캐시)로. 매끈한 원+연속 알파는
+        큰 픽셀 규칙에 어긋나고 모자이크 블러처럼 보였다. 밝기는 set_alpha 로 맥동."""
+        from core.pixelfx import glow_sprite, blit_glow
         for f in self.fireflies:
             alpha = int(110 + 70 * math.sin(f['scale_timer']))
             alpha = max(0, min(255, alpha))
-            glow_color = (255, 235, 140)
-            size = f['size']
-            
-            glow_surf = pygame.Surface((int(size * 6), int(size * 6)), pygame.SRCALPHA)
-            # 은은한 외곽 글로우 효과
-            pygame.draw.circle(
-                glow_surf, 
-                (glow_color[0], glow_color[1], glow_color[2], int(alpha * 0.45)), 
-                (int(size * 3), int(size * 3)), 
-                int(size * 2.5)
-            )
-            # 중심 밝은 입자 효과
-            pygame.draw.circle(
-                glow_surf, 
-                (255, 255, 200, alpha), 
-                (int(size * 3), int(size * 3)), 
-                int(size * 1.1)
-            )
-            screen.blit(glow_surf, (int(f['x'] - size * 3), int(f['y'] - size * 3)))
+            g = glow_sprite(f['size'] * 2.5, (255, 235, 140), px=3,
+                            steps=(115,), core=((255, 255, 200), 255))
+            blit_glow(screen, g, (f['x'], f['y']), alpha)

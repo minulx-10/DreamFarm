@@ -38,6 +38,7 @@ class StoryChoiceScene:
         crop_word = current_crop().get("food", "당근")
         
         self.title = swap_crop_word(data.get("title", ""), crop_word)
+        self.canon_title = data.get("title", "")   # 기록용 정본 제목(작물 치환 전) — 갤러리·비반복 매칭
         self.text = swap_crop_word(data.get("text", ""), crop_word)
         
         raw_a_label, a_effects = data.get("choice_a", ("", {}))
@@ -114,12 +115,13 @@ class StoryChoiceScene:
                 self.qte_targets.append({"pos": blade_spots[i % len(blade_spots)], "done": False})
         else:
             # 서로 겹치지 않게 랜덤 배치 (tap/hold/rub 공용)
+            # y 는 210부터 — 상단 '남은 곳: N개' 안내와 표적이 겹치지 않게
             placed = []
             for _ in range(count):
                 tx, ty = 400, 270
                 for _try in range(40):
                     tx = random.randint(190, 610)
-                    ty = random.randint(190, 355)
+                    ty = random.randint(210, 355)
                     if all((tx - px) ** 2 + (ty - py) ** 2 > 78 * 78 for px, py in placed):
                         break
                 placed.append((tx, ty))
@@ -151,7 +153,7 @@ class StoryChoiceScene:
 
         # Record story in meta save data
         from core import save_system
-        save_system.record_story(self.title)
+        save_system.record_story(self.canon_title)
 
         for key, val in effects.items():
             if key == "understanding":
@@ -177,7 +179,7 @@ class StoryChoiceScene:
 
         # Record story in meta save data
         from core import save_system
-        save_system.record_story(self.title)
+        save_system.record_story(self.canon_title)
 
         if success:
             audio.play("success")
@@ -325,51 +327,58 @@ class StoryChoiceScene:
         pulse = abs(math.sin(pygame.time.get_ticks() * 0.008))
         active = self._active_target()
 
+        # 일러스트(돌·잎·벌·울타리·호미·링)는 임시 레이어에 그린 뒤 통째로 도트화한다
+        # ('큰 픽셀·곡선 없음' 통일 — 매끈한 원/타원이 그대로 노출되던 층).
+        # 글자(숫자·힌트)는 뭉개지지 않게 도트화 후 screen 에 따로 얹는다.
+        layer = pygame.Surface((800, 600), pygame.SRCALPHA)
+        hint_text = None
+        hint_y = 430
+        trail_numbers = []
+
         if self.qte_kind == "tap":
             for t in self.qte_targets:
                 if t["done"]:
                     continue
                 cx, cy = t["pos"]
-                self._draw_stone(screen, cx, cy)
+                self._draw_stone(layer, cx, cy)
 
         elif self.qte_kind == "trail":
             # 잎들을 잇는 점선 경로
             pts = [t["pos"] for t in self.qte_targets]
             for i in range(len(pts) - 1):
-                pygame.draw.line(screen, (150, 170, 120), pts[i], pts[i + 1], 2)
+                pygame.draw.line(layer, (150, 170, 120), pts[i], pts[i + 1], 2)
             for i, t in enumerate(self.qte_targets):
                 cx, cy = t["pos"]
                 is_next = (t is active)
                 last = (i == len(self.qte_targets) - 1)
                 if last:
                     # 목적지는 잎이 아니라 꽃밭의 꽃 한 송이로 그린다
-                    self._draw_flower(screen, cx, cy, t["done"], is_next, pulse)
+                    self._draw_flower(layer, cx, cy, t["done"], is_next, pulse)
                     continue
                 if t["done"]:
                     col = (120, 150, 100)
                 elif is_next:
                     col = (90, 200, 110)
-                    pygame.draw.circle(screen, (90, 200, 110), (cx, cy), int(20 + 6 * pulse), 2)
+                    pygame.draw.circle(layer, (90, 200, 110), (cx, cy), int(20 + 6 * pulse), 2)
                 else:
                     col = (70, 130, 80)
                 # 잎 모양
-                pygame.draw.ellipse(screen, col, (cx - 13, cy - 9, 26, 18))
-                pygame.draw.line(screen, (40, 90, 50), (cx - 10, cy), (cx + 10, cy), 1)
-                num = get_font(13).render(str(i + 1), True, (30, 60, 35))
-                screen.blit(num, (cx - num.get_width() // 2, cy - num.get_height() // 2))
+                pygame.draw.ellipse(layer, col, (cx - 13, cy - 9, 26, 18))
+                pygame.draw.line(layer, (40, 90, 50), (cx - 10, cy), (cx + 10, cy), 1)
+                trail_numbers.append((str(i + 1), cx, cy))
             # 벌: 다음 잎(또는 마지막 완료 잎) 위에 앉아 있다
             bee_t = active or self.qte_targets[-1]
             bx, by = bee_t["pos"]
             by -= 18
-            pygame.draw.ellipse(screen, (240, 200, 60), (bx - 6, by - 4, 12, 8))
-            pygame.draw.line(screen, (40, 30, 10), (bx - 2, by - 4), (bx - 2, by + 4), 1)
-            pygame.draw.line(screen, (40, 30, 10), (bx + 2, by - 4), (bx + 2, by + 4), 1)
-            pygame.draw.ellipse(screen, (220, 235, 255), (bx - 9, by - 7, 7, 5))
-            pygame.draw.ellipse(screen, (220, 235, 255), (bx + 2, by - 7, 7, 5))
+            pygame.draw.ellipse(layer, (240, 200, 60), (bx - 6, by - 4, 12, 8))
+            pygame.draw.line(layer, (40, 30, 10), (bx - 2, by - 4), (bx - 2, by + 4), 1)
+            pygame.draw.line(layer, (40, 30, 10), (bx + 2, by - 4), (bx + 2, by + 4), 1)
+            pygame.draw.ellipse(layer, (220, 235, 255), (bx - 9, by - 7, 7, 5))
+            pygame.draw.ellipse(layer, (220, 235, 255), (bx + 2, by - 7, 7, 5))
 
         elif self.qte_kind == "hold":
             if self.qte_theme == "fence":
-                self._draw_fence_qte(screen, active, pulse)
+                self._draw_fence_qte(layer, active, pulse)
             else:
                 # 물길/이랑 등 — 막아야 할 틈/구멍 (테마에 따라 색만 달리)
                 hole_c = (44, 78, 104) if self.qte_theme == "water" else (48, 34, 24)
@@ -377,27 +386,26 @@ class StoryChoiceScene:
                     cx, cy = t["pos"]
                     if t["done"]:
                         fill = (110, 150, 180) if self.qte_theme == "water" else (120, 95, 70)
-                        pygame.draw.circle(screen, fill, (cx, cy), 16)
+                        pygame.draw.circle(layer, fill, (cx, cy), 16)
                         continue
-                    pygame.draw.circle(screen, hole_c, (cx, cy), 17)
+                    pygame.draw.circle(layer, hole_c, (cx, cy), 17)
                     if t is active:
-                        pygame.draw.circle(screen, (210, 180, 90), (cx, cy), int(20 + 4 * pulse), 2)
+                        pygame.draw.circle(layer, (210, 180, 90), (cx, cy), int(20 + 4 * pulse), 2)
                         if self.qte_progress > 0:
                             ang = -math.pi / 2
                             end = ang + self.qte_progress * 2 * math.pi
                             rect = pygame.Rect(cx - 15, cy - 15, 30, 30)
-                            pygame.draw.arc(screen, (95, 200, 120), rect, ang, end, 5)
-            hint = t_font.render("표적 위에서 마우스를 꾹 누르세요", True, TEXT_MUTED)
-            screen.blit(hint, (400 - hint.get_width() // 2, 430))
+                            pygame.draw.arc(layer, (95, 200, 120), rect, ang, end, 5)
+            hint_text = "표적 위에서 마우스를 꾹 누르세요"
 
         elif self.qte_kind == "rub":
-            self._draw_hoe(screen)   # 실제 낡은 호미(자루+날)
+            self._draw_hoe(layer)   # 실제 낡은 호미(자루+날)
             for t in self.qte_targets:
                 cx, cy = t["pos"]
                 if t["done"]:
                     # 닦인 자리 — 반짝이는 금속
-                    pygame.draw.circle(screen, (176, 182, 190), (cx, cy), 11)
-                    pygame.draw.circle(screen, (232, 238, 244), (cx - 3, cy - 3), 4)
+                    pygame.draw.circle(layer, (176, 182, 190), (cx, cy), 11)
+                    pygame.draw.circle(layer, (232, 238, 244), (cx - 3, cy - 3), 4)
                     continue
                 # 녹슨 자국 (울퉁불퉁한 붉은 녹)
                 import random as _r
@@ -406,14 +414,25 @@ class StoryChoiceScene:
                     ox, oy = rng.randint(-8, 8), rng.randint(-7, 7)
                     rr = rng.randint(4, 8)
                     col = rng.choice([(150, 92, 44), (128, 72, 34), (172, 108, 52)])
-                    pygame.draw.circle(screen, col, (cx + ox, cy + oy), rr)
+                    pygame.draw.circle(layer, col, (cx + ox, cy + oy), rr)
                 if t is active:
-                    pygame.draw.circle(screen, (210, 150, 90), (cx, cy), int(16 + 4 * pulse), 2)
+                    pygame.draw.circle(layer, (210, 150, 90), (cx, cy), int(16 + 4 * pulse), 2)
                     if self.qte_progress > 0:
                         w = int(24 * self.qte_progress)
-                        pygame.draw.rect(screen, (180, 186, 192), (cx - 12, cy + 16, w, 4))
-            hint = t_font.render("호미의 녹슨 자리에서 마우스를 좌우로 문지르세요", True, TEXT_MUTED)
-            screen.blit(hint, (400 - hint.get_width() // 2, 418))
+                        pygame.draw.rect(layer, (180, 186, 192), (cx - 12, cy + 16, w, 4))
+            hint_text = "호미의 녹슨 자리에서 마우스를 좌우로 문지르세요"
+            hint_y = 418
+
+        from core.pixelfx import pixelate
+        screen.blit(pixelate(layer, 3, smooth=False), (0, 0))   # 큰 픽셀: QTE 일러스트 도트화
+        # (smooth=False: 평균축소는 경계가 섞여 모자이크 블러처럼 보였다 — 선화는 최근접 서브샘플)
+
+        for num_str, cx, cy in trail_numbers:
+            num = get_font(13).render(num_str, True, (30, 60, 35))
+            screen.blit(num, (cx - num.get_width() // 2, cy - num.get_height() // 2))
+        if hint_text:
+            hint = t_font.render(hint_text, True, TEXT_MUTED)
+            screen.blit(hint, (400 - hint.get_width() // 2, hint_y))
 
     def _draw_hoe(self, screen):
         """아버지의 낡은 호미 — 한국식 전통 손호미.

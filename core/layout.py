@@ -78,11 +78,11 @@ def _init_motes():
             "speed": r.uniform(0.12, 0.5), "amp": r.uniform(6, 22),
             "bright": r.uniform(0.4, 1.0), "side": i % 2,
         })
+    from core.pixelfx import glow_sprite
     for rr in (1, 2, 3):                     # 빛 스프라이트 1회 생성(기준 밝기 150) → blit 시 set_alpha 로 조절
-        glow = pygame.Surface((rr * 6, rr * 6), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (255, 238, 188, 50), (rr * 3, rr * 3), rr * 3)
-        pygame.draw.circle(glow, (255, 246, 212, 150), (rr * 3, rr * 3), rr)
-        _MOTE_GLOW[rr] = glow
+        # '계단 알파' 도트 글로우 — 평균축소 pixelate 는 모자이크 블러로 보였다
+        _MOTE_GLOW[rr] = glow_sprite(rr * 3, (255, 238, 188), px=3,
+                                     steps=(50,), core=((255, 246, 212), 150))
 
 
 def _blur(surf, f):

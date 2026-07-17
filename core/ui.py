@@ -13,7 +13,7 @@ from core import audio
 # RADIUS 계열 상수는 하위호환용 별칭으로 남기되(값=챔퍼 크기), 실제 렌더는 pixel_rect가 담당한다.
 # 픽셀 프리미티브·챔퍼 상수는 core.pixelfx 가 단일 소스(assets 와 공유, 순환참조 방지).
 from core.pixelfx import (CHAMFER, CHAMFER_STEP, CHAMFER_LG, CHAMFER_SM,
-                          pixel_rect, pixel_disc, _fill_chamfer)
+                          pixel_rect, pixel_disc, pixelate, _fill_chamfer)
 RADIUS = CHAMFER      # 하위호환 별칭 — 이제 '챔퍼 크기'로 해석됨
 RADIUS_LG = CHAMFER_LG
 RADIUS_SM = CHAMFER_SM
@@ -109,17 +109,6 @@ def mix_color(a, b, ratio):
     )
 
 
-def draw_vertical_gradient(screen, rect, top_color, bottom_color):
-    for i in range(rect.h):
-        ratio = i / max(1, rect.h - 1)
-        pygame.draw.line(
-            screen,
-            mix_color(top_color, bottom_color, ratio),
-            (rect.x, rect.y + i),
-            (rect.right, rect.y + i),
-        )
-
-
 def draw_soft_shadow(screen, rect, radius=RADIUS, offset=SHADOW_OFFSET, alpha=SHADOW_ALPHA):
     # 곡선 없음: 그림자도 계단식 픽셀 챔퍼로(패널 모서리와 톤 일치).
     shadow = pygame.Surface((rect.w + abs(offset[0]) + 8, rect.h + abs(offset[1]) + 8), pygame.SRCALPHA)
@@ -145,8 +134,22 @@ def draw_button(screen, rect, text, font, hovered=False, selected=False):
     if hovered:
         base = mix_color(base, WHITE, 0.18)
     draw_panel(screen, rect, fill=base, border=edge, radius=RADIUS, shadow=True)
+    rect = pygame.Rect(rect)
     lines = wrap_text(text, font, rect.w - 18, max_lines=2)
     line_h = font.get_height()
+    # 라벨이 버튼 세로를 넘치면(긴 영어가 2줄로 감길 때) 폰트를 줄여 안에 맞춘다.
+    if len(lines) * line_h + (len(lines) - 1) * 2 > rect.h - 6:
+        for sz in (15, 13, 11):
+            small = get_font(sz)
+            cand = wrap_text(text, small, rect.w - 18, max_lines=2)
+            if len(cand) * small.get_height() + (len(cand) - 1) * 2 <= rect.h - 6:
+                font, lines, line_h = small, cand, small.get_height()
+                break
+        else:
+            small = get_font(11)
+            font = small
+            lines = wrap_text(text, small, rect.w - 18, max_lines=2)
+            line_h = small.get_height()
     y = rect.centery - (len(lines) * line_h + (len(lines) - 1) * 2) // 2
     text_color = WHITE if selected else TEXT_DARK
     for line in lines:
@@ -234,13 +237,10 @@ def draw_story_backdrop(screen, mood="night"):
             if -8 <= bx <= PW + 8:
                 pygame.draw.circle(bg, col, (bx, sy + oy), sb)
 
-    # 달 — 부드러운 헤일로 + 초승달
+    # 달 — 헤일로는 '계단 알파' 도트 글로우 (연속 falloff 평균축소는 모자이크 블러로 보임 + 캐시로 매 프레임 재생성 제거)
     mx, my = 648, 90
-    halo = pygame.Surface((180, 180), pygame.SRCALPHA)
-    for r in range(84, 0, -6):
-        a = int(40 * (1 - r / 84.0))
-        pygame.draw.circle(halo, (moon_glow[0], moon_glow[1], moon_glow[2], a), (90, 90), r)
-    screen.blit(halo, (mx - 90, my - 90))
+    from core.pixelfx import glow_sprite, blit_glow
+    blit_glow(screen, glow_sprite(84, moon_glow, px=5, steps=(10, 22, 38)), (mx, my))
     if game_state.player_name == "서태양":
         # 이스터에그: 달 대신 '얼굴 그려진 태양'. 악)몽중농원에서는 붉게 물들고 선글라스를 낀다.
         nm = (mood == "nightmare")
@@ -338,48 +338,6 @@ def draw_light_panel(screen, rect):
     draw_panel(screen, rect, fill=PANEL_WARM, border=PANEL_EDGE, radius=8)
 
 
-def draw_moon_phase(screen, x, y, phase, size=18):
-    """Draw a clean moon phase icon."""
-    cx, cy = x + size // 2, y + size // 2
-    r = size // 2
-
-    # Outer glow
-    pygame.draw.circle(screen, (80, 75, 55), (cx, cy), r + 1)
-    # Dark base
-    pygame.draw.circle(screen, (40, 35, 28), (cx, cy), r)
-
-    bright = (255, 240, 180)
-    if phase == 0:
-        pygame.draw.circle(screen, (55, 50, 40), (cx, cy), r, 1)
-    elif phase == 4:
-        pygame.draw.circle(screen, bright, (cx, cy), r)
-        pygame.draw.circle(screen, (220, 200, 140), (cx, cy), r - 2)
-        pygame.draw.circle(screen, bright, (cx, cy), r - 3)
-        pygame.draw.circle(screen, (180, 160, 110), (cx, cy), r, 1)
-    else:
-        # Draw lit portion using overlapping circles
-        if phase == 1:
-            clip_r = r
-            clip_offset = r // 2
-        elif phase == 2:
-            clip_r = r
-            clip_offset = 0
-        else:  # phase 3
-            clip_r = r
-            clip_offset = -(r // 2)
-        # Bright side
-        for dy in range(-r, r + 1):
-            row_w = int(math.sqrt(max(0, r * r - dy * dy)))
-            shadow_w = int(math.sqrt(max(0, clip_r * clip_r - dy * dy)))
-            left = cx + clip_offset - shadow_w if phase < 3 else cx - row_w
-            right = cx + row_w
-            if phase == 1:
-                left = max(left, cx - row_w + row_w // 2)
-            if right > left:
-                pygame.draw.line(screen, bright, (max(cx - r, left), cy + dy), (min(cx + r, right), cy + dy))
-        pygame.draw.circle(screen, (180, 160, 110), (cx, cy), r, 1)
-
-
 def draw_understanding_badge(screen, x, y, w):
     """Draw the understanding stage name with moon phase."""
     _, stage_name, phase = get_understanding_stage(game_state.understanding)
@@ -388,7 +346,6 @@ def draw_understanding_badge(screen, x, y, w):
     label_font = get_font(13)
 
     label = label_font.render("이해도", True, TEXT_MUTED)
-    screen.blit(label, (x, y - 1))
 
     # 달 위상 아이콘은 자꾸 어긋나 보여 빼고, 라벨 뒤에 단계명을 바로 붙여 이름이 잘리지 않게 한다.
     name_x = x + label.get_width() + 8
@@ -396,9 +353,17 @@ def draw_understanding_badge(screen, x, y, w):
     name_surf = font.render(stage_name, True, TEXT_DARK)
     if name_surf.get_width() > avail:
         name_surf = get_font(13).render(stage_name, True, TEXT_DARK)
-    # 영어 등 단계명이 뱃지 폭을 넘으면 라벨·미터만 두고 이름은 생략(겹침 방지)
     if name_surf.get_width() <= avail:
+        screen.blit(label, (x, y - 1))
         screen.blit(name_surf, (name_x, y))
+    else:
+        # 라벨+이름이 같이 안 들어가면(영어 단계명) 라벨을 빼고 이름만 남긴다 —
+        # 서사 장치인 단계명이 정보의 핵심이라 이름 생략은 정보 손실이었다.
+        for sz in (13, 12, 11):
+            name_surf = get_font(sz).render(stage_name, True, TEXT_DARK)
+            if name_surf.get_width() <= w:
+                break
+        screen.blit(name_surf, (x, y))
 
     bar = pygame.Rect(x, y + 22, w, 10)
     fill_w = int((bar.w - 4) * clamp_percent(game_state.understanding, 60))

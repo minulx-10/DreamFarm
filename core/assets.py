@@ -4,7 +4,8 @@ import pygame
 # `from core.assets import GOLD, TEXT_DARK ...` 임포트를 그대로 유지한다.
 from core.palette import *  # noqa: F401,F403
 # 곡선 없음: 픽셀 챔퍼 사각형·픽셀 원 프리미티브(ui 와 공유, 순환참조 방지 위해 별도 모듈)
-from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM
+from core.pixelfx import (pixel_rect, pixel_disc, pixelate, glow_sprite, blit_glow,
+                          CHAMFER, CHAMFER_SM)
 
 import os
 import sys
@@ -223,6 +224,99 @@ LGg...
 .Gg...
 LGgL..
 ''', 2)
+
+    # ── 아버지의 창고 물건 아이콘 (갤러리 '창고' 탭) ──
+    sprites['item_hoe'] = create_sprite_from_string('''
+.........BB.
+........BBB.
+.......BB...
+......BB....
+.....BB.....
+....BB......
+...mBB......
+..MMm.......
+.MMMm.......
+MMMm........
+WMm.........
+.m..........
+''', 3)
+    sprites['item_seed_pouch'] = create_sprite_from_string('''
+...BB.....
+..ByyB....
+.BBBBBB...
+BBbBBBBB..
+BBBBOBBB..
+BBbBOBBB..
+.BBBBBB...
+..bbbb....
+''', 3)
+    sprites['item_shears'] = create_sprite_from_string('''
+.M......M.
+.MM....MM.
+..MM..MM..
+...MMMM...
+....WW....
+...ByyB...
+..By..yB..
+.By....yB.
+.B......B.
+''', 3)
+    sprites['item_basket'] = create_sprite_from_string('''
+..bBBBBb..
+.B.BBBB.B.
+.BBbBbBBB.
+.BbBbBbBB.
+.BBbBbBBB.
+..BBBBBB..
+...bbbb...
+''', 3)
+    sprites['item_boots'] = create_sprite_from_string('''
+.nn...nn..
+.nn...nn..
+.nn...nn..
+.nn...nn..
+.nnn..nnn.
+.nnnn.nnnn
+.kkkk.kkkk
+''', 3)
+    sprites['item_radio'] = create_sprite_from_string('''
+......y...
+.....y....
+KKKKKKKKKK
+KmmmKKWWKK
+KmmmKKQKKK
+KmmmKKKKKK
+KKKKKKKKKK
+kkkkkkkkkk
+''', 3)
+    sprites['item_bojagi'] = create_sprite_from_string('''
+....YY....
+...Y..Y...
+....YY....
+..YYYYYY..
+.YyYYYYyY.
+.YYYYYYYY.
+..YYYYYY..
+''', 3)
+    sprites['item_key'] = create_sprite_from_string('''
+.MMM......
+M...M.....
+M...M.....
+.MMM......
+..M.......
+..M.MM....
+..M.......
+..M.MM....
+..MM......
+''', 3)
+    sprites['item_black_hat'] = create_sprite_from_string('''
+...kkkk...
+..kKKKKk..
+..kKKKKk..
+kkkkkkkkkk
+kKKKKKKKKk
+.kkkkkkkk.
+''', 3)
     sprites['seed'] = create_sprite_from_string('''
 ...XX...
 ..XooX..
@@ -619,14 +713,10 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
             col = (min(255, tw), 60, 60) if game_state.nightmare else (min(255, tw), min(255, tw), 210)
             pygame.draw.circle(bg, col, (sx + ox, sy + oy), sb)
 
-    # --- 태양 + 부드러운 블룸 ---
+    # --- 태양 + 블룸 — '계단 알파' 도트 글로우 (캐시: 매 프레임 원 18개+pixelate 재생성 제거) ---
     sun_x, sun_y = 640 + ox, 78 + oy
-    bloom = pygame.Surface((260, 260), pygame.SRCALPHA)
-    for r in range(126, 0, -7):
-        a = int(54 * (1.0 - r / 126.0))
-        glow_c = (180, 20, 20, a) if game_state.nightmare else (255, 188, 120, a)
-        pygame.draw.circle(bloom, glow_c, (130, 130), r)
-    bg.blit(bloom, (sun_x - 130, sun_y - 130))
+    bloom_c = (180, 20, 20) if game_state.nightmare else (255, 188, 120)
+    blit_glow(bg, glow_sprite(126, bloom_c, px=5, steps=(14, 30, 50)), (sun_x, sun_y))
     # 태양 본체 — 블룸(위)은 소프트하게 두고, 본체는 큰 픽셀 디스크로(곡선 없음)
     if game_state.nightmare:
         pixel_disc(bg, (30, 0, 0), (sun_x, sun_y), 40, px=3)
@@ -672,7 +762,7 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         a = int(70 * (1 - abs(i - 10) / 10))
         col = (180, 20, 20, a) if game_state.nightmare else (255, 196, 140, a)
         pygame.draw.line(haze, col, (0, i * 2), (PW, i * 2))
-    bg.blit(haze, (0, horizon - 20 + oy))
+    bg.blit(pixelate(haze), (0, horizon - 20 + oy))   # 큰 픽셀: 햇무리 밴드 도트화
 
     # --- 잔디: 세로 그라데이션(계단식 밴딩) + 결 — 아래 여백까지 전체 폭 ---
     i = 0
@@ -707,11 +797,11 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     top_band = pygame.Surface((dirt_rect.w, 64), pygame.SRCALPHA)
     for i in range(64):
         top_band.fill((255, 205, 150, int(58 * (1 - i / 64))) if not game_state.nightmare else (200, 50, 50, int(58 * (1 - i / 64))), (0, i, dirt_rect.w, 1))
-    screen.blit(top_band, (dirt_rect.x, dirt_rect.y))
+    screen.blit(pixelate(top_band), (dirt_rect.x, dirt_rect.y))   # 큰 픽셀: 빛 밴드 도트화
     bot_band = pygame.Surface((dirt_rect.w, 90), pygame.SRCALPHA)
     for i in range(90):
         bot_band.fill((26, 16, 10, int(72 * (i / 90))) if not game_state.nightmare else (20, 5, 5, int(72 * (i / 90))), (0, i, dirt_rect.w, 1))
-    screen.blit(bot_band, (dirt_rect.x, dirt_rect.bottom - 90))
+    screen.blit(pixelate(bot_band), (dirt_rect.x, dirt_rect.bottom - 90))   # 큰 픽셀: 그늘 밴드 도트화
     # 입체 이랑 (어두운 고랑 + 윗면 노을 하이라이트)
     for y in range(dirt_rect.y + 30, dirt_rect.bottom - 16, 40):
         pygame.draw.rect(screen, _mix_color(dd, BLACK, 0.20), (dirt_rect.x + 14, y + 6, dirt_rect.w - 28, 6))
