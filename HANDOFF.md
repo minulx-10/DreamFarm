@@ -105,6 +105,15 @@ scenes/
 
 ## 4. 개발 작업 로그 (최근 업데이트가 위)
 
+- **2026-07-18** (v2.5.0-dev.1 태그 배포 + 레포 전반 정리):
+  - **배포**: 커밋 a95a94b → 태그 `v2.5.0-dev.1` 푸시 → CI 성공(EXE·APK·AAB 프리릴리스 등록).
+    `buildozer.spec` version이 2.2.2로 낡아 APK 파일명이 어긋나던 것 → 2.5.0으로 동기화
+    (**다음 태그부터** 파일명 반영. 앞으로 버전 올릴 때 `core/version.py`와 함께 갱신할 것).
+  - **레포 정리**: README(특징·조작법·구조·문서 표를 v2.5 기준으로), 소개 사이트 `docs/`
+    (특징 카드 3장 추가 + **스크린샷 15장 현행 빌드로 전면 교체** — main 병합 시 Pages 반영),
+    GitHub 이슈 #2~#7 진행 코멘트/제목 갱신(＃6은 v2.5 안정판 기준으로 개명), 레포
+    description·토픽 정리. 스크린샷 원본은 `scratch/qa/sweep/`(qa_sweep.py 재생성 가능).
+
 - **2026-07-18 새벽** (v2.5 — IDEAS_STEAM 로드맵 완주 · 미출시):
   - **에필로그**: `scenes/epilogue.py` — BEATS 스크립트(라벨·본문·인터랙션·틴트). 내부에
     실제 FarmScene을 배경 호스트로 만들어 `draw_tiled_background`+`draw_farm_plot`만 빌려

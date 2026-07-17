@@ -25,7 +25,7 @@ requirements = python3,pygame-ce
 p4a.local_recipes = ./p4a-recipes
 
 # (str) Application versioning (method 1)
-version = 2.2.2
+version = 2.5.0
 
 # (str) 앱 아이콘 — 여백을 잘라 아이콘 칸을 꽉 채운 투명 배경 버전(core/icon.png). 스플래시는 로고 사용.
 icon.filename = %(source.dir)s/core/icon.png
