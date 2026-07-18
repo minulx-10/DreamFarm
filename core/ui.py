@@ -101,6 +101,17 @@ def clamp_percent(value, max_value=100):
     return max(0, min(1, value / max_value))
 
 
+def draw_full_veil(screen, color):
+    """캔버스 '전체'(4:3 안전영역 밖 여백 포함)를 덮는 반투명 베일/틴트.
+    씬은 800x600 안전영역 서브서피스에 그리므로, 전면 딤을 (800,600)으로만 채우면
+    넓은/세로 화면에서 여백만 밝게 남는 '가운데만 어두운 액자' 현상이 생긴다."""
+    parent = screen.get_parent()
+    target = parent if (parent is not None and parent.get_size() != screen.get_size()) else screen
+    veil = pygame.Surface(target.get_size(), pygame.SRCALPHA)
+    veil.fill(color)
+    target.blit(veil, (0, 0))
+
+
 def mix_color(a, b, ratio):
     return (
         int(a[0] + (b[0] - a[0]) * ratio),
@@ -374,7 +385,7 @@ def draw_understanding_badge(screen, x, y, w):
 
 
 def draw_top_bar(screen, show_stats=True):
-    # 적응형(가장자리 앵커): 넓은 화면에선 바를 캔버스 폭까지 늘려 그린다. 내용(제목·타이머·점수)은
+    # 적응형(가장자리 앵커): 확장 캔버스에선 바를 캔버스 폭까지 늘려 그린다. 내용(제목·타이머·점수)은
     # 안전영역 좌표 그대로 두어 가운데 정렬을 유지한다. 4:3(여백 0)이면 기존과 동일.
     parent = screen.get_parent()
     if parent:
@@ -417,7 +428,7 @@ def draw_top_bar(screen, show_stats=True):
 
 
 def draw_bottom_bar(screen, obj_name, obj_desc):
-    # 적응형(가장자리 앵커): 넓은 화면에선 하단 바를 캔버스 폭까지 늘린다. 글은 안전영역 좌표 유지.
+    # 적응형(가장자리 앵커): 확장 캔버스에선 하단 바를 캔버스 폭까지 늘린다. 글은 안전영역 좌표 유지.
     parent = screen.get_parent()
     if parent:
         ox, oy = screen.get_offset()

@@ -208,7 +208,8 @@ def draw(screen):
 
     y = int(y)
     panel = pygame.Surface((W, H), pygame.SRCALPHA)
-    pixel_rect(panel, (40, 34, 28, 236), (0, 0, W, H), chamfer=CHAMFER)
+    # 거의 불투명하게 — 236이면 상단 바의 밝은 게임 제목이 토스트 글자 사이로 비쳐 겹쳐 보인다
+    pixel_rect(panel, (40, 34, 28, 252), (0, 0, W, H), chamfer=CHAMFER)
     tier_col = TIER_COLORS.get(a.get("tier"), (176, 168, 150))
     pixel_rect(panel, (*tier_col, 255), (0, 0, W, H), width=2, chamfer=CHAMFER)
     screen.blit(panel, (x, y))

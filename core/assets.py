@@ -645,6 +645,7 @@ _STARS = [(58, 26, 2), (124, 52, 1), (208, 20, 2), (332, 44, 1), (96, 92, 1),
           (470, 28, 1), (250, 70, 2), (150, 130, 1), (560, 22, 1), (40, 120, 1),
           (412, 104, 1), (300, 16, 1), (90, 56, 1)]
 _CLOUDS = [(150, 92, 132, 22), (520, 64, 168, 28), (350, 126, 96, 16), (60, 138, 80, 14)]
+_CLOUD_CACHE = {}   # (w, h, nightmare) -> 도트화 프리렌더 구름
 # 흙바닥 알갱이 텍스처 — 고정 배치 (dirt_rect 기준 상대좌표)
 import random as _random
 _speck_rng = _random.Random(7)
@@ -727,13 +728,18 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
         pixel_disc(bg, (255, 206, 142), (sun_x, sun_y), 29, px=3)
         pixel_disc(bg, (255, 240, 206), (sun_x, sun_y), 15, px=3)
 
-    # --- 노을 구름 (반투명, 빛을 받은 아랫면이 환하게) ---
+    # --- 노을 구름 (반투명, 빛을 받은 아랫면이 환하게) — 도트화 캐시(곡선 없음 규칙) ---
     for cx, cy, cw, ch in _CLOUDS:
-        cloud = pygame.Surface((cw, ch * 2), pygame.SRCALPHA)
-        cloud_c1 = (60, 20, 20, 120) if game_state.nightmare else (90, 52, 84, 120)
-        cloud_c2 = (140, 30, 30, 110) if game_state.nightmare else (236, 158, 120, 110)
-        pygame.draw.ellipse(cloud, cloud_c1, (0, 0, cw, ch))
-        pygame.draw.ellipse(cloud, cloud_c2, (cw * 0.18, ch * 0.5, cw * 0.7, ch))
+        key = (cw, ch, game_state.nightmare)
+        cloud = _CLOUD_CACHE.get(key)
+        if cloud is None:
+            raw = pygame.Surface((cw, ch * 2), pygame.SRCALPHA)
+            cloud_c1 = (60, 20, 20, 120) if game_state.nightmare else (90, 52, 84, 120)
+            cloud_c2 = (140, 30, 30, 110) if game_state.nightmare else (236, 158, 120, 110)
+            pygame.draw.ellipse(raw, cloud_c1, (0, 0, cw, ch))
+            pygame.draw.ellipse(raw, cloud_c2, (cw * 0.18, ch * 0.5, cw * 0.7, ch))
+            cloud = pixelate(raw, 3, smooth=False)   # 모듈 상단 임포트 사용(지역 임포트는 섀도잉 함정)
+            _CLOUD_CACHE[key] = cloud
         bg.blit(cloud, (cx - cw // 2 + ox, cy - ch // 2 + oy))
 
     # --- 안개 낀 산 3겹 (멀수록 옅고 푸르게) — 능선을 캔버스 양끝까지 평평하게 연장 ---
@@ -755,6 +761,44 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
     _hill(m1, [(0, horizon - 6), (140, 96), (300, horizon - 14), (470, 92), (650, horizon - 4), (800, 104)], horizon + 10)
     _hill(m2, [(0, horizon + 22), (110, 116), (260, horizon + 12), (440, 108), (610, horizon + 20), (800, 122)], h)
     _hill(m3, [(0, horizon + 52), (160, 146), (340, horizon + 44), (520, 138), (800, horizon + 50)], h)
+
+    # --- 위 여백에도 별을 이어 뿌린다 — 세로 화면에서 밴드가 민짜 하늘로 비지 않게 ---
+    if oy > 0:
+        for sx, sy, sb in _STARS:
+            bx = (sx * 31 + sy * 5) % PW
+            by = (sx * 13 + sy * 7) % oy
+            tw = 170 + sb * 20
+            col = (min(255, tw), 60, 60) if game_state.nightmare else (min(255, tw), min(255, tw), 205)
+            pygame.draw.rect(bg, col, (bx, by, sb, sb))
+
+    # --- 작물별 지평선 실루엣 — 회차마다 배경 표정이 달라진다 (당근=기본 들녘) ---
+    sil = (34, 48, 56) if not game_state.nightmare else (24, 5, 5)
+    sil_l = _mix_color(sil, (255, 210, 160), 0.18)
+    if game_state.crop == "apple":
+        # 능선 위 과수원 나무 열 — 캔버스 전체 폭으로 반복
+        for tx in range(-((ox) % 96), PW, 96):
+            ty = horizon + 40 + ((tx // 96) % 3) * 4 + oy
+            pygame.draw.rect(bg, sil, (tx + 10, ty - 10, 4, 12))                     # 줄기
+            for ci, (cw2, chh) in enumerate(((14, 6), (18, 6), (10, 5))):
+                pygame.draw.rect(bg, sil if ci != 2 else sil_l,
+                                 (tx + 12 - cw2 // 2, ty - 14 - ci * 5, cw2, chh))   # 수관 층층이
+    elif game_state.crop == "rice":
+        # 다랑이 논 — 지평선 밑 물빛 계단 두 줄 (노을을 받아 반짝인다)
+        gl = (150, 30, 30) if game_state.nightmare else (150, 190, 214)
+        gl_hi = (220, 120, 110) if game_state.nightmare else (222, 236, 244)
+        for band_i, by in enumerate((horizon + 36, horizon + 52)):
+            pygame.draw.rect(bg, _mix_color(sil, gl, 0.55), (0, by + oy, PW, 6))
+            for seg in range(-((ox + band_i * 24) % 46), PW, 46):
+                pygame.draw.rect(bg, gl_hi, (seg, by + 1 + oy, 12, 2))
+            pygame.draw.rect(bg, sil, (0, by + 6 + oy, PW, 2))                       # 논둑 그늘
+    elif game_state.crop == "potato":
+        # 이랑 진 밭 언덕 — 지평선 밑 비스듬한 고랑 줄무늬
+        fur = _mix_color(sil, (120, 82, 54), 0.5)
+        fur_hi = _mix_color(fur, (255, 220, 170), 0.3)
+        pygame.draw.rect(bg, fur, (0, horizon + 38 + oy, PW, 22))
+        for seg in range(-((ox) % 34), PW, 34):
+            pygame.draw.line(bg, fur_hi, (seg, horizon + 58 + oy), (seg + 14, horizon + 40 + oy), 2)
+        pygame.draw.rect(bg, sil, (0, horizon + 58 + oy, PW, 2))
 
     # --- 지평선 햇무리 (따뜻한 가로 빛띠) — 전체 폭 ---
     haze = pygame.Surface((PW, 40), pygame.SRCALPHA)
@@ -779,6 +823,47 @@ def draw_tiled_background(screen, w, h, grass=None, grass_dk=None, dirt=None, di
             if (gx + gy) % 3 == 0:
                 pygame.draw.line(bg, gd, (gx + 10, gy + 8 + oy), (gx + 18, gy + 2 + oy), 2)
                 pygame.draw.line(bg, gd, (gx + 17, gy + 3 + oy), (gx + 22, gy + 11 + oy), 2)
+
+    # --- 작물별 들녘 스캐터 — 넓은/세로 화면의 잔디 벌판이 회차마다 다른 표정을 갖는다 ---
+    nm2 = game_state.nightmare
+    if game_state.crop == "apple":
+        # 흩어진 낙엽 + 낮은 덤불
+        leaf_cs = [(150, 40, 34), (110, 26, 24)] if nm2 else [(196, 122, 56), (162, 94, 46)]
+        bush_c = (90, 26, 24) if nm2 else _mix_color(gd, (40, 90, 50), 0.5)
+        for gx in range(0, PW, 58):
+            gy = horizon + 30 + ((gx * 7) % max(1, bot_y - horizon - 60))
+            if (gx // 58) % 4 == 0:
+                pygame.draw.rect(bg, bush_c, (gx + 6, gy + oy, 14, 5))
+                pygame.draw.rect(bg, _mix_color(bush_c, (255, 230, 190), 0.18), (gx + 9, gy - 3 + oy, 8, 4))
+            else:
+                pygame.draw.rect(bg, leaf_cs[(gx // 58) % 2], (gx + 12, gy + oy, 4, 3))
+    elif game_state.crop == "rice":
+        # 물기 어린 들 — 갈대 포기 + 물웅덩이 반짝임
+        reed_c = (120, 40, 32) if nm2 else (128, 132, 74)
+        reed_hd = (170, 70, 50) if nm2 else (176, 158, 96)
+        glint = (200, 90, 80) if nm2 else (188, 216, 230)
+        for gx in range(0, PW, 74):
+            gy = horizon + 40 + ((gx * 11) % max(1, bot_y - horizon - 70))
+            if (gx // 74) % 3 == 0:
+                pygame.draw.rect(bg, glint, (gx + 8, gy + 6 + oy, 16, 3))
+                pygame.draw.rect(bg, _mix_color(glint, (255, 255, 255), 0.4), (gx + 12, gy + 6 + oy, 5, 2))
+            else:
+                for rx, rh in ((0, 12), (4, 16), (8, 10)):
+                    pygame.draw.rect(bg, reed_c, (gx + rx + 10, gy - rh + oy, 2, rh))
+                pygame.draw.rect(bg, reed_hd, (gx + 13, gy - 19 + oy, 4, 5))
+    elif game_state.crop == "potato":
+        # 돌무더기 + 짚단 낟가리
+        st_c = (70, 24, 22) if nm2 else (128, 122, 112)
+        st_l = (110, 44, 38) if nm2 else (170, 164, 152)
+        hay_c = (140, 60, 40) if nm2 else (196, 158, 84)
+        for gx in range(0, PW, 66):
+            gy = horizon + 34 + ((gx * 13) % max(1, bot_y - horizon - 64))
+            if (gx // 66) % 4 == 0:
+                pygame.draw.rect(bg, hay_c, (gx + 8, gy - 6 + oy, 12, 8))
+                pygame.draw.rect(bg, _mix_color(hay_c, (0, 0, 0), 0.25), (gx + 8, gy + oy, 12, 2))
+            else:
+                pygame.draw.rect(bg, st_c, (gx + 10, gy + oy, 7, 5))
+                pygame.draw.rect(bg, st_l, (gx + 12, gy - 2 + oy, 5, 4))
 
     # --- 텃밭 흙바닥: 나무 테두리 + 결 고운 흙 + 빛·그늘 밴드 + 입체 이랑 ---
     dirt_rect = pygame.Rect(38, 112, w - 76, h - 246)

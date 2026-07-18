@@ -73,7 +73,6 @@ class WaterPour(MiniGameBase):
             return max(0.0, (target - m) / self.PER_LEVEL)
         self.good_low = lvl_for(38)
         self.good_high = lvl_for(72)
-        self.overflow = lvl_for(78)
         if self.good_high <= self.good_low:
             self.good_high = self.good_low + 6
 
@@ -83,6 +82,9 @@ class WaterPour(MiniGameBase):
             mid = (self.good_low + self.good_high) / 2
             half = max(4.0, (self.good_high - self.good_low) * 0.32)
             self.good_low, self.good_high = mid - half, mid + half
+        # 과습선은 항상 적정 구간 '위'에 둔다 — 수분이 이미 높으면(72↑) lvl_for(78)이 0으로
+        # 무너져서, 초록 칸이 과습선 밖에 그려지고 무조건 실패하는 함정이 됐었다.
+        self.overflow = max(lvl_for(78), self.good_high + 4)
 
     def _handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -468,10 +470,16 @@ class PestTap(MiniGameBase):
                 b["vx"], b["vy"] = v.x, v.y
             b["x"] += b["vx"] * dt
             b["y"] += b["vy"] * dt
-            if b["x"] < PLOT.x + 36 or b["x"] > PLOT.right - 40:
-                b["vx"] *= -1
-            if b["y"] < PLOT.y + 50 or b["y"] > PLOT.bottom - 50:
-                b["vy"] *= -1
+            # 벽 반사 — 반전만 하면 렉 프레임에 벽 밖으로 나간 벌레가 매 프레임 방향을 뒤집으며
+            # 벽에 박혀 떠는 채로 갇힌다 → 반전과 함께 경계 안으로 되민다
+            if b["x"] < PLOT.x + 36:
+                b["x"] = PLOT.x + 36; b["vx"] = abs(b["vx"])
+            elif b["x"] > PLOT.right - 40:
+                b["x"] = PLOT.right - 40; b["vx"] = -abs(b["vx"])
+            if b["y"] < PLOT.y + 50:
+                b["y"] = PLOT.y + 50; b["vy"] = abs(b["vy"])
+            elif b["y"] > PLOT.bottom - 50:
+                b["y"] = PLOT.bottom - 50; b["vy"] = -abs(b["vy"])
         for p in self.puffs:
             p[2] -= dt
         self.puffs = [p for p in self.puffs if p[2] > 0]
@@ -505,11 +513,11 @@ class PestTap(MiniGameBase):
             if b["dead"]:
                 continue
             bx, by = int(b["x"]), int(b["y"])
-            # 조준 고리
+            # 조준 고리 — 도트화(같은 파일의 반짝이·글로우와 톤 통일)
             ring = pygame.Surface((36, 36), pygame.SRCALPHA)
             pygame.draw.circle(ring, (255, 90, 60, 70) if not is_potato else (240, 200, 100, 70), (18, 18), 16)
             pygame.draw.circle(ring, (255, 140, 95, 210) if not is_potato else (229, 180, 50, 210), (18, 18), 15, 3)
-            screen.blit(ring, (bx - 18, by - 18))
+            screen.blit(pixelate(ring, 3, smooth=False), (bx - 18, by - 18))
             
             # 밭에 보이던 해충과 같은 스프라이트로 통일 (잡을 때 다른 벌레로 바뀌지 않게)
             screen.blit(bsp, (bx - bsp.get_width() // 2, by - bsp.get_height() // 2))
@@ -518,7 +526,7 @@ class PestTap(MiniGameBase):
             s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
             color = (245, 240, 220, int(180 * (p[2] / 0.35))) if is_potato else (210, 220, 120, int(180 * (p[2] / 0.35)))
             pygame.draw.circle(s, color, (r, r), r)
-            screen.blit(s, (p[0] - r, p[1] - r))
+            screen.blit(pixelate(s, 3, smooth=False), (p[0] - r, p[1] - r))
 
         remain = sum(1 for b in self.bugs if not b["dead"])
         cap = self.PROMPT if self.result is None else self.feedback
@@ -656,9 +664,8 @@ class SoilMound(MiniGameBase):
 # ---- 공통 그리기 헬퍼 ----
 
 def _veil(screen):
-    veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-    veil.fill((10, 14, 22, 70))
-    screen.blit(veil, (0, 0))
+    from core.ui import draw_full_veil
+    draw_full_veil(screen, (10, 14, 22, 70))   # 캔버스 전체(여백 포함) — 여백만 밝게 남지 않게
 
 
 def _pill(screen, rect, alpha=190):
@@ -681,7 +688,8 @@ def _caption(screen, text, color=None, hot=False):
         f = _font(size)
         t = f.render(text, True, color)
     x = PLOT.centerx - t.get_width() // 2
-    x = max(12, min(800 - t.get_width() - 12, x))
+    # 알약 배경이 x-12부터 그려지므로 20px 여백을 잡아야 알약이 화면 끝에 붙지 않는다
+    x = max(20, min(800 - t.get_width() - 20, x))
     y = 466
     _pill(screen, pygame.Rect(x - 12, y - 5, t.get_width() + 24, t.get_height() + 8))
     screen.blit(t, (x, y))
@@ -1013,6 +1021,12 @@ class WeatherCloudy:
         for c in self.clouds:
             if c["alive"] and c is not self.dragging:
                 c["x"] += c["drift"] * dt
+                # 밭 밖까지 저절로 흘러가지 않게 가장자리에서 되돌아온다
+                # (스스로 떠나 버리면 잡을 구름이 사라져 클리어 불가가 된다)
+                if c["x"] < PLOT.x + 6:
+                    c["x"] = PLOT.x + 6; c["drift"] = abs(c["drift"])
+                elif c["x"] + c["w"] > PLOT.right - 6:
+                    c["x"] = PLOT.right - 6 - c["w"]; c["drift"] = -abs(c["drift"])
         if self.timer <= 0:
             self._resolve()
 
@@ -1038,9 +1052,17 @@ class WeatherCloudy:
 
     def draw(self, screen):
         _veil(screen)
+        # 드래그 중이 아닌 구름은 밭 안에만 — 다른 날씨 게임과 같은 클리핑.
+        # (드래그 중인 구름은 '화면 밖으로 밀어내는' 손맛을 위해 프레임 위로도 보인다.)
+        old_clip = screen.get_clip()
+        screen.set_clip(PLOT)
         for c in self.clouds:
-            if not c["alive"]:
+            if not c["alive"] or c is self.dragging:
                 continue
+            screen.blit(c["sprite"], (int(c["x"]), int(c["y"])))
+        screen.set_clip(old_clip)
+        if self.dragging and self.dragging["alive"]:
+            c = self.dragging
             screen.blit(c["sprite"], (int(c["x"]), int(c["y"])))
         _caption(screen, self.PROMPT if self.result is None else self.feedback,
                  None if self.result is None else self.feedback_color)

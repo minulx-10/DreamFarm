@@ -11,7 +11,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import get_font, TEXT_MUTED
 from core.ui import draw_story_backdrop
-from core.pixelfx import pixel_rect, pixelate, glow_sprite, blit_glow, CHAMFER, CHAMFER_SM
+from core.pixelfx import pixel_rect, pixel_disc, pixelate, glow_sprite, blit_glow, CHAMFER, CHAMFER_SM
 from core import audio
 from core import i18n
 
@@ -161,8 +161,9 @@ class StarConnectScene:
             # 반경 2px 양자화(맥동 헤일로의 캐시 상한).
             halo_q = max(4, (halo // 2) * 2)
             blit_glow(screen, glow_sprite(halo_q, color[:3], px=3, steps=(20, 42, 68)), (x, y))
-        pygame.draw.circle(screen, color, (x, y), size)
-        pygame.draw.circle(screen, (255, 255, 255), (x, y), max(1, size - 3))
+        # 별 본체도 도트 원으로 — 헤일로·링은 전부 도트인데 본체만 매끈한 원이었다
+        pixel_disc(screen, color, (x, y), size, px=2)
+        pixel_disc(screen, (255, 255, 255), (x, y), max(1, size - 3), px=2)
 
     def _dotted(self, screen, a, b, color):
         dx, dy = b[0] - a[0], b[1] - a[1]
@@ -182,6 +183,12 @@ class StarConnectScene:
         pixel_rect(screen, (40, 44, 60), (28, 56, w, 6), chamfer=CHAMFER_SM)
         pixel_rect(screen, (210, 190, 120),
                    (28, 56, int(w * (self.idx / self.total)), 6), chamfer=CHAMFER_SM)
+        # 남은 시간 — 진행 바 아래 가는 바 (제한시간이 있는데 안 보이면 갑작스러운 종료로 느껴진다)
+        pixel_rect(screen, (40, 44, 60), (28, 66, w, 3), chamfer=CHAMFER_SM)
+        tw = int(w * max(0.0, self.timer / self.DURATION))
+        if tw > 0:
+            col = (216, 110, 96) if self.timer < self.DURATION * 0.25 else (150, 160, 190)
+            pixel_rect(screen, col, (28, 66, tw, 3), chamfer=CHAMFER_SM)
         if self.done:
             msg = "다 이었다…" if self.idx >= self.total else "별이 흐려진다…"
             tip = self.font.render(msg, True, GOLD_DIM)

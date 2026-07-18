@@ -37,9 +37,11 @@ class CropSelectScene:
         self.back_btn = pygame.Rect(24, 22, 104, 34)
 
         # 도전 규칙 (기본 엔딩 3종 수집 시 해금) — 클릭 순환 버튼 (좌하단)
-        self.challenge = getattr(game_state, "challenge", None)
-        self.challenge_btn = pygame.Rect(40, 506, 220, 36)
         self.CHALLENGES = [None, "no_journal", "drought", "seven_days"]
+        self.challenge = getattr(game_state, "challenge", None)
+        if self.challenge not in self.CHALLENGES:   # 낡은/깨진 세이브 값 방어 (KeyError 크래시 방지)
+            self.challenge = None
+        self.challenge_btn = pygame.Rect(40, 506, 220, 36)
         self.CHALLENGE_NAMES = {None: "없음", "no_journal": "무일지",
                                 "drought": "한발", "seven_days": "이레"}
         self.CHALLENGE_DESCS = {
@@ -74,6 +76,14 @@ class CropSelectScene:
                 audio.play("click")
                 game_state.current_scene = "title"
                 return
+            # Enter로도 확인 — 초반 흐름(이름 입력 Enter)과 키보드 조작 통일
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                audio.play("success")
+                game_state.crop = self.selected_crop
+                game_state.nightmare = self.nightmare_mode
+                game_state.challenge = self.challenge
+                game_state.current_scene = "name_input"
+                return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 뒤로가기 → 타이틀
                 if self.hovered_back:
@@ -105,8 +115,8 @@ class CropSelectScene:
         pass
 
     def draw(self, screen):
-        # 1. 배경 (밤하늘 / 악몽 모드 활성화 시 악몽 하늘)
-        draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
+        # 1. 배경 (밤하늘 / 악몽 체크 시 즉시 악몽 하늘 — 확인 전에도 분위기가 미리 보이게)
+        draw_story_backdrop(screen, "nightmare" if (game_state.nightmare or self.nightmare_mode) else "night")
         
         # 2. 안내 문구 — 우측 상단의 달/태양(이스터에그)을 전혀 가리지 않도록 2줄로 나누어 컴팩트하게 배치
         line1 = get_font(18).render("회차마다 다른 작물을 길러", True, WHITE)
@@ -178,16 +188,21 @@ class CropSelectScene:
             # 체크 박스 + 라벨을 하나의 묶음으로 박스 안에서 가운데 정렬 (텍스트 잘림 방지)
             r = self.nightmare_rect
             label_font = get_font(16)
-            check_char = "✓" if self.nightmare_mode else "□"
-            check_surf = label_font.render(check_char, True, (200, 30, 30))
             label_surf = label_font.render("[악)몽중농원] 활성화 (지옥 모드)",
                                            True, (139, 30, 30) if self.nightmare_mode else TEXT_DARK)
             gap = 8
-            total_w = check_surf.get_width() + gap + label_surf.get_width()
+            box = 13   # 체크박스는 직접 그린다 — '✓'는 Galmuri11에 없어 두부(□)로 떴었다
+            total_w = box + gap + label_surf.get_width()
             start_x = r.centerx - total_w // 2
             cy = r.centery
-            screen.blit(check_surf, (start_x, cy - check_surf.get_height() // 2))
-            screen.blit(label_surf, (start_x + check_surf.get_width() + gap, cy - label_surf.get_height() // 2))
+            bx, by = start_x, cy - box // 2
+            pygame.draw.rect(screen, (255, 246, 238), (bx, by, box, box))
+            pygame.draw.rect(screen, (200, 30, 30) if self.nightmare_mode else (150, 100, 100),
+                             (bx, by, box, box), 2)
+            if self.nightmare_mode:   # 픽셀 체크 표시
+                for i, (dx, dy) in enumerate([(2, 6), (3, 7), (4, 8), (5, 9), (6, 8), (7, 6), (8, 4), (9, 2)]):
+                    pygame.draw.rect(screen, (200, 30, 30), (bx + dx, by + dy - 1, 2, 2))
+            screen.blit(label_surf, (start_x + box + gap, cy - label_surf.get_height() // 2))
             
             # 설명구
             warn_text = "음식을 남기면 지옥에서 다 먹어야 합니다. 검붉은 밭에서 시작합니다."

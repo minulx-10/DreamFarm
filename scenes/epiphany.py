@@ -3,6 +3,7 @@ import pygame
 from core.game_state import game_state
 from core.assets import BLACK, get_font
 from core.pixelfx import pixelate, glow_sprite, blit_glow
+from core.ui import wrap_text
 from core import audio
 
 class EpiphanyScene:
@@ -63,14 +64,20 @@ class EpiphanyScene:
         blit_glow(screen, glow_sprite(glow_radius, (255, 200, 80), px=5, steps=(9, 18, 30)),
                   (400, 300), int(255 * ratio))
 
-        # Main text with alpha
+        # Main text with alpha — 긴 영어 문구는 한 줄 렌더로 화면(800px)을 넘어 잘린다 →
+        # 폭에 맞춰 줄바꿈(wrap_text가 번역 후 감쌈)하고 세로 중앙 정렬
         color = (
             int(255 * ratio),
             int(220 * ratio),
             int(130 * ratio),
         )
-        text_surf = self.font.render(self.text, True, color)
-        screen.blit(text_surf, (400 - text_surf.get_width() // 2, 290))
+        lines = wrap_text(self.text, self.font, 700) or [""]
+        line_h = self.font.get_height() + 6
+        y = 300 - (len(lines) * line_h) // 2
+        for line in lines:
+            text_surf = self.font.render(line, True, color)
+            screen.blit(text_surf, (400 - text_surf.get_width() // 2, y))
+            y += line_h
 
         # Prompt after delay
         if self.phase == "hold" and self.hold_timer > 1.5:

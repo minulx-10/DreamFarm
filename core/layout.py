@@ -12,17 +12,27 @@
 """
 
 SAFE_W, SAFE_H = 800, 600
-# 캔버스 폭/높이 상한 — 극단적 울트라와이드/세로에서 여백이 과하게 늘어나는 걸 막는다.
-# (상한을 넘는 비율은 약간의 레터박스가 다시 생기지만, 그 안은 배경으로 꽉 찬다.)
-MAX_W, MAX_H = 1280, 960
+# 캔버스 폭/높이 상한 — 비정상적으로 길쭉한 창에서 캔버스가 무한정 커지는 것만 막는 안전판.
+# 실기기 전부(32:9 5120x1440 → 2560, 폴더블 펼침 세로 1812x2176 → 1088)가 상한 안이라
+# **어떤 화면에서도 레터박스 없이 꽉 찬다** — 정수 배율 스냅은 캔버스를 ceil(창/배율)로
+# '오버스캔'해 채우므로(넘친 몇 px는 크롭), 상한이 이 오버스캔을 잘라먹지만 않으면 된다.
+# (예전 1760x800 상한이 폴더블에서 212~576px 검은 띠의 원인이었다.)
+MAX_W, MAX_H = 2600, 1500
 
 canvas_w, canvas_h = SAFE_W, SAFE_H
 safe_x, safe_y = 0, 0
 
 
+def _place_safe():
+    """안전영역은 항상 가운데 — 세로 확장 화면도 배경 연장 + 중앙 게임 블록(v2.2 방식)."""
+    global safe_x, safe_y
+    safe_x = (canvas_w - SAFE_W) // 2
+    safe_y = max(0, canvas_h - SAFE_H) // 2
+
+
 def set_viewport(win_w, win_h):
     """실제 창 비율에 맞춰 캔버스 크기와 안전영역 오프셋을 정한다."""
-    global canvas_w, canvas_h, safe_x, safe_y
+    global canvas_w, canvas_h
     if win_w <= 0 or win_h <= 0:
         return
     aspect = win_w / win_h
@@ -32,17 +42,15 @@ def set_viewport(win_w, win_h):
     else:                                  # 4:3보다 김(세로) → 상하로 확장
         canvas_w = SAFE_W
         canvas_h = max(SAFE_H, min(MAX_H, round(SAFE_W / aspect)))
-    safe_x = (canvas_w - SAFE_W) // 2
-    safe_y = (canvas_h - SAFE_H) // 2
+    _place_safe()
 
 
 def set_canvas(cw, ch):
-    """정수 배율 스냅용 — 캔버스 크기를 직접 지정하고 안전영역을 가운데로 재정렬한다.
+    """정수 배율 스냅용 — 캔버스 크기를 직접 지정하고 안전영역을 재배치한다.
     (game_main._apply_scaling 이 고해상도에서 정수배로 창을 꽉 채우려고 캔버스를 다시 키울 때 사용.)"""
-    global canvas_w, canvas_h, safe_x, safe_y
+    global canvas_w, canvas_h
     canvas_w, canvas_h = cw, ch
-    safe_x = (canvas_w - SAFE_W) // 2
-    safe_y = (canvas_h - SAFE_H) // 2
+    _place_safe()
 
 
 def safe_rect():

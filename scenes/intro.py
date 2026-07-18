@@ -44,10 +44,12 @@ class IntroScene:
                     "꿈에서 깨어날 수 있다."),
                 i18n.tnar(
                     "{name_eun} 검붉은 흙 앞에 선다.\n"
-                    "이 지옥의 밭에서 {crop_word}를 끝까지 길러 거두어야\n"
+                    "이 지옥의 밭에서 {crop_leul} 끝까지 길러 거두어야\n"
                     "비로소 꿈에서 놓여날 수 있다.\n\n"
                     "'남기지 마라. 이번엔, 끝까지.'",
-                    crop_key=ck, name=name, name_eun=name_eun, crop_word=crop_name),
+                    crop_key=ck, name=name, name_eun=name_eun,
+                    # '{crop_word}를' 고정 조사는 '당근를'이 됐었다 — 을/를을 작물명에 맞춘다
+                    crop_leul=append_josa(crop_name, "을/를")),
             ]
 
         # 일반 도입부 — 고른 작물에 맞춰 '당근'을 갈아 끼운다 (KO: swap_crop_word / EN: {crop} 치환)
@@ -113,11 +115,12 @@ class IntroScene:
 
     def start_game(self):
         game_state.reset()
-        game_state.transition_text = (
+        # 벼 회차는 '밭일→논일' 치환까지 — tnar가 언어별로 처리
+        game_state.transition_text = i18n.tnar(
             "[꿈속 밭일]\n"
             "밭의 상태를 살피고 알맞은 행동을 고르세요.\n"
-            "기다리는 것도 선택이지만, 방치하면 문제가 커집니다."
-        )
+            "기다리는 것도 선택이지만, 방치하면 문제가 커집니다.",
+            crop_key=game_state.crop)
         game_state.transition_next = "farm"
         game_state.is_clear_transition = False
         game_state.current_scene = "transition"

@@ -91,12 +91,27 @@ class Stage4Scene:
         self.pull_per_click = 16.0       # 클릭당 올라가는 픽셀 (10 -> 16 버프)
         self.slide_speed = 32.0          # 클릭 안 할 때 내려가는 속도 (50 -> 32 너프)
         self.last_click_time = 0.0       # 마지막 클릭 시각 (pygame.time.get_ticks 기반)
-        self.rapid_threshold = 0.055     # 이 시간(초) 미만 간격이면 과도한 연타로 판정 (0.08 -> 0.055)
+        # 이 시간(초) 미만 간격이면 과도한 연타로 판정. 0.055는 사람 손으로 사실상 불가능해
+        # (18타/초) '서두르면 상한다' 메커닉이 죽어 있었다 → 11타/초 수준으로 복원
+        self.rapid_threshold = 0.09
 
         self.stage_clear = False
         self.clear_timer = 2.0
         self.dirt_particles = []
         self.flash_timer = 0.0   # 수확 성공 순간의 황금빛 플래시
+
+        if self.is_apple:
+            # 배경 사과·잎 데코 — 매끈한 circle 직접 렌더 대신 1회 도트화 프리렌더(곡선 없음 규칙)
+            from core.pixelfx import pixelate
+            deco = pygame.Surface((800, 600), pygame.SRCALPHA)
+            for bx, by in [(110, 180), (220, 200), (580, 210), (690, 180)]:
+                pygame.draw.line(deco, (80, 50, 30), (bx - 30, by - 20), (bx + 30, by - 12), 4)
+                pygame.draw.line(deco, (96, 62, 36), (bx, by - 16), (bx, by), 2)
+                pygame.draw.circle(deco, (160, 30, 30), (bx, by), 12)
+                pygame.draw.circle(deco, (86, 168, 84), (bx + 4, by - 14), 5)
+            pygame.draw.circle(deco, (46, 112, 60), (320, 165), 18)
+            pygame.draw.circle(deco, (66, 150, 78), (480, 175), 15)
+            self._apple_bg = pixelate(deco, 3, smooth=False)
 
     def _harvest_burst(self, x, y):
         """수확 성공 순간 — 황금빛 플래시 + 흙·빛 파티클 분출 (클라이맥스 강조)."""
@@ -220,6 +235,9 @@ class Stage4Scene:
                             self.last_click_time = pygame.time.get_ticks() / 1000.0
                             audio.play("pop")
                     elif self.pull_phase == "pulling":
+                        # 사과 위를 눌러야 당겨진다 — 화면 아무 데나 클릭해도 따지던 것 방지
+                        if not carrot_rect.collidepoint(event.pos):
+                            continue
                         now = pygame.time.get_ticks() / 1000.0
                         interval = now - self.last_click_time
                         self.carrot_y = min(self.carrot_target_y + 15.0, self.carrot_y + self.pull_per_click)
@@ -284,11 +302,10 @@ class Stage4Scene:
                 save_system.record_crop_clear(game_state.crop)
                 from core import achievements
                 achievements.on_harvest(game_state.crop, perfects, self.attempts)
-                game_state.transition_text = (
-                    "수확 완료!\n\n"
-                    f"완벽한 수확: {perfects}회\n"
-                    f"생명의 무게를 온전히 느꼈습니다. 이해도 +{bonus}"
-                )
+                # f-string 조립 금지(프로젝트 i18n 규칙) — 통짜 템플릿을 tf 로
+                game_state.transition_text = i18n.tf(
+                    "수확 완료!\n\n완벽한 수확: {perfects}회\n생명의 무게를 온전히 느꼈습니다. 이해도 +{bonus}",
+                    perfects=perfects, bonus=bonus)
                 game_state.transition_next = "ending"
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -306,10 +323,17 @@ class Stage4Scene:
         if self.pull_phase == "pulling":
             if self.is_rice:
                 if self.rice_phase == "thresh":
-                    if self.dragging:
+                    # 탈곡 완료 체크는 드래그 여부와 무관 — 100% 도달 프레임에 손을 놓으면
+                    # 전환이 누락돼 한 번 더 잡아야 했다
+                    if self.thresh_progress >= 100.0:
+                        self.rice_phase = "hull"
+                        self.dragging = False
+                        self.tension = 0.0
+                        audio.play("success")
+                    elif self.dragging:
                         # 흔드는 동안 tension은 서서히 감소
                         self.tension = max(0.0, self.tension - 25.0 * dt)
-                        
+
                         # 부러짐 체크 (너무 강한 흔들림/마우스 속도로 인한 tension 과다)
                         if self.tension >= 100.0:
                             self.pull_phase = "feedback"
@@ -321,12 +345,6 @@ class Stage4Scene:
                             self.attempts += 1
                             game_state.score -= 50
                             self.dragging = False
-                        # 탈곡 완료 체크 -> 도정 단계로 전환
-                        elif self.thresh_progress >= 100.0:
-                            self.rice_phase = "hull"
-                            self.dragging = False
-                            self.tension = 0.0
-                            audio.play("success")
                     else:
                         # 손을 놓으면 다시 잡을 수 있도록 '준비' 상태로 복귀한다 (탈곡 진행도는 유지).
                         # 이 복귀가 없어서, 벼를 끝까지 못 털고 손을 떼면 다시 못 잡아 나머지 수확이 막혔다.
@@ -467,8 +485,9 @@ class Stage4Scene:
                     if self.carrot_y > self.carrot_start_y:
                         self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
                 else:
-                    if self.carrot_y < self.carrot_start_y:
-                        self.carrot_y += (self.carrot_start_y - self.carrot_y) * 9.0 * dt
+                    # 당근: '풀린 정도(carrot_loosen)'는 유지되므로 높이도 그에 맞춰 유지한다.
+                    # 원위치로 눕히면 다시 잡는 순간 loosen 높이로 100px씩 스냅 점프했었다.
+                    self.carrot_y = self.carrot_start_y - (self.carrot_start_y - self.carrot_target_y) * min(1.0, self.carrot_loosen / 100.0)
                 self.tension = max(0.0, self.tension - 120.0 * dt)
 
         elif self.pull_phase == "feedback":
@@ -511,20 +530,13 @@ class Stage4Scene:
             sx = random.randint(-4, 4)
 
         if self.is_apple:
-            # 1. 배경 데코 (사과나무 가지와 매달린 사과)
-            bg_apples = [(110, 180), (220, 200), (580, 210), (690, 180)]
-            for bx, by in bg_apples:
-                pygame.draw.line(screen, (80, 50, 30), (bx - 30, by - 20), (bx + 30, by - 12), 4)
-                pygame.draw.line(screen, (96, 62, 36), (bx, by - 16), (bx, by), 2)
-                pygame.draw.circle(screen, (160, 30, 30), (bx, by), 12)
-                pygame.draw.circle(screen, (86, 168, 84), (bx + 4, by - 14), 5)
-            
-            # 2. 가운데 사과나무 가지와 꼭지 줄기
+            # 1. 배경 데코 (사과나무 가지와 매달린 사과) — __init__에서 도트화 프리렌더
+            screen.blit(self._apple_bg, (0, 0))
+
+            # 2. 가운데 사과나무 가지와 꼭지 줄기 (동적 — 직선이라 도트화 불필요)
             mcx = self.center_x + sx
             pygame.draw.line(screen, (96, 62, 36), (mcx, 172), (mcx, int(self.carrot_y) - 16), 3)
             pygame.draw.line(screen, (90, 60, 40), (260, 160), (540, 180), 8)
-            pygame.draw.circle(screen, (46, 112, 60), (320, 165), 18)
-            pygame.draw.circle(screen, (66, 150, 78), (480, 175), 15)
         else:
             # 1. 배경 밭 — 줄지어 심긴 모습 (작물별 잎사귀 색조/형태 다양화)
             for i, crop in enumerate(self.bg_crops):
@@ -580,9 +592,8 @@ class Stage4Scene:
         # 수확 성공 플래시 — 짧은 황금빛 섬광 (연출 강조, 알파는 SRCALPHA 서피스 경유)
         if self.flash_timer > 0:
             fa = int(140 * (self.flash_timer / 0.45))
-            fl = pygame.Surface((800, 600), pygame.SRCALPHA)
-            fl.fill((255, 236, 170, fa))
-            screen.blit(fl, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (255, 236, 170, fa))   # 캔버스 전체 섬광
 
         # 3. 작물별 수확물 그리기 (당근=스프라이트, 그 외=고유 도형)
         broken = self.pull_phase == "feedback" and "상했다" in self.feedback_text
@@ -692,9 +703,8 @@ class Stage4Scene:
                         pygame.draw.circle(screen, gold_light, pt, 3)
             elif self.rice_phase == "hull":
                 # 어두운 도정 오버레이
-                veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-                veil.fill((0, 0, 0, 150))
-                screen.blit(veil, (0, 0))
+                from core.ui import draw_full_veil
+                draw_full_veil(screen, (0, 0, 0, 150))   # 캔버스 전체(여백 포함)
                 
                 # 가운데 큰 백미 낟알
                 pygame.draw.ellipse(screen, (250, 250, 245), (320, 230, 160, 100))
@@ -783,9 +793,8 @@ class Stage4Scene:
 
         if self.phase == "intro":
             # 인트로 오버레이
-            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 170))
-            screen.blit(overlay, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (0, 0, 0, 170))   # 캔버스 전체(여백 포함)
             font_t = get_font(26)
             t1 = font_t.render("[수확의 시간]", True, (255, 220, 130))
             screen.blit(t1, (400 - t1.get_width() // 2, 200))

@@ -468,13 +468,80 @@ def _bgm_event():
     return _mix(pad * 0.5, pulse * 0.5, arp * 0.3)
 
 
+def _bgm_gallery():
+    """추억 저장소 — 오르골 느낌. 높은 음역의 성근 멜로디가 아련하게 반짝인다."""
+    pad = _pad_progression([_Am, _F, _C, _G, _F, _Em, _Am, _Am], 3.8)
+    # 오르골 보이스: 배음을 줄이고 어택을 짧게 — 금속 빗살을 튕기는 소리에 가깝게
+    def _box(seq, base):
+        pos = 0
+        total = int(SAMPLE_RATE * sum(b for _, b in seq) * base) + SAMPLE_RATE
+        out = np.zeros(total)
+        for f, beats in seq:
+            d = beats * base
+            if f > 0:
+                note = _tone(f, d * 1.6, harmonics=(1.0, 0.12, 0.05)) * _adsr(d * 1.6, a=0.004, d=0.3, s=0.18, r=0.5)
+                out[pos:pos + len(note)] += note * 0.55
+            pos += int(SAMPLE_RATE * d)
+        return out[:pos]
+    mel = _box([
+        (659.25, 1), (587.33, 1), (523.25, 2), (440.0, 2), (523.25, 1), (587.33, 1), (659.25, 2), (0, 2),
+        (698.46, 1), (659.25, 1), (587.33, 2), (523.25, 2), (440.0, 1), (493.88, 1), (523.25, 2), (0, 2),
+        (659.25, 1), (587.33, 1), (523.25, 2), (587.33, 2), (659.25, 1), (783.99, 1), (659.25, 2), (0, 2),
+        (587.33, 1), (523.25, 1), (440.0, 2), (392.0, 2), (440.0, 4), (0, 2),
+    ], 0.62)
+    return _mix(pad * 0.42, mel * 0.6)
+
+
+def _bgm_epilogue():
+    """에필로그 '아버지의 새벽' — 어둑한 시작에서 서서히 밝아지는 새벽빛 장조."""
+    C  = [130.81, 164.81, 196.00]
+    F  = [174.61, 220.00, 261.63]
+    G  = [196.00, 246.94, 293.66]
+    Am = [110.00, 164.81, 220.00]
+    Em = [164.81, 196.00, 246.94]
+    pad = _pad_progression([Am, F, C, G, Am, F, G, C], 4.2)
+    mel = _melody([
+        (0, 2), (261.63, 2), (293.66, 1), (329.63, 1), (392.0, 2),
+        (349.23, 2), (329.63, 1), (293.66, 1), (261.63, 2), (0, 2),
+        (329.63, 2), (392.0, 1), (440.0, 1), (523.25, 2),
+        (440.0, 2), (392.0, 1), (349.23, 1), (392.0, 4),
+    ], 0.68)
+    return _mix(pad * 0.55, mel * 0.5)
+
+
+def _bgm_stage():
+    """수확·밭일 스테이지 — 가볍게 통통 튀는 일손 리듬 (본편 farm보다 빠르고 경쾌하게)."""
+    pad = _pad_progression([_C, _F, _G, _C, _Am, _F, _G, _C], 2.4)
+    mel = _melody([
+        (523.25, 1), (587.33, 1), (659.25, 1), (523.25, 1), (587.33, 2), (440.0, 2),
+        (523.25, 1), (659.25, 1), (698.46, 1), (659.25, 1), (587.33, 2), (523.25, 2),
+        (440.0, 1), (523.25, 1), (587.33, 1), (659.25, 1), (783.99, 2), (659.25, 2),
+        (587.33, 1), (523.25, 1), (440.0, 1), (392.0, 1), (523.25, 2), (0, 2),
+    ], 0.32)
+    # 가벼운 4분음 베이스 펄스 — 일하는 손놀림의 박자감
+    pulse = np.zeros(len(pad))
+    one = _tone(130.81, 0.16, harmonics=(1.0, 0.4)) * _adsr(0.16, a=0.003, d=0.05, s=0.25, r=0.06)
+    b = 0
+    while True:
+        s = int(b * 0.64 * SAMPLE_RATE)
+        if s >= len(pulse):
+            break
+        seg = one[:len(pulse) - s]
+        pulse[s:s + len(seg)] += seg
+        b += 1
+    return _mix(pad * 0.42, mel * 0.6, pulse * 0.35)
+
+
 _BGM_BUILDERS = {
     "farm": _bgm_farm,
     "night": _bgm_night,
-    "event": _bgm_event,              # 돌발상황(밭 정리·선택형 이벤트)
+    "event": _bgm_event,              # 돌발상황(선택형 이벤트)·악몽
     "ending": _bgm_ending,            # 중립(솜씨·노멀)
     "ending_warm": _bgm_ending_warm,  # 따뜻함(진·해피·성장)
     "ending_sad": _bgm_ending_sad,    # 슬픔(조급·배드·시듦)
+    "gallery": _bgm_gallery,          # 추억 저장소 — 오르골
+    "epilogue": _bgm_epilogue,        # 아버지의 새벽 — 여명
+    "stage": _bgm_stage,              # 수확·밭일 스테이지 — 경쾌한 일손
 }
 
 
@@ -550,12 +617,24 @@ def init():
         # 안드로이드는 오디오 지연/언더런이 잦아 버퍼를 조금 키운다(512→1024).
         from core.platform import IS_ANDROID
         buffer = 1024 if IS_ANDROID else 512
+        # pygame.init()이 이미 믹서를 열어 두면 pre_init이 무시된다 → 닫고 원하는 설정으로 다시 연다
+        if pygame.mixer.get_init():
+            pygame.mixer.quit()
         pygame.mixer.pre_init(SAMPLE_RATE, -16, 2, buffer)
         pygame.mixer.init()
         pygame.mixer.set_num_channels(16)
+        pygame.mixer.set_reserved(1)   # 채널 0(BGM)을 find_channel 강제 회수 대상에서 제외
         _bgm_channel = pygame.mixer.Channel(0)
         _build_instant_only()
         _enabled = True
+        # 저장된 음량·음소거 상태 복원 (설정 파일이 없으면 기본값 유지)
+        try:
+            from core import save_system
+            set_bgm_volume(save_system.get_setting("bgm_volume"))
+            set_sfx_volume(save_system.get_setting("sfx_volume"))
+            set_muted(bool(save_system.get_setting("muted")))
+        except Exception:
+            pass
     except Exception as e:
         print("오디오 비활성화 (장치 없음 또는 초기화 실패):", e)
         _enabled = False
@@ -595,8 +674,11 @@ def play_bgm(name, fade_ms=600):
     if snd is None or _bgm_channel is None:
         return
     try:
-        snd.set_volume(0.0 if _muted else _bgm_volume)
+        # 볼륨은 '채널' 한 축으로만 제어한다. Sound.set_volume까지 쓰면 두 값이 곱해져
+        # (예: 음소거 해제 후 0.3×0.3=0.09) 소리가 제곱으로 줄어드는 버그가 된다.
+        snd.set_volume(1.0)
         _bgm_channel.play(snd, loops=-1, fade_ms=fade_ms)
+        _bgm_channel.set_volume(0.0 if _muted else _bgm_volume)
         _current_bgm = name
     except Exception:
         pass
@@ -614,7 +696,7 @@ def stop_bgm(fade_ms=400):
 
 
 def toggle_mute():
-    """음소거 토글. 현재 음소거 상태를 반환."""
+    """음소거 토글. 현재 음소거 상태를 반환 (재시작 후에도 유지되게 저장)."""
     global _muted
     _muted = not _muted
     if _bgm_channel is not None:
@@ -622,6 +704,11 @@ def toggle_mute():
             _bgm_channel.set_volume(0.0 if _muted else _bgm_volume)
         except Exception:
             pass
+    try:
+        from core import save_system
+        save_system.set_setting("muted", _muted)
+    except Exception:
+        pass
     return _muted
 
 

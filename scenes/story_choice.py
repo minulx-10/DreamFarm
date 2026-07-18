@@ -33,20 +33,17 @@ class StoryChoiceScene:
         self.qte_theme = None
 
         data = game_state.choice_data or {}
-        
-        from core.crops import swap_crop_word, current_crop
-        crop_word = current_crop().get("food", "당근")
-        
-        self.title = swap_crop_word(data.get("title", ""), crop_word)
-        self.canon_title = data.get("title", "")   # 기록용 정본 제목(작물 치환 전) — 갤러리·비반복 매칭
-        self.text = swap_crop_word(data.get("text", ""), crop_word)
-        
-        raw_a_label, a_effects = data.get("choice_a", ("", {}))
-        raw_b_label, b_effects = data.get("choice_b", ("", {}))
-        
-        self.choice_a = (swap_crop_word(raw_a_label, crop_word), self._cropify_effects(a_effects, crop_word))
-        self.choice_b = (swap_crop_word(raw_b_label, crop_word), self._cropify_effects(b_effects, crop_word))
-        
+
+        # 원문(정본 KO)을 그대로 들고, 표시할 때 i18n.tnar로 작물 치환+번역한다.
+        # 예전처럼 여기서 swap_crop_word를 먼저 돌리면 EN 카탈로그 키와 안 맞아
+        # 당근 외 작물 회차에서 영어가 통째로 미번역으로 남는다.
+        self.canon_title = data.get("title", "")   # 기록용 정본 제목 — 갤러리·비반복 매칭
+        self.title = i18n.tnar(self.canon_title, crop_key=game_state.crop)
+        self.text = data.get("text", "")
+
+        self.choice_a = data.get("choice_a", ("", {}))
+        self.choice_b = data.get("choice_b", ("", {}))
+
         self.text_to_print = self._prepare(self.text)
         self.typewriter.set_text(self.text_to_print)
 
@@ -55,28 +52,10 @@ class StoryChoiceScene:
         self.hover_a = False
         self.hover_b = False
 
-    def _cropify_effects(self, effects, crop_word):
-        from core.crops import swap_crop_word
-        new_effects = {}
-        for k, v in effects.items():
-            if k in ["result_text", "impact_text"]:
-                new_effects[k] = swap_crop_word(v, crop_word)
-            elif k == "task":
-                new_task = {}
-                for tk, tv in v.items():
-                    if tk in ["prompt", "fail_text"]:
-                        new_task[tk] = swap_crop_word(tv, crop_word)
-                    else:
-                        new_task[tk] = tv
-                new_effects[k] = new_task
-            else:
-                new_effects[k] = v
-        return new_effects
-
     def _prepare(self, text):
         # 카탈로그 키가 '전체 본문'(줄바꿈 포함)이라 줄 단위로 넘기면 번역이 안 맞는다.
-        # → 먼저 통째로 번역한 뒤 줄바꿈으로 나눠 폭에 맞춰 다시 감싼다.
-        text = i18n.t(text)
+        # → 먼저 통째로 번역(+작물 치환)한 뒤 줄바꿈으로 나눠 폭에 맞춰 다시 감싼다.
+        text = i18n.tnar(text, crop_key=game_state.crop)
         lines = []
         for p in text.split("\n"):
             if not p:
@@ -89,7 +68,10 @@ class StoryChoiceScene:
         self.qte_active = True
         self.qte_task = task_data
         self.qte_kind = task_data.get("kind", "tap")
-        self.qte_timer = task_data.get("time_limit", 30.0)
+        # 데이터는 'time' 키(8~9초)로 제한시간을 지정한다 — 'time_limit'만 읽으면 전부 30초가 돼
+        # 긴장감이 사라진다
+        self.qte_total = task_data.get("time_limit", task_data.get("time", 30.0))
+        self.qte_timer = self.qte_total
         self.qte_choice = choice
         self.qte_progress = 0.0          # hold/rub 진행도 (0~1, 현재 표적 기준)
         self.qte_targets = []
@@ -140,7 +122,8 @@ class StoryChoiceScene:
 
     def _apply(self, choice):
         label, effects = choice
-        
+        replay = getattr(game_state, "event_replay", False)   # 갤러리 감상 — 실제 진행에 영향 X
+
         # 만약 'task'가 설정되어 있다면 바로 적용하지 않고 QTE 실행
         if "task" in effects:
             audio.play("water")
@@ -148,21 +131,23 @@ class StoryChoiceScene:
             return
 
         # #11 Track empathy if this is the compassionate choice (choice_b)
-        if choice == self.choice_b:
-            game_state.empathy_choices += 1
+        if not replay:
+            if choice == self.choice_b:
+                game_state.empathy_choices += 1
 
-        # Record story in meta save data
-        from core import save_system
-        save_system.record_story(self.canon_title)
+            # Record story in meta save data
+            from core import save_system
+            save_system.record_story(self.canon_title)
 
         for key, val in effects.items():
             if key == "understanding":
-                game_state.understanding += val
+                if not replay:
+                    game_state.understanding += val
             elif key == "result_text":
                 self.result_text = val
-            elif key == "impact_text":
+            elif key == "impact_text" and not replay:
                 game_state.choice_impacts.append({
-                    "title": self.title,
+                    "title": self.canon_title,    # 정본 KO로 저장 — 표시할 때 tnar로 치환·번역
                     "choice": label,
                     "impact": val,
                 })
@@ -172,43 +157,48 @@ class StoryChoiceScene:
     def _resolve_qte(self, success):
         self.qte_active = False
         label, effects = self.qte_choice
-        
-        # #11 Track empathy if this is the compassionate choice (choice_b)
-        if self.qte_choice == self.choice_b:
-            game_state.empathy_choices += 1
+        replay = getattr(game_state, "event_replay", False)   # 갤러리 감상 — 실제 진행에 영향 X
 
-        # Record story in meta save data
-        from core import save_system
-        save_system.record_story(self.canon_title)
+        if not replay:
+            # #11 Track empathy if this is the compassionate choice (choice_b)
+            if self.qte_choice == self.choice_b:
+                game_state.empathy_choices += 1
+
+            # Record story in meta save data
+            from core import save_system
+            save_system.record_story(self.canon_title)
 
         if success:
             audio.play("success")
             for key, val in effects.items():
                 if key == "understanding":
-                    game_state.understanding += val
+                    if not replay:
+                        game_state.understanding += val
                 elif key == "result_text":
                     self.result_text = val
-                elif key == "impact_text":
+                elif key == "impact_text" and not replay:
                     game_state.choice_impacts.append({
-                        "title": self.title,
+                        "title": self.canon_title,
                         "choice": label,
                         "impact": val,
                     })
         else:
             audio.play("break")
             fail_text = self.qte_task.get("fail_text", "작업이 원활히 끝나지 못했습니다.")
-            self.result_text = i18n.tf("실패: {text}", text=i18n.t(fail_text))
-            
-            # 실패 시 이해도 획득 절반 차감
-            und = effects.get("understanding", 6) // 2
-            game_state.understanding += und
-            
-            game_state.choice_impacts.append({
-                "title": self.title,
-                "choice": label,
-                "impact": effects.get("impact_text", "") + f" ({fail_text})",
-            })
-            
+            self.result_text = i18n.tf("실패: {text}", text=i18n.tnar(fail_text, crop_key=game_state.crop))
+
+            if not replay:
+                # 실패 시 이해도 획득 절반 차감
+                und = effects.get("understanding", 6) // 2
+                game_state.understanding += und
+
+                game_state.choice_impacts.append({
+                    "title": self.canon_title,
+                    "choice": label,
+                    "impact": effects.get("impact_text", ""),
+                    "fail": fail_text,     # 정본 KO — 엔딩 크레딧이 표시 시점에 붙여 번역
+                })
+
         self.choice_made = True
         self.result_timer = 4.0
 
@@ -239,12 +229,12 @@ class StoryChoiceScene:
                             if self.qte_progress >= 1.0:
                                 tgt["done"] = True
                                 self.qte_progress = 0.0
-                                audio.play("rub")
-                    # rub은 떼어도 유지되지만, 시간이 지나면 서서히 복구됨
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                         pass
+                                audio.play("weed_pull")   # 'rub' 효과음은 정의돼 있지 않아 무음이었다
+                # QTE 중에는 여기서 끝 — 아래로 흘리면 화면에 없는 A/B 버튼이
+                # 여전히 클릭돼 선택이 이중 적용되고 QTE가 리셋된다
+                continue
 
-            if not self.qte_active and event.type == pygame.MOUSEMOTION and self.typewriter.finished and not self.choice_made:
+            if event.type == pygame.MOUSEMOTION and self.typewriter.finished and not self.choice_made:
                 self.hover_a = self.btn_a.collidepoint(event.pos)
                 self.hover_b = self.btn_b.collidepoint(event.pos)
  
@@ -306,8 +296,9 @@ class StoryChoiceScene:
         self.typewriter.update(dt, getattr(game_state, "fast_forward", False))
 
     def _draw_qte(self, screen):
-        # 상단 프롬프트
-        prompt_surf = self.font.render(self.qte_task["prompt"], True, (170, 60, 40))
+        # 상단 프롬프트 — 원문(KO 정본)을 표시 시점에 작물 치환+번역
+        prompt_surf = self.font.render(
+            i18n.tnar(self.qte_task.get("prompt", ""), crop_key=game_state.crop), True, (170, 60, 40))
         screen.blit(prompt_surf, (400 - prompt_surf.get_width() // 2, 138))
 
         remain = sum(1 for t in self.qte_targets if not t["done"])
@@ -315,7 +306,7 @@ class StoryChoiceScene:
         screen.blit(remain_surf, (400 - remain_surf.get_width() // 2, 170))
 
         # 타이머 바
-        total = self.qte_task.get("time_limit", 30.0)
+        total = getattr(self, "qte_total", 30.0)
         timer_w = int(500 * max(0.0, self.qte_timer / total))
         pixel_rect(screen, (80, 70, 60), (150, 470, 500, 16), chamfer=CHAMFER_SM)
         bar_col = (220, 60, 60) if self.qte_timer < total * 0.35 else (90, 160, 110)
@@ -668,11 +659,12 @@ class StoryChoiceScene:
             y += 28
 
         if self.choice_made:
-            r_surf = self.font.render(self.result_text, True, (140, 90, 20))
+            r_surf = self.font.render(i18n.tnar(self.result_text, crop_key=game_state.crop),
+                                      True, (140, 90, 20))
             screen.blit(r_surf, (400 - r_surf.get_width() // 2, 410))
         elif self.typewriter.finished:
-            # 라벨을 개별 번역한 뒤 접두어를 붙인다("A. "+원문 통짜론 카탈로그와 안 맞음)
-            self._draw_btn(screen, self.btn_a, "A. " + i18n.t(self.choice_a[0]), self.hover_a)
-            self._draw_btn(screen, self.btn_b, "B. " + i18n.t(self.choice_b[0]), self.hover_b)
+            # 라벨을 개별 번역(+작물 치환)한 뒤 접두어를 붙인다("A. "+원문 통짜론 카탈로그와 안 맞음)
+            self._draw_btn(screen, self.btn_a, "A. " + i18n.tnar(self.choice_a[0], crop_key=game_state.crop), self.hover_a)
+            self._draw_btn(screen, self.btn_b, "B. " + i18n.tnar(self.choice_b[0], crop_key=game_state.crop), self.hover_b)
             prompt = self.font_small.render("선택하세요", True, TEXT_MUTED)
             screen.blit(prompt, (400 - prompt.get_width() // 2, 480))

@@ -104,9 +104,8 @@ class DevOverlay:
     def draw(self, screen):
         if not self.open:
             return
-        veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-        veil.fill((0, 0, 0, 150))
-        screen.blit(veil, (0, 0))
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (0, 0, 0, 150))   # 캔버스 전체(여백 포함)
         draw_panel(screen, self.panel, fill=(34, 40, 46), border=(120, 200, 150), radius=10)
         title = get_font(20).render("개발자 모드  (F9로 닫기)", True, (150, 230, 170))
         screen.blit(title, (self.panel.centerx - title.get_width() // 2, self.panel.y + 14))

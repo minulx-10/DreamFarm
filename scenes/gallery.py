@@ -44,6 +44,7 @@ class GalleryScene:
         # 선택되어 모달 팝업으로 상세 읽는 스토리/기억 데이터
         self.reading_title = None
         self.reading_text = None
+        self.reading_kind = None     # story | memory | item | run — '다시 하기' 버튼은 story에서만
         self.modal_rect = pygame.Rect(120, 120, 560, 380)
         self.modal_close_btn = pygame.Rect(452, 440, 128, 36)
         self.modal_replay_btn = pygame.Rect(220, 440, 128, 36)   # 이벤트 다시 하기
@@ -59,6 +60,8 @@ class GalleryScene:
         self.ach_scroll = 0
         self.runs_scroll = 0
         self.reading_scroll = 0
+        self.story_item_rects = []       # (rect, 제목, 본문) — draw가 매 프레임 채움
+        self.memory_item_rects = []
         self.reading_journal = None      # 창고 '지난 회차' 열람 — 일지 원문 리스트(표시 시점 번역)
         self.storehouse_item_rects = []
         self.run_item_rects = []
@@ -84,10 +87,9 @@ class GalleryScene:
         for tid, label in tabs:
             self.tab_rects.append((pygame.Rect(x, 105, w, 34), tid, label))
             x += w + gap
-
-        # 리스트 아이템 마우스 오버용 위치 매핑 리스트
-        self.story_item_rects = []
-        self.memory_item_rects = []
+        # 주의: story/memory_item_rects는 여기서 비우면 안 된다 — handle_events 초입에서
+        # 이 함수를 부르는데, 클릭 판정이 그 리스트를 쓰므로 비우면 목록 클릭이 죽는다.
+        # (draw 쪽에서 매 프레임 새로 채운다.)
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -95,7 +97,8 @@ class GalleryScene:
         # 모달 팝업이 띄워져 있는가
         if self.reading_title:
             self.hovered_modal_close = self.modal_close_btn.collidepoint(mouse_pos)
-            replay_ev = self._find_replay_event(self.reading_title)
+            replay_ev = (self._find_replay_event(self.reading_title)
+                         if getattr(self, "reading_kind", None) == "story" else None)
             for event in events:
                 if event.type == pygame.MOUSEWHEEL:
                     self.reading_scroll = max(0, self.reading_scroll - event.y * 40)
@@ -132,7 +135,9 @@ class GalleryScene:
                     elif self.memories_area.collidepoint(mouse_pos):
                         self.memories_scroll = max(0, self.memories_scroll - event.y * 40)
                 elif self.active_tab == "storehouse":
-                    self.runs_scroll = max(0, self.runs_scroll - event.y * 30)
+                    # 마우스가 '지난 회차' 목록 위에 있을 때만 그 목록을 스크롤
+                    if pygame.Rect(90, 396, 380, 138).collidepoint(mouse_pos):
+                        self.runs_scroll = max(0, self.runs_scroll - event.y * 30)
                 elif self.active_tab == "achievements":
                     self.ach_scroll = max(0, self.ach_scroll - event.y * 40)
                 continue
@@ -182,6 +187,7 @@ class GalleryScene:
                             audio.play("click")
                             self.reading_title = title
                             self.reading_text = text
+                            self.reading_kind = "story"
                             self.reading_scroll = 0
                             return
                     # 기억목록 클릭
@@ -190,6 +196,7 @@ class GalleryScene:
                             audio.play("click")
                             self.reading_title = title
                             self.reading_text = text
+                            self.reading_kind = "memory"
                             self.reading_scroll = 0
                             return
                 elif self.active_tab == "storehouse":
@@ -200,6 +207,7 @@ class GalleryScene:
                                 audio.play("click")
                                 self.reading_title = item["name"]
                                 self.reading_text = item["story"]
+                                self.reading_kind = "item"
                                 self.reading_scroll = 0
                             else:
                                 audio.play("break")
@@ -210,6 +218,7 @@ class GalleryScene:
                             audio.play("page")
                             self.reading_title = i18n.tf("{n}회차의 일지", n=run.get("n", 0))
                             self.reading_text = ""
+                            self.reading_kind = "run"
                             self.reading_journal = list(run.get("journal", []))
                             self.reading_scroll = 0
                             return
@@ -218,6 +227,7 @@ class GalleryScene:
         self.reading_title = None
         self.reading_text = None
         self.reading_journal = None
+        self.reading_kind = None
         self.reading_scroll = 0
 
     def update(self, dt):
@@ -271,8 +281,13 @@ class GalleryScene:
             "bad": {"title": "배드엔딩: 아직은 쓰기만 한 맛", "desc": "당근을 바라보았으나 차마 입에 넣지는 못합니다. 그래도 전처럼 무작정 밀치진 않는 작은 변화가 일어납니다."},
             "wither": {"title": "시듦엔딩: 끝내 지켜내지 못한 밭", "desc": "밭의 정성과 기다림이 어긋나 작물이 시들어 버렸습니다. 그러나 아버지가 매일 새벽 무엇과 싸워왔는가 배웁니다."}
         }
-        
+
+        # 악몽 엔딩 — 본 사람에게만 하단에 가로 카드로 나타난다 (못 본 사람에게는 존재 자체를 숨김)
+        self._draw_nightmare_ending_card(screen)
+
         for key, rect in self.ending_slots.items():
+            if key == "nightmare":   # 악몽 카드는 위에서 별도 가로 카드로 그림
+                continue
             is_wilt = (key == "wither")
             unlocked = (key in self.endings_seen) or (is_wilt and "wither" in self.endings_seen)
             meta = ending_meta[key]
@@ -310,6 +325,25 @@ class GalleryScene:
                 
                 lock_desc = self.font_body.render("아직 해금되지 않은 결말입니다.", True, (130, 125, 115))
                 screen.blit(lock_desc, (rect.x + 18, rect.y + 60))
+
+    def _draw_nightmare_ending_card(self, screen):
+        """다섯 번째 엔딩(악몽) — 해금된 경우에만 2x2 그리드 아래 가로 카드로."""
+        if "nightmare" not in self.endings_seen:
+            self.ending_slots.pop("nightmare", None)
+            self.replay_btns.pop("nightmare", None)
+            return
+        rect = pygame.Rect(90, 508, 620, 52)
+        btn = pygame.Rect(560, 518, 140, 32)
+        self.ending_slots["nightmare"] = rect
+        self.replay_btns["nightmare"] = btn
+        draw_panel(screen, rect, fill=(46, 24, 26), border=(150, 60, 54), shadow=False)
+        title = self.font_card_title.render(i18n.t("악몽의 끝: 비워진 식탁"), True, (232, 120, 104))
+        screen.blit(title, (rect.x + 18, rect.y + 6))
+        desc = i18n.t("붉은 하늘 아래, 마지막 한 조각까지 비워 냈습니다.")
+        desc_surf = self.font_small.render(desc, True, (206, 168, 158))
+        screen.blit(desc_surf, (rect.x + 18, rect.y + 28))
+        hovered = btn.collidepoint(pygame.mouse.get_pos())
+        draw_button(screen, btn, "엔딩 다시보기", self.font_small, hovered=hovered)
 
     def _draw_achievements_tab(self, screen):
         from core import achievements
@@ -356,7 +390,7 @@ class GalleryScene:
                 rk = get_font(11).render(rank, True, achievements.TIER_COLORS.get(ach["tier"], (150, 150, 150)))
                 rank_x = cell.right - rk.get_width() - 10
                 # 제목은 등급 라벨 앞까지만 — 긴 영어 제목이 라벨과 겹치지 않게 폭 맞춰 축소
-                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                title = self._fit_render(ach["title"], rank_x - 12 - (cell.x + 52),
                                          base=15, color=TEXT_DARK, min_size=11)
                 screen.blit(title, (cell.x + 52, cell.y + 7))
                 screen.blit(rk, (rank_x, cell.y + 8))
@@ -364,15 +398,17 @@ class GalleryScene:
                     ds = self.font_small.render(line, True, TEXT_MUTED)
                     screen.blit(ds, (cell.x + 52, cell.y + 27 + j * 14))
             else:
-                pygame.draw.circle(screen, (170, 164, 154), (mcx, mcy), 15)
-                pygame.draw.circle(screen, (140, 134, 124), (mcx, mcy), 15, 2)
+                # 잠긴 메달도 도트 원으로 — 옆의 해금 메달(도트)과 톤 통일
+                from core.pixelfx import pixel_disc
+                pixel_disc(screen, (140, 134, 124), (mcx, mcy), 15, px=2)
+                pixel_disc(screen, (170, 164, 154), (mcx, mcy), 13, px=2)
                 q = self.font_body.render("?", True, (120, 114, 104))
                 screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
                 rank = achievements.TIER_LABELS.get(ach["tier"], "")
                 rk = get_font(11).render(rank, True, (170, 164, 154))
                 rank_x = cell.right - rk.get_width() - 10
                 # 잠겼어도 이름은 보여줘 무엇을 노려야 할지 유추할 수 있게 (설명만 감춘다)
-                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                title = self._fit_render(ach["title"], rank_x - 12 - (cell.x + 52),
                                          base=15, color=(150, 144, 134), min_size=11)
                 screen.blit(title, (cell.x + 52, cell.y + 7))
                 screen.blit(rk, (rank_x, cell.y + 8))
@@ -586,6 +622,10 @@ class GalleryScene:
                 seed = run.get("seed", "평년")
                 if seed != "평년":
                     label += " · " + i18n.t(seed)
+                ch = run.get("challenge")
+                if ch:   # 도전 규칙 회차 표시 — 기록만 하고 안 보여주면 도전한 보람이 없다
+                    CH_SHORT = {"no_journal": "무일지", "drought": "한발", "seven_days": "이레"}
+                    label += " · " + i18n.t(CH_SHORT.get(ch, ch))
                 ls = self._fit_render(label, rect.w - 16, base=13, min_size=11)
                 screen.blit(ls, (rect.x + 8, rect.centery - ls.get_height() // 2))
                 self.run_item_rects.append((rect, run))
@@ -618,10 +658,9 @@ class GalleryScene:
             y += 18
 
     def _draw_modal_popup(self, screen):
-        # 반투명 장막
-        veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-        veil.fill((0, 0, 0, 130))
-        screen.blit(veil, (0, 0))
+        # 반투명 장막 — 캔버스 전체(여백 포함)
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (0, 0, 0, 130))
 
         draw_light_panel(screen, self.modal_rect)
 
@@ -640,7 +679,9 @@ class GalleryScene:
                 paragraphs.extend(_localize_journal_line(raw) for raw in entry.split("\n"))
                 paragraphs.append("")
         else:
-            paragraphs = self.reading_text.split("\n")
+            # 통째로 번역한 뒤 줄을 가른다 — 갈라 놓고 조각별로 번역하면 카탈로그 키와 안 맞아
+            # EN에서 한국어가 그대로 남는다 (창고 '사연'이 그랬다).
+            paragraphs = i18n.t(self.reading_text).split("\n")
 
         view = pygame.Rect(self.modal_rect.x + 40, self.modal_rect.y + 72,
                            self.modal_rect.w - 80, self.modal_rect.h - 130)
@@ -671,8 +712,8 @@ class GalleryScene:
                                                             self.modal_rect.w - 14, view.h),
                                         view, content_h, self.reading_scroll)
 
-        # 다시 하기 버튼 (선택형 이벤트인 경우만) + 닫기 버튼
-        if self._find_replay_event(self.reading_title) is not None:
+        # 다시 하기 버튼 (선택형 이벤트인 경우만 — 창고 물건 이름이 이벤트 제목과 겹쳐도 안 뜨게) + 닫기 버튼
+        if self.reading_kind == "story" and self._find_replay_event(self.reading_title) is not None:
             hov = self.modal_replay_btn.collidepoint(pygame.mouse.get_pos())
             draw_button(screen, self.modal_replay_btn, "다시 하기", self.font_small, hovered=hov)
         draw_button(screen, self.modal_close_btn, "닫기", self.font_small, hovered=self.hovered_modal_close)
@@ -720,7 +761,7 @@ class GalleryScene:
                 rk = get_font(11).render(rank, True, (190, 48, 48))
                 rank_x = cell.right - rk.get_width() - 10
                 # 제목은 등급 라벨 앞까지만 (긴 영어 제목 겹침 방지 — 일반 업적 탭과 동일)
-                title = self._fit_render(ach["title"], rank_x - 6 - (cell.x + 52),
+                title = self._fit_render(ach["title"], rank_x - 12 - (cell.x + 52),
                                          base=15, color=(90, 20, 20), min_size=11)
                 screen.blit(title, (cell.x + 52, cell.y + 7))
                 screen.blit(rk, (rank_x, cell.y + 8))
@@ -735,8 +776,9 @@ class GalleryScene:
                 draw_panel(screen, cell, fill=base, border=edge, radius=8, shadow=False)
                 
                 mcx, mcy = cell.x + 26, cell.centery
-                pygame.draw.circle(screen, (150, 144, 134), (mcx, mcy), 15)
-                pygame.draw.circle(screen, (120, 114, 104), (mcx, mcy), 15, 2)
+                from core.pixelfx import pixel_disc
+                pixel_disc(screen, (120, 114, 104), (mcx, mcy), 15, px=2)
+                pixel_disc(screen, (150, 144, 134), (mcx, mcy), 13, px=2)
                 q = self.font_body.render("?", True, (90, 84, 74))
                 screen.blit(q, (mcx - q.get_width() // 2, mcy - q.get_height() // 2))
                 

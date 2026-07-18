@@ -8,6 +8,7 @@ import pygame
 import math
 
 from core import audio
+from core import i18n
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
 from core.ui import draw_panel, mix_color
 from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM
@@ -50,7 +51,8 @@ class SettingsOverlay:
         self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 388, 140, 36)
         self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 432, 140, 36)
         self._text_speed_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
-        self._close_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 476, self.panel.width - 2 * pad, 32)
+        self._update_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 476, 140, 32)
+        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 476, 140, 32)
 
         self.show_message = ""
         self.message_timer = 0.0
@@ -80,6 +82,7 @@ class SettingsOverlay:
                         and self.button.collidepoint(event.pos)):
                     self.open = True
                     consumed = True
+                    audio.play("click")
                     self.show_message = ""
                     self._confirm_action = None
                 continue
@@ -94,7 +97,7 @@ class SettingsOverlay:
                 #  - 안드로이드: 키보드가 화면을 가려 타이핑이 불편하므로, '예'를 두 번 눌러 확정
                 #    (첫 탭=무장, 둘째 탭=실행). 키보드 없이도 같은 수준의 실수 방지.
                 need_type = (self._confirm_action == "reset_all")
-                type_ok = (self._reset_confirm_text.strip() == "초기화")
+                type_ok = self._reset_typed_ok()
 
                 def _yes():
                     if need_type and not IS_ANDROID and not type_ok:
@@ -141,8 +144,17 @@ class SettingsOverlay:
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 if self._drag == "sfx":
                     audio.play("hover")
+                if self._drag:   # 드래그를 놓는 순간에만 파일로 저장 (프레임마다 쓰지 않게)
+                    save_system.set_setting("bgm_volume", round(audio.get_bgm_volume(), 3))
+                    save_system.set_setting("sfx_volume", round(audio.get_sfx_volume(), 3))
                 self._drag = None
         return consumed
+
+    def _reset_typed_ok(self):
+        """완전 초기화 확인 문구 판정 — 안내가 언어별로 번역되므로 판정도 언어별로 받는다.
+        (EN 안내는 Type 'Reset'인데 판정이 '초기화' 고정이면 영어 사용자는 초기화 자체가 불가능.)"""
+        typed = self._reset_confirm_text.strip().casefold()
+        return typed in ("초기화", i18n.t("초기화").strip().casefold())
 
     def _close_confirm(self):
         """확인 모달을 닫는다 (완전 초기화 입력 상태도 정리)."""
@@ -185,10 +197,15 @@ class SettingsOverlay:
             audio.play("success")
             self.show_message = "모든 기록이 초기화되었습니다."
             self.message_timer = 2.0
-            # 태초로 — 악몽 모드(달 이스터에그 등)와 회차 기록까지 완전 초기화
+            # 태초로 — 악몽 모드(달 이스터에그 등)와 회차 기록까지 완전 초기화.
+            # reset()이 '다시 시작' 용도로 보존하는 필드들(challenge·prev_*)도 여기서는 지운다 —
+            # 남으면 기록이 사라진 새 게임에 도전 규칙이 몰래 적용된다.
             game_state.reset()
             game_state.nightmare = False
             game_state.is_second_run = False
+            game_state.challenge = None
+            game_state.prev_ending = ""
+            game_state.prev_understanding = 0
             game_state.player_name = "지후"
             game_state.current_scene = "title"
             self.open = False
@@ -270,9 +287,16 @@ class SettingsOverlay:
             nxt = order[(order.index(cur) + 1) % len(order)] if cur in order else "normal"
             save_system.set_setting("text_speed", nxt)
             audio.play("click")
+        elif self._update_btn.collidepoint(pos):
+            # 시작 시 새 버전 확인(GitHub 릴리스) 켜고 끄기 — 문서에 '설정으로 끌 수 있다'고
+            # 안내해 놓고 UI가 없었다
+            save_system.set_setting("update_check", not save_system.get_setting("update_check"))
+            audio.play("click")
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
+            audio.play("click")
             self.open = False
         elif not self.panel.collidepoint(pos):
+            audio.play("click")
             self.open = False
 
     def _set_from_mouse(self, mx):
@@ -301,8 +325,10 @@ class SettingsOverlay:
         bg = (60, 74, 74) if not self.open else (96, 120, 110)
         if hovered:
             bg = mix_color(bg, WHITE, 0.2)
-        pixel_rect(screen, bg, b, chamfer=CHAMFER_SM)
-        pixel_rect(screen, (229, 192, 124), b, width=1, chamfer=CHAMFER_SM)
+        # 테두리는 '금색 채움 위에 배경 채움'으로 — width=1 링은 28px 크기에서
+        # 상하변만 남고 좌우변이 끊겨 보였다
+        pixel_rect(screen, (229, 192, 124), b, chamfer=CHAMFER_SM)
+        pixel_rect(screen, bg, b.inflate(-2, -2), chamfer=CHAMFER_SM)
         self._draw_gear_icon(screen, b.centerx, b.centery, bg)
 
     @staticmethod
@@ -317,10 +343,9 @@ class SettingsOverlay:
         screen.blit(scaled, (cx - s // 2, cy - s // 2))
 
     def _draw_panel(self, screen):
-        # 뒤를 살짝 어둡게
-        veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-        veil.fill((0, 0, 0, 110))
-        screen.blit(veil, (0, 0))
+        # 뒤를 살짝 어둡게 — 캔버스 전체(여백 포함)
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (0, 0, 0, 110))
 
         draw_panel(screen, self.panel, radius=12)
 
@@ -382,14 +407,17 @@ class SettingsOverlay:
         show_ver = save_system.get_setting("show_version")
         self._draw_text_button(screen, self._version_btn, f"버전 표시: {'ON' if show_ver else 'OFF'}", active=show_ver)
 
-        # 텍스트 속도 (느림/보통/빠름 순환) — 타자기 서사 연출의 속도
-        from core import i18n
+        # 텍스트 속도 (느림/보통/빠름 순환) — 타자기 서사 연출의 속도.
+        # '보통'은 품질 등급 번역(Fair)과 KO 키가 겹치므로 통짜 라벨 키로 번역한다.
         speed_names = {"slow": "느림", "normal": "보통", "fast": "빠름"}
         cur_speed = save_system.get_setting("text_speed")
-        self._draw_text_button(screen, self._text_speed_btn,
-                               i18n.tf("텍스트 속도: {v}", v=i18n.t(speed_names.get(cur_speed, "보통"))),
+        speed_label = "텍스트 속도: " + speed_names.get(cur_speed, "보통")
+        self._draw_text_button(screen, self._text_speed_btn, i18n.t(speed_label),
                                active=(cur_speed != "normal"))
 
+        upd = save_system.get_setting("update_check")
+        self._draw_text_button(screen, self._update_btn,
+                               "업데이트 확인: ON" if upd else "업데이트 확인: OFF", active=upd)
         self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
         # 알림 메시지 출력
@@ -441,7 +469,7 @@ class SettingsOverlay:
             screen.blit(warn, (modal.centerx - warn.get_width() // 2, modal.y + 50))
         elif self._confirm_action == "reset_all":
             # 데스크톱: 실수 방지 — '초기화'라고 직접 입력해야 '예'가 활성화된다.
-            ok = (self._reset_confirm_text.strip() == "초기화")   # 판정은 확정된 글자만
+            ok = self._reset_typed_ok()   # 판정은 확정된 글자만 (언어별 확인 문구 허용)
             typed = self._reset_confirm_text + self._reset_ime    # 표시는 조합 중 글자까지
             label = get_font(13).render("확인하려면 '초기화' 입력:", True, TEXT_MUTED)
             box_w = 76
@@ -501,8 +529,12 @@ class SettingsOverlay:
         if not disabled and rect.collidepoint(pygame.mouse.get_pos()):
             base = mix_color(base, WHITE, 0.16)
         draw_panel(screen, rect, fill=base, border=edge, radius=8, shadow=not disabled)
-        
-        font = get_font(15)
+
+        # 긴 영어 라벨('Language: English' 등)이 테두리에 닿지 않게 폭에 맞춰 폰트 축소
+        for sz in (15, 14, 13, 12):
+            font = get_font(sz)
+            if font.size(text)[0] <= rect.w - 12:
+                break
         surf = font.render(text, True, text_color)
         screen.blit(surf, (rect.centerx - surf.get_width() // 2,
                            rect.centery - surf.get_height() // 2))

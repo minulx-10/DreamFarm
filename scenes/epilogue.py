@@ -44,6 +44,10 @@ class EpilogueScene:
         self.font_hint = get_font(14)
 
         # 아버지의 당근밭 — 실제 FarmScene을 배경 호스트로 쓴다 (UI는 그리지 않음)
+        # 전역 상태를 빌려 쓰므로 끝날 때 되돌린다 (달 이스터에그 악몽 등 유지)
+        self._prev_crop = game_state.crop
+        self._prev_nightmare = game_state.nightmare
+        self._prev_year_seed = getattr(game_state, "year_seed", "평년")
         game_state.crop = "carrot"
         game_state.nightmare = False
         from scenes.farm import FarmScene
@@ -67,11 +71,18 @@ class EpilogueScene:
         label, text, _inter, _tint = BEATS[self.beat]
         self.phase = "text"
         self.interaction = None
-        # 통째로 번역 후 폭에 맞춰 개행 (HANDOFF 팁#5)
+        # 통째로 번역 후 폭에 맞춰 개행 (HANDOFF 팁#5).
+        # 영어가 길어 패널(높이 172, 힌트 줄 제외 약 120px)을 넘으면 폰트를 줄인다 —
+        # 마지막 비트에서 본문과 'Click to finish' 힌트가 겹치던 문제.
         body = i18n.t(text)
-        lines = []
-        for p in body.split("\n"):
-            lines.extend(wrap_text(p, self.font_body, 660) if p else [""])
+        avail_h = 172 - 20 - 34
+        for sz in (17, 16, 15, 14):
+            self.font_body = get_font(sz)
+            lines = []
+            for p in body.split("\n"):
+                lines.extend(wrap_text(p, self.font_body, 660) if p else [""])
+            if len(lines) * (self.font_body.get_height() + 5) <= avail_h:
+                break
         self.typewriter.set_text("\n".join(lines))
 
     def _start_interaction(self):
@@ -87,11 +98,14 @@ class EpilogueScene:
             audio.play("page")
             self._load_beat()
         else:
-            # 끝 — 기록하고 타이틀로
+            # 끝 — 기록하고 타이틀로 (빌려 쓴 전역 상태 원복)
             save_system.update_meta(epilogue_seen=True)
             from core import achievements
             achievements.unlock("dawn_reply")
             audio.play("epiphany")
+            game_state.crop = self._prev_crop
+            game_state.nightmare = self._prev_nightmare
+            game_state.year_seed = self._prev_year_seed
             game_state.current_scene = "title"
 
     # ------------------------------------------------------------------ 입출력
@@ -112,6 +126,7 @@ class EpilogueScene:
                 self._start_interaction()
             else:
                 self._advance()
+            break   # 한 프레임에 클릭이 2개 몰려도 비트가 통째로 건너뛰지 않게 하나만 처리
 
     def update(self, dt):
         if self.phase == "interact" and self.interaction:
@@ -141,9 +156,8 @@ class EpilogueScene:
                                   sc["dirt"], sc["dirt_dark"])
             r.draw_farm_plot(screen, self.farm)
             if tint:
-                veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-                veil.fill(tint)
-                screen.blit(veil, (0, 0))
+                from core.ui import draw_full_veil
+                draw_full_veil(screen, tint)   # 캔버스 전체(여백 포함)
 
         if self.phase == "interact" and self.interaction:
             self.interaction.draw(screen)
@@ -169,7 +183,7 @@ class EpilogueScene:
 
         if self.typewriter.finished:
             if inter_name and self.interaction is None:
-                hint = "클릭해 밭일을 시작"
+                hint = "클릭하여 밭일을 시작"   # 문체 통일: '클릭하여 ~' (마치기·계속과 동일)
             elif last:
                 hint = "클릭하여 마치기"
             else:

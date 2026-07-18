@@ -32,8 +32,9 @@ class Bug:
         if self.y < 100:
             self.y = 100
             self.dy *= -1
-        elif self.y > 500 - self.size:
-            self.y = 500 - self.size
+        elif self.y > 486 - self.size:
+            # 하단 바(y≈500~)에 가려진 채 돌아다니지 않게 그 위에서 반사
+            self.y = 486 - self.size
             self.dy *= -1
             
         self.rect.topleft = (int(self.x), int(self.y))

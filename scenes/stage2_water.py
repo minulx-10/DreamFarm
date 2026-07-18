@@ -17,7 +17,9 @@ class Stage2Scene:
         game_state.timer = 24.0
         game_state.score = 600
         self.stage_clear = False
+        self.timed_out = False
         self.clear_timer = 2.0
+        self._score_drain = 0.0
 
         # Spawn 5 rounded soil mounds
         self.mounds = []
@@ -53,11 +55,19 @@ class Stage2Scene:
         if self.stage_clear:
             self.clear_timer -= dt
             if self.clear_timer <= 0:
-                bonus = 15
-                game_state.understanding += bonus
-                game_state.transition_text = i18n.tf(
-                    "물 주기 완료!\n\n모든 흙이 충분히 물을 흡수했습니다.\n생명의 근원을 전했습니다. 이해도 +{bonus}",
-                    bonus=bonus)
+                if self.timed_out:
+                    # 시간 초과 — 성공 문구·보상을 그대로 주면 제한시간이 무의미하다
+                    bonus = 6
+                    game_state.understanding += bonus
+                    game_state.transition_text = i18n.tf(
+                        "시간이 다 됐다…\n\n미처 다 적시지 못한 두둑이 남았다.\n그래도 물의 무게는 조금 알 것 같다. 이해도 +{bonus}",
+                        bonus=bonus)
+                else:
+                    bonus = 15
+                    game_state.understanding += bonus
+                    game_state.transition_text = i18n.tf(
+                        "물 주기 완료!\n\n모든 흙이 충분히 물을 흡수했습니다.\n생명의 근원을 전했습니다. 이해도 +{bonus}",
+                        bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
                 game_state.current_scene = "transition"
@@ -66,10 +76,17 @@ class Stage2Scene:
         game_state.timer -= dt
         if game_state.timer <= 0:
             game_state.timer = 0
+            self.timed_out = True
             self.stage_clear = True
+            self.clear_timer = 2.0
+            audio.play("page")
 
-        # Slowly decrease score as time ticks
-        game_state.score = max(100, game_state.score - int(10 * dt))
+        # Slowly decrease score as time ticks — int(10*dt)는 60fps에서 항상 0이라 감점이 죽어 있었다
+        self._score_drain = getattr(self, "_score_drain", 0.0) + 10 * dt
+        drop = int(self._score_drain)
+        if drop:
+            self._score_drain -= drop
+            game_state.score = max(100, game_state.score - drop)
 
         # Smoothly follow mouse
         mx, my = pygame.mouse.get_pos()
@@ -143,19 +160,18 @@ class Stage2Scene:
     def draw(self, screen):
         draw_tiled_background(screen, 800, 600)
 
-        # Draw 5 rounded soil mounds (이랑 / 두둑)
+        # Draw 5 rounded soil mounds (이랑 / 두둑) — 매끈한 대형 타원 대신 도트화(곡선 없음 규칙)
+        from core.pixelfx import pixelate
         for i, mound in enumerate(self.mounds):
             x, y = mound['x'], mound['y']
-            
-            # Outer dark shadow of the soil mound
-            pygame.draw.ellipse(screen, (38, 25, 18), (x - 48, y - 8, 96, 38))
-            
-            # Inner dirt color fades from DIRT_DARK to wet mud color as moisture increases
-            # DIRT_DARK = (92, 60, 43), Wet Mud = (66, 44, 30)
+
             mud_color = (66, 44, 30)
             mound_color = mix_color(DIRT_DARK, mud_color, mound['moisture'] / 100.0)
-            pygame.draw.ellipse(screen, mound_color, (x - 44, y - 11, 88, 32))
-            
+            mound_surf = pygame.Surface((96, 41), pygame.SRCALPHA)
+            pygame.draw.ellipse(mound_surf, (38, 25, 18), (0, 3, 96, 38))
+            pygame.draw.ellipse(mound_surf, mound_color, (4, 0, 88, 32))
+            screen.blit(pixelate(mound_surf, 3, smooth=False), (x - 48, y - 11))
+
             # Draw sprouts on top
             screen.blit(sprites['sprout2'], (x - 20, y - 28))
 
@@ -168,9 +184,9 @@ class Stage2Scene:
                 # Glowing blue/cyan moisture color
                 pixel_rect(screen, (60, 160, 240), (bar_rect.x + 3, bar_rect.y + 3, fill_w, 6), chamfer=CHAMFER_SM)
 
-        # Draw falling water drops particles
+        # Draw falling water drops particles — 3px 사각 도트(곡선 없음 규칙, screen 직접 원 금지)
         for p in self.particles:
-            pygame.draw.circle(screen, (90, 185, 240), (int(p['x']), int(p['y'])), 3)
+            pygame.draw.rect(screen, (90, 185, 240), (int(p['x']) - 1, int(p['y']) - 1, 3, 3))
 
         # Draw watering can (tilts when clicking)
         can_sprite = sprites['watering_can']
@@ -183,7 +199,7 @@ class Stage2Scene:
 
         if self.stage_clear:
             font = get_font(30)
-            clear_text = font.render("물 주기 완료!", True, (200, 100, 0))
+            clear_text = font.render("시간 초과…" if self.timed_out else "물 주기 완료!", True, (200, 100, 0))
             panel_clear = pygame.Rect(400 - 150, 210, 300, 60)
             draw_wood_panel(screen, panel_clear)
             screen.blit(clear_text, (400 - clear_text.get_width()//2, 220))

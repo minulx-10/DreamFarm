@@ -34,7 +34,9 @@ class FatherDayScene:
         self.transition_timer = 0
 
     def _find_threshold(self):
-        for t in sorted(FATHER_DAY_NARRATIONS.keys()):
+        # 방금 넘긴(=가장 높은) 임계값의 서사를 보여준다. 오름차순으로 '처음 만난 seen'을
+        # 돌려주면 두 번째 아버지의 날부터 영영 첫(40) 서사만 반복된다.
+        for t in sorted(FATHER_DAY_NARRATIONS.keys(), reverse=True):
             if t in game_state.father_day_seen:
                 return t
         return list(FATHER_DAY_NARRATIONS.keys())[0]
@@ -134,6 +136,5 @@ class FatherDayScene:
 
         # Fade overlay
         if self.fade_alpha > 0:
-            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, int(min(255, self.fade_alpha))))
-            screen.blit(overlay, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (0, 0, 0, int(min(255, self.fade_alpha))))

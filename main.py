@@ -23,6 +23,14 @@ except Exception as e:
     ]
     if 'ANDROID_PRIVATE' in os.environ:
         paths_to_try.append(os.path.join(os.environ['ANDROID_PRIVATE'], 'crash.txt'))
+    # 데스크톱(윈도우 등) — 안드로이드 경로만 있으면 크래시 로그가 어디에도 안 남는다
+    try:
+        paths_to_try.append(os.path.join(os.path.dirname(os.path.abspath(
+            sys.executable if getattr(sys, "frozen", False) else __file__)), 'crash.txt'))
+    except Exception:
+        pass
+    if os.environ.get('APPDATA'):
+        paths_to_try.append(os.path.join(os.environ['APPDATA'], 'MongjungNongwon', 'crash.txt'))
         
     for path in paths_to_try:
         try:

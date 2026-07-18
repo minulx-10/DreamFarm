@@ -101,6 +101,9 @@ class GameState:
         # 플레이 시간 측정용 변수 (초 단위)
         self.play_time = 0.0
 
+        # 배속 토글 (») — reset()이 __init__ 경유라 여기 두면 새 회차마다 확실히 꺼진다
+        self.fast_forward_toggle = False
+
         # 기르는 작물 (core/crops.py의 키) — 엔딩을 한 번 보면 다른 작물이 열린다
         self.crop = "carrot"
         # 악)몽중농원 모드 (진엔딩 해금)

@@ -126,18 +126,33 @@ _FARM_SET_FIELDS = ["memories_seen", "stories_seen"]
 
 
 def snapshot(farm):
-    """현재 게임 전체 상태를 dict로 뜬다 (farm 씬 포함)."""
+    """현재 게임 전체 상태를 dict로 뜬다 (farm 씬 포함).
+    밭 수치는 farm.sim(FarmSimulator)에 산다 — 삼분할 이후 씬은 컨트롤러일 뿐."""
+    host = getattr(farm, "sim", farm)
     gs = {k: getattr(game_state, k, None) for k in _GS_FIELDS}
     for k in _GS_SET_FIELDS:
         gs[k] = sorted(getattr(game_state, k, set()))
-    fm = {k: getattr(farm, k, None) for k in _FARM_FIELDS}
+    fm = {k: getattr(host, k, None) for k in _FARM_FIELDS}
     for k in _FARM_SET_FIELDS:
-        fm[k] = sorted(getattr(farm, k, set()))
+        fm[k] = sorted(getattr(host, k, set()))
     return {"version": 1, "game_state": gs, "farm": fm}
+
+
+def restore_state(data):
+    """스냅샷의 game_state 부분만 먼저 되살린다.
+    FarmScene/FarmSimulator 생성이 crop·nightmare·challenge·year_seed를 읽으므로,
+    씬을 만들기 '전에' 이걸 불러야 저장 당시 설정 그대로 밭이 구성된다."""
+    gs = data.get("game_state", {})
+    for k in _GS_FIELDS:
+        if k in gs:
+            setattr(game_state, k, gs[k])
+    for k in _GS_SET_FIELDS:
+        setattr(game_state, k, set(gs.get(k, [])))
 
 
 def restore(data, farm):
     """스냅샷을 game_state와 farm 씬에 되살린다."""
+    host = getattr(farm, "sim", farm)
     gs = data.get("game_state", {})
     for k in _GS_FIELDS:
         if k in gs:
@@ -147,9 +162,9 @@ def restore(data, farm):
     fm = data.get("farm", {})
     for k in _FARM_FIELDS:
         if k in fm and fm[k] is not None:
-            setattr(farm, k, fm[k])
+            setattr(host, k, fm[k])
     for k in _FARM_SET_FIELDS:
-        setattr(farm, k, set(fm.get(k, [])))
+        setattr(host, k, set(fm.get(k, [])))
     # 불러온 밭은 온보딩을 다시 보여주지 않는다
     farm.tutorial_active = False
     farm.rebuild_buttons()
@@ -182,6 +197,7 @@ def delete_save():
 def reset_all():
     """세이브 슬롯과 회차 기록(메타)을 모두 삭제 — 태초부터 다시 시작.
     엔딩 해금·작물별 클리어 횟수·업적·이야기/기억 기록이 전부 사라진다."""
+    global _meta_cache
     ok = False
     for path in (SLOT_PATH, META_PATH):
         try:
@@ -190,6 +206,7 @@ def reset_all():
                 ok = True
         except Exception:
             pass
+    _meta_cache = None   # 파일만 지우고 캐시가 남으면 다음 저장 때 기록이 되살아난다
     return ok
 
 
@@ -327,7 +344,8 @@ def epilogue_unlocked():
 # ────────────────────────────── 유저 설정 ──────────────────────────────
 
 _DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko", "update_check": True,
-                     "text_speed": "normal"}   # 타자기 텍스트 속도: slow | normal | fast
+                     "text_speed": "normal",   # 타자기 텍스트 속도: slow | normal | fast
+                     "bgm_volume": 0.30, "sfx_volume": 0.55, "muted": False}
 
 
 def load_settings():

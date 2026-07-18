@@ -51,6 +51,7 @@ class TitleScene:
         self.hovered_start = False
         self.hovered_load = False
         self.hovered_gallery = False
+        self.hovered_epilogue = False
         self.hovered_settings = False
         self.hovered_credits = False
         self.hovered_quit = False
@@ -239,8 +240,9 @@ class TitleScene:
             self._update_rect = rect
             hovered = rect.collidepoint(pygame.mouse.get_pos())
             bg = pygame.Surface(rect.size, pygame.SRCALPHA)
-            pixel_rect(bg, (44, 78, 60, 235) if hovered else (32, 56, 46, 215), bg.get_rect(), chamfer=CHAMFER)
-            pixel_rect(bg, (150, 210, 170, 235), bg.get_rect(), width=1, chamfer=CHAMFER)
+            # 챔퍼 6은 이 높이(26px)에선 과해서 1px 테두리 세로변이 '[ ]'처럼 떨어져 보였다
+            pixel_rect(bg, (44, 78, 60, 235) if hovered else (32, 56, 46, 215), bg.get_rect(), chamfer=CHAMFER_SM)
+            pixel_rect(bg, (150, 210, 170, 235), bg.get_rect(), width=1, chamfer=CHAMFER_SM)
             screen.blit(bg, rect.topleft)
             screen.blit(un, (rect.x + 11, rect.y + 4))
 
@@ -252,10 +254,10 @@ class TitleScene:
         if has_save:
             draw_button(screen, self.load_btn, "이어하기", self.font_button, hovered=self.hovered_load)
         else:
-            # 비활성화된 모양 그리기
-            pixel_rect(screen, (70, 70, 70), self.load_btn, chamfer=CHAMFER)
-            pixel_rect(screen, (100, 100, 100), self.load_btn, width=1, chamfer=CHAMFER)
-            label = self.font_button.render("이어하기", True, (130, 130, 130))
+            # 비활성화된 모양 — 무채색 회색은 웜톤 팔레트에서 겉돌아 따뜻한 저채도 갈색으로
+            pixel_rect(screen, (88, 80, 70), self.load_btn, chamfer=CHAMFER)
+            pixel_rect(screen, (122, 110, 94), self.load_btn, width=1, chamfer=CHAMFER)
+            label = self.font_button.render("이어하기", True, (156, 144, 128))
             screen.blit(label, (self.load_btn.centerx - label.get_width() // 2, self.load_btn.centery - label.get_height() // 2))
             
         if self.show_gallery:
@@ -276,8 +278,12 @@ class TitleScene:
                 "체험판 — 정식판에는 세 가지 작물과 아버지의 새벽이 더 기다립니다", True, (255, 226, 180))
             screen.blit(demo_surf, (400 - demo_surf.get_width() // 2, 548))
 
-        # 6. 저작권 표시 — 연도·제작팀 명시
+        # 6. 저작권 표시 — 연도·제작팀 명시. 어두운 배경 위 저대비 + 지형 라인이 글자를 관통해
+        # 안 읽히던 것 → 밝기 올리고 얇은 그림자를 깔아 분리한다
         cr_font = get_font(13)
-        cr_col = (130, 125, 115) if game_state.nightmare else TEXT_MUTED
-        cr_surf = cr_font.render("© 2026 삼광 (三光). All Rights Reserved.", True, cr_col)
+        cr_col = (168, 158, 146) if game_state.nightmare else (188, 178, 160)
+        cr_text = "© 2026 삼광 (三光). All Rights Reserved."
+        cr_sh = cr_font.render(cr_text, True, (24, 22, 26))
+        cr_surf = cr_font.render(cr_text, True, cr_col)
+        screen.blit(cr_sh, (400 - cr_surf.get_width() // 2 + 1, 575))
         screen.blit(cr_surf, (400 - cr_surf.get_width() // 2, 574))

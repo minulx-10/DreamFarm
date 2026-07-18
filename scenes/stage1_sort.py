@@ -13,8 +13,9 @@ class SortItem:
         self.x = x
         self.y = y
         self.sprite = sprites[item_type]
-        self.size = self.sprite.get_width()
-        self.rect = pygame.Rect(x, y, self.size, self.size)
+        # 판정 상자는 스프라이트 실제 크기로 — 높이에 너비를 쓰면 납작한 스프라이트가
+        # 아래로 10px 넘게 유령 판정을 가진다
+        self.rect = pygame.Rect(x, y, self.sprite.get_width(), self.sprite.get_height())
         self.dragging = False
         
         if item_type == 'seed':
@@ -34,7 +35,8 @@ class SortItem:
             self.is_good = True
         elif item_type == 'weed':
             self.name = "잡초"
-            self.desc = swap_crop_word("당근의 영양분을 빼앗습니다. 치워야 합니다.", current_crop()["food"])
+            # 정본(당근) 유지 — 표시 시점 tnar 번역·치환 (미리 치환하면 EN 미번역)
+            self.desc = "당근의 영양분을 빼앗습니다. 치워야 합니다."
             self.is_good = False
         elif item_type == 'rock':
             self.name = "돌멩이"
@@ -74,8 +76,13 @@ class Stage1Scene:
         self.clear_timer = 2.0
 
     def spawn_item(self, itype):
-        x = random.randint(100, 700 - 40)
-        y = random.randint(100, 350 - 40)
+        # 서로 겹쳐 태어나지 않게 몇 번 자리를 다시 굴린다 (완벽할 필요는 없고 덜 겹치면 됨)
+        x, y = 100, 100
+        for _ in range(24):
+            x = random.randint(100, 700 - 40)
+            y = random.randint(100, 350 - 40)
+            if all((x - it.rect.x) ** 2 + (y - it.rect.y) ** 2 > 44 * 44 for it in self.items):
+                break
         self.items.append(SortItem(itype, x, y))
 
     def draw_seed_bed(self, screen):
@@ -87,13 +94,15 @@ class Stage1Scene:
         self._blit_bin(screen, sprites['trashcan'], self.bin_trash)
 
     def _blit_bin(self, screen, spr, zone):
-        """두 통을 같은 방식·같은 바닥선으로 그려 통일감을 준다."""
+        """두 통을 같은 방식·같은 바닥선으로 그려 통일감을 준다.
+        바닥선 486 — 500이면 하단 바(y≈500~)가 통 아래 14px과 그림자를 가렸다."""
         cx = zone.x + zone.width // 2
         w, h = spr.get_width(), spr.get_height()
         shadow = pygame.Surface((w, 22), pygame.SRCALPHA)
         pygame.draw.ellipse(shadow, (30, 22, 16, 120), (0, 0, w, 22))
-        screen.blit(shadow, (cx - w // 2, 490))
-        screen.blit(spr, (cx - w // 2, 500 - h))
+        from core.pixelfx import pixelate
+        screen.blit(pixelate(shadow, 3, smooth=False), (cx - w // 2, 476))
+        screen.blit(spr, (cx - w // 2, 486 - h))
 
     def handle_events(self, events):
         if self.stage_clear: return
@@ -114,9 +123,9 @@ class Stage1Scene:
                         audio.play("soil")
                         self.hovered_desc = "좋습니다. 씨앗이 제자리를 찾았습니다."
                     else:
-                        game_state.score -= 80
+                        game_state.score = max(0, game_state.score - 80)
                         audio.play("break")
-                        self.hovered_desc = swap_crop_word("이건 밭에 두면 당근이 자라기 어렵습니다.", current_crop()["food"])
+                        self.hovered_desc = "이건 밭에 두면 당근이 자라기 어렵습니다."
                     self.items.remove(self.dragged_item)
                 elif self.bin_trash.collidepoint(event.pos):
                     if not self.dragged_item.is_good:
@@ -124,7 +133,7 @@ class Stage1Scene:
                         audio.play("soil")
                         self.hovered_desc = "잘 치웠습니다. 흙이 한결 깨끗해졌습니다."
                     else:
-                        game_state.score -= 80
+                        game_state.score = max(0, game_state.score - 80)
                         audio.play("break")
                         self.hovered_desc = "씨앗까지 버리면 수확할 것이 없어집니다."
                     self.items.remove(self.dragged_item)
@@ -133,6 +142,8 @@ class Stage1Scene:
                 if self.dragged_item:
                     self.dragged_item.rect.x += event.rel[0]
                     self.dragged_item.rect.y += event.rel[1]
+                    # 상/하단 바 밑으로 끌고 들어가 안 보이는 채 버려지지 않게 화면 안으로 클램프
+                    self.dragged_item.rect.clamp_ip(pygame.Rect(8, 62, 784, 438))
                 else:
                     hovered = False
                     for item in reversed(self.items):
@@ -178,13 +189,17 @@ class Stage1Scene:
         draw_top_bar(screen)
         
         if self.stage_clear:
-            clear_text = font.render("스테이지 완료!", True, (200, 100, 0))
+            done_msg = "스테이지 완료!" if not self.items else "시간 초과…"
+            clear_text = font.render(done_msg, True, (200, 100, 0))
             panel = pygame.Rect(400 - 100, 300 - 30, 200, 60)
             draw_wood_panel(screen, panel)
             screen.blit(clear_text, (400 - clear_text.get_width()//2, 300 - clear_text.get_height()//2))
             draw_bottom_bar(screen, "결과", i18n.tf("얻은 점수: {score}", score=game_state.score))
         else:
+            ck = game_state.crop
             if self.dragged_item:
-                draw_bottom_bar(screen, self.dragged_item.name, "알맞은 위치로 끌어다 놓으세요.")
+                draw_bottom_bar(screen, i18n.tnar(self.dragged_item.name, crop_key=ck),
+                                "알맞은 위치로 끌어다 놓으세요.")
             else:
-                draw_bottom_bar(screen, self.hovered_name, self.hovered_desc)
+                draw_bottom_bar(screen, i18n.tnar(self.hovered_name, crop_key=ck),
+                                i18n.tnar(self.hovered_desc, crop_key=ck))

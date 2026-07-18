@@ -192,16 +192,15 @@ class FarmRenderer:
     def _draw_journal_popup(self, screen, farm_scene):
         """지금까지 쌓인 밭일 일지를 인게임에서 훑어보는 팝업 (표시 시점 번역 — 엔딩과 동일 규칙)."""
         from scenes.ending import _localize_journal_line
-        veil = pygame.Surface((800, 600), pygame.SRCALPHA)
-        veil.fill((10, 12, 18, 170))
-        screen.blit(veil, (0, 0))
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (10, 12, 18, 170))   # 캔버스 전체(여백 포함)
         panel = JOURNAL_PANEL
         draw_light_panel(screen, panel)
         title = get_font(22).render("밭일 일지", True, TEXT_DARK)
         screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 18))
         bar_w = min(title.get_width(), 160)
         pygame.draw.rect(screen, GOLD, (panel.centerx - bar_w // 2, panel.y + 46, bar_w, 3))
-        hint = get_font(13).render("J · ESC · 바깥 클릭으로 닫기  ·  휠로 스크롤", True, TEXT_MUTED)
+        hint = get_font(13).render("J · ESC · 바깥 클릭으로 닫기  ·  휠·방향키로 스크롤", True, TEXT_MUTED)
         screen.blit(hint, (panel.centerx - hint.get_width() // 2, panel.bottom - 28))
 
         entries = list(game_state.journal_entries)
@@ -266,12 +265,14 @@ class FarmRenderer:
             pygame.draw.rect(screen, wing, (x + 1, y - 4, 3, 6))
         pygame.draw.rect(screen, (58, 48, 40), (x - 1, y - 3, 2, 7))
 
-    def draw_compact_meter(self, screen, label, value, x, y, color):
+    def draw_compact_meter(self, screen, label, value, x, y, color, label_w=None):
         font = get_font(14)
         label_surf = font.render(label, True, TEXT_DARK)
         screen.blit(label_surf, (x, y - 1))
         bar_right = x + 134
-        bar_x = x + max(48, label_surf.get_width() + 6)
+        # label_w: 여섯 스탯이 같은 시작점을 쓰도록 호출부가 '가장 긴 라벨 폭'을 넘긴다 —
+        # 라벨 폭대로 시작점을 잡으면 트랙 길이가 제각각이라 수치 비교가 왜곡돼 보인다
+        bar_x = x + max(48, (label_w if label_w else label_surf.get_width()) + 6)
         bar = pygame.Rect(bar_x, y, bar_right - bar_x, 13)
         # 도전 '무일지' — 수치를 감춘다: 빈 트랙에 '?'만
         if getattr(game_state, "challenge", None) == "no_journal":
@@ -294,9 +295,10 @@ class FarmRenderer:
 
         if label == "성장":
             fill_w = int(bar.w * (shown_value / max_value))
-            carrot_x = max(bar.x, bar.x + fill_w - 3)
             crop_key = game_state.crop
             mini_spr = sprites.get(f"mini_{crop_key}", sprites["mini_carrot"])
+            # 20/20(가득)에서 마커가 게이지 프레임 밖으로 삐져나가지 않게 오른쪽 끝에서 클램프
+            carrot_x = max(bar.x, min(bar.right - mini_spr.get_width() + 2, bar.x + fill_w - 3))
             screen.blit(mini_spr, (carrot_x, bar.y + 7 - mini_spr.get_height() // 2))
 
     def draw_field_summary(self, screen, sim):
@@ -320,25 +322,36 @@ class FarmRenderer:
         screen.blit(health_text, (450, 162))
 
         if sim.is_harvest_ready():
-            ready = status_font.render("수확 가능", True, (145, 55, 0))
-            screen.blit(ready, (640, 162))
+            # 오른쪽 정렬 + 폭 초과 시 폰트 축소 — EN 'Harvest Ready'가 패널 밖으로 잘렸었다
+            avail = panel.right - 10 - 640
+            rf = status_font
+            for sz in (16, 14, 13, 12):
+                rf = get_font(sz)
+                if rf.size("수확 가능")[0] <= avail:
+                    break
+            ready = rf.render("수확 가능", True, (145, 55, 0))
+            screen.blit(ready, (panel.right - 10 - ready.get_width(), 162))
 
     def draw_meters(self, screen, sim):
         panel = pygame.Rect(430, 190, 320, 106)
         draw_light_panel(screen, panel)
         c1, c2 = 450, 600
-        self.draw_compact_meter(screen, "수분", sim.moisture, c1, 205, (80, 170, 240))
-        self.draw_compact_meter(screen, "건강", sim.health, c2, 205, (90, 185, 95))
+        # 모든 트랙이 같은 x에서 시작하게, 이번 화면에서 가장 긴 라벨 폭으로 통일한다
+        f14 = get_font(14)
+        meter_labels = ["수분", "건강", "해충", "스트레스", "배수"] + ([] if sim.no_weeds else ["잡초"])
+        lw = max(f14.size(l)[0] for l in meter_labels)
+        self.draw_compact_meter(screen, "수분", sim.moisture, c1, 205, (80, 170, 240), label_w=lw)
+        self.draw_compact_meter(screen, "건강", sim.health, c2, 205, (90, 185, 95), label_w=lw)
         if sim.no_weeds:
             # 잡초 없는 작물(나무): 5칸 — 스트레스를 위로 당겨 그리드 '중간 구멍'을 없앤다
-            self.draw_compact_meter(screen, "해충", sim.pests, c1, 232, (210, 110, 60))
-            self.draw_compact_meter(screen, "스트레스", sim.stress, c2, 232, (210, 95, 95))
-            self.draw_compact_meter(screen, "배수", sim.drainage, c1, 259, (90, 160, 185))
+            self.draw_compact_meter(screen, "해충", sim.pests, c1, 232, (210, 110, 60), label_w=lw)
+            self.draw_compact_meter(screen, "스트레스", sim.stress, c2, 232, (210, 95, 95), label_w=lw)
+            self.draw_compact_meter(screen, "배수", sim.drainage, c1, 259, (90, 160, 185), label_w=lw)
         else:
-            self.draw_compact_meter(screen, "잡초", sim.weeds, c1, 232, (150, 160, 60))
-            self.draw_compact_meter(screen, "해충", sim.pests, c2, 232, (210, 110, 60))
-            self.draw_compact_meter(screen, "배수", sim.drainage, c1, 259, (90, 160, 185))
-            self.draw_compact_meter(screen, "스트레스", sim.stress, c2, 259, (210, 95, 95))
+            self.draw_compact_meter(screen, "잡초", sim.weeds, c1, 232, (150, 160, 60), label_w=lw)
+            self.draw_compact_meter(screen, "해충", sim.pests, c2, 232, (210, 110, 60), label_w=lw)
+            self.draw_compact_meter(screen, "배수", sim.drainage, c1, 259, (90, 160, 185), label_w=lw)
+            self.draw_compact_meter(screen, "스트레스", sim.stress, c2, 259, (210, 95, 95), label_w=lw)
 
     def draw_action_scrollbar(self, screen, farm_scene):
         sim = farm_scene.sim
@@ -347,7 +360,7 @@ class FarmRenderer:
             return
 
         track = pygame.Rect(732, 330, 8, 121)
-        pixel_rect(screen, (198, 166, 118), track, chamfer=CHAMFER_SM)
+        pixel_rect(screen, (206, 188, 158), track, chamfer=CHAMFER_SM)   # 일지 팝업 스크롤바와 색 통일
         thumb_h = max(22, int(track.h * 4 / len(actions)))
         max_scroll = max(1, len(actions) - 4)
         thumb_y = track.y + int((track.h - thumb_h) * farm_scene.action_scroll / max_scroll)
@@ -362,6 +375,8 @@ class FarmRenderer:
         draw_crop_seed(screen, x, y, game_state.crop)
 
     def _draw_plain_soil(self, screen, sim, plot_rect, season_colors):
+        """사과나무 — 맨흙 사각형 대신 '과수원 바닥': 풀포기·낙엽/꽃잎·다져진 밑동·뿌리.
+        당근/감자 밭(field_bed)의 밀도에 맞추되, 나무가 사는 땅으로 변별력을 준다."""
         sc = season_colors
         inner = pygame.Rect(plot_rect.x + 22, plot_rect.y + 28, plot_rect.w - 44, plot_rect.h - 56)
         nm = game_state.nightmare
@@ -369,20 +384,82 @@ class FarmRenderer:
         pixel_rect(screen, (40, 30, 25) if not nm else (28, 8, 8), frame.move(0, 4), chamfer=CHAMFER)
         pixel_rect(screen, (132, 83, 48) if not nm else (96, 32, 30), frame, chamfer=CHAMFER)
         pixel_rect(screen, (185, 125, 80) if not nm else (150, 45, 42), frame, width=3, chamfer=CHAMFER)
-        
+
         if nm:
             soil = (78, 20, 18) if sim.moisture > 72 else (116, 40, 34) if sim.moisture < 28 else (96, 30, 28)
             soil_dark = (48, 12, 12)
+            grass_c, grass_d = (110, 34, 30), (74, 22, 20)
+            litter = [(140, 46, 38), (104, 30, 26)]
         else:
             soil = (96, 62, 42) if sim.moisture > 72 else (120, 82, 54) if sim.moisture < 28 else sc["dirt"]
             soil_dark = sc["dirt_dark"]
+            grass_c, grass_d = sc.get("grass", (96, 148, 88)), sc.get("grass_dark", (66, 110, 64))
+            season = get_season(sim.growth, sim.growth_goal)
+            # 계절 낙하물: 봄=꽃잎, 여름=진초록 잎, 가을=낙엽
+            if season in ("이른 봄", "봄"):
+                litter = [(238, 196, 206), (222, 168, 186)]
+            elif season == "가을":
+                litter = [(206, 128, 54), (170, 96, 44)]
+            else:
+                litter = [(88, 138, 74), (64, 108, 58)]
         pixel_rect(screen, soil_dark, inner.move(0, 3), chamfer=CHAMFER)
         pixel_rect(screen, soil, inner, chamfer=CHAMFER)
-        
-        for i in range(1, 5):
-            ly = inner.y + inner.h * i // 5
-            pygame.draw.line(screen, mix_color(soil, (0, 0, 0), 0.12),
-                             (inner.x + 10, ly), (inner.right - 10, ly), 2)
+
+        # 디테일 레이어 — 통째로 3px 도트화해 큰 픽셀 톤 유지
+        import random as _r
+        rng = _r.Random(23)
+        det = pygame.Surface((inner.w, inner.h), pygame.SRCALPHA)
+        # 흙 얼룩(명암 모틀링)
+        for _ in range(26):
+            mx, my = rng.randint(4, inner.w - 10), rng.randint(4, inner.h - 10)
+            c = mix_color(soil, (0, 0, 0), 0.14) if rng.random() < 0.6 else mix_color(soil, (255, 235, 190), 0.10)
+            pygame.draw.rect(det, (*c, 255), (mx, my, rng.choice((3, 6)), 3))
+        # 밑동 둘레 '다져진 흙' — 나무는 (225,362) 근방(inner-로컬로 변환)
+        bx, by = 225 - inner.x, 362 - inner.y - 6
+        packed = mix_color(soil, (0, 0, 0), 0.2)
+        pygame.draw.ellipse(det, (*packed, 255), (bx - 52, by - 14, 104, 30))
+        pygame.draw.ellipse(det, (*mix_color(soil, (255, 235, 190), 0.08), 255), (bx - 40, by - 10, 80, 22))
+        # 뿌리 — 밑동에서 세 갈래로 뻗는 굵은 지그재그
+        root_c = (74, 48, 28) if not nm else (48, 24, 22)
+        for ang_dx, ang_dy in ((-1, 1), (1, 1), (-1, 0)):
+            px, py = bx, by
+            for s in range(3):
+                nx = px + ang_dx * rng.randint(8, 14)
+                ny = py + ang_dy * rng.randint(2, 6) + 2
+                pygame.draw.line(det, (*root_c, 255), (px, py), (nx, ny), 4)
+                px, py = nx, ny
+        # 풀포기 — 계절색 톱니 다발
+        for _ in range(15):
+            gx, gy = rng.randint(8, inner.w - 12), rng.randint(8, inner.h - 12)
+            if abs(gx - bx) < 46 and abs(gy - by) < 26:
+                continue   # 다져진 밑동 위에는 풀이 안 난다
+            col = grass_c if rng.random() < 0.6 else grass_d
+            for k, (tx, th) in enumerate(((0, 7), (4, 9), (8, 6))):
+                pygame.draw.rect(det, (*col, 255), (gx + tx, gy - th, 3, th))
+        # 낙하물(꽃잎/잎/낙엽)
+        for _ in range(12):
+            lx, ly = rng.randint(6, inner.w - 10), rng.randint(6, inner.h - 8)
+            pygame.draw.rect(det, (*rng.choice(litter), 255), (lx, ly, rng.choice((3, 4)), 3))
+        screen.blit(pixelate(det, 3, smooth=False), (inner.x, inner.y))
+
+        # 다 자란 나무 옆 수확 사다리 — 과수원의 서사 소품 (성장 82%↑)
+        if sim.growth >= sim.growth_goal * 0.82:
+            lad_x, lad_y = inner.right - 62, inner.bottom - 88
+            wood_l, wood_dk = (176, 132, 82), (110, 72, 42)
+            for rx in (0, 16):
+                pygame.draw.rect(screen, wood_dk, (lad_x + rx, lad_y, 5, 78))
+                pygame.draw.rect(screen, wood_l, (lad_x + rx + 1, lad_y, 3, 76))
+            for step in range(5):
+                sy = lad_y + 9 + step * 15
+                pygame.draw.rect(screen, wood_dk, (lad_x + 3, sy, 15, 5))
+                pygame.draw.rect(screen, wood_l, (lad_x + 3, sy, 15, 2))
+        # 수확기 — 떨어진 사과 두엇
+        if sim.is_harvest_ready() and not nm:
+            fruit_c = sim.crop_cfg.get("tint") or (200, 60, 50)
+            for fx, fy in ((inner.x + 66, inner.bottom - 40), (inner.x + 288, inner.bottom - 58)):
+                pygame.draw.rect(screen, fruit_c, (fx, fy, 6, 6))
+                pygame.draw.rect(screen, (255, 236, 218), (fx + 1, fy + 1, 2, 2))
+
         if sim.moisture < 28:
             cx, cy = inner.centerx, inner.centery
             pygame.draw.line(screen, (82, 53, 35), (cx - 40, cy + 30), (cx - 20, cy + 40), 2)
@@ -423,19 +500,59 @@ class FarmRenderer:
         screen.blit(water, (inner.x, inner.y))
 
         hl = (214, 240, 255) if not nm else (236, 150, 140)
-        # 큰 픽셀: 물 잔물결을 '각진 픽셀 대시'로 (가는 타원 외곽선 대신)
+        # 큰 픽셀: 물 잔물결을 '각진 픽셀 대시'로 (가는 타원 외곽선 대신) — 길이를 어긋나게 해 단조로움 제거
         for i in range(1, 5):
             ly = inner.y + inner.h * i // 5
             indent = 18 + (20 if i % 2 else 0)
             ln = max(30, inner.w - 2 * indent - i * 4)
-            for seg in range(inner.x + indent, inner.x + indent + ln, 12):
-                pygame.draw.rect(screen, hl, (seg, ly - 1, 7, 3))
+            for k, seg in enumerate(range(inner.x + indent, inner.x + indent + ln, 12)):
+                pygame.draw.rect(screen, hl, (seg, ly - 1, 8 if k % 3 else 5, 3))
         import random as _r
         _rng = _r.Random(11)
         for _ in range(6):
             sx = inner.x + _rng.randint(20, inner.w - 20)
             sy = inner.y + _rng.randint(18, inner.h - 18)
             pygame.draw.rect(screen, hl, (sx, sy, 2, 2))
+
+        # ── 논둑(두렁) — 못자리를 여섯 배미로 나누는 흙둑. 논을 '논답게' 만드는 뼈대 ──
+        levee = mix_color(mud_dry, (206, 172, 118) if not nm else (150, 60, 50), 0.3)
+        levee_dk = mix_color(levee, (0, 0, 0), 0.32)
+        levee_hi = mix_color(levee, (255, 240, 200), 0.22)
+        mid_y = inner.y + inner.h // 2 + 4
+        pygame.draw.rect(screen, levee_dk, (inner.x + 6, mid_y - 3, inner.w - 12, 12))
+        pygame.draw.rect(screen, levee, (inner.x + 6, mid_y - 5, inner.w - 12, 10))
+        pygame.draw.rect(screen, levee_hi, (inner.x + 6, mid_y - 5, inner.w - 12, 3))
+        for vx in (inner.x + inner.w // 3 - 4, inner.x + inner.w * 2 // 3 + 1):
+            pygame.draw.rect(screen, levee_dk, (vx + 1, inner.y + 8, 11, inner.h - 16))
+            pygame.draw.rect(screen, levee, (vx - 1, inner.y + 8, 10, inner.h - 16))
+            pygame.draw.rect(screen, levee_hi, (vx - 1, inner.y + 8, 3, inner.h - 16))
+            # 두렁 위 풀 몇 포기 — 흙둑 티를 낸다
+            for gy2 in range(inner.y + 26, inner.y + inner.h - 20, 52):
+                pygame.draw.rect(screen, (86, 132, 74) if not nm else (120, 44, 36), (vx + 2, gy2, 3, 5))
+
+        # ── 물꼬 — 좌상단 나무 물문에서 물이 흘러드는 자리 ──
+        gx, gy = inner.x + 14, inner.y + 6
+        wood_dk, wood_l = (86, 56, 30), (150, 108, 66)
+        for px_off in (0, 22):
+            pygame.draw.rect(screen, wood_dk, (gx + px_off, gy - 8, 6, 20))
+            pygame.draw.rect(screen, wood_l, (gx + px_off + 1, gy - 8, 3, 18))
+        inflow = (150, 200, 236) if not nm else (200, 90, 80)
+        pygame.draw.rect(screen, inflow, (gx + 7, gy + 2, 14, 4))
+        for rr, ry in ((10, 10), (16, 15)):   # 흘러든 자리의 각진 파문
+            pygame.draw.rect(screen, hl, (gx + 14 - rr // 2, gy + ry, rr, 2))
+
+        # ── 부평초(개구리밥) 무리 + 우렁이 — 물 위의 잔재미 ──
+        duck = (96, 160, 84) if not nm else (140, 60, 44)
+        duck_l = mix_color(duck, (255, 255, 220), 0.25)
+        for _ in range(7):
+            dx = inner.x + _rng.randint(24, inner.w - 28)
+            dy = inner.y + _rng.randint(20, inner.h - 24)
+            for ox2, oy2 in ((0, 0), (4, 2), (-3, 3)):
+                pygame.draw.rect(screen, duck if _rng.random() < 0.7 else duck_l, (dx + ox2, dy + oy2, 3, 3))
+        snail = (64, 44, 30) if not nm else (60, 20, 18)
+        for sx2, sy2 in ((inner.x + 60, mid_y + 22), (inner.x + inner.w - 74, mid_y - 30)):
+            pygame.draw.rect(screen, snail, (sx2, sy2, 4, 4))
+            pygame.draw.rect(screen, mix_color(snail, (255, 230, 190), 0.4), (sx2 + 1, sy2 + 1, 2, 2))
 
         if wet < 0.18:
             for cx, cy in self.crop_positions()[:3]:
@@ -603,8 +720,8 @@ class FarmRenderer:
                 for dx, dy in [(-3, -9), (0, -13), (3, -9)]:
                     self._rice_blade(screen, x, y + 8, dx, dy, gd, gm, gl)
                 return
-            if game_state.crop != "carrot":
-                self._draw_seeds(screen, x, y)
+            # 당근도 씨앗을 보여준다 — 아무것도 안 그리면 파종 직후 밭이 텅 비어 보인다
+            self._draw_seeds(screen, x, y)
             return
 
         if game_state.crop != "rice":
@@ -661,18 +778,22 @@ class FarmRenderer:
                 orig_spr = sprites["sprout4"]
                 withered = orig_spr.copy()
                 tint = pygame.Surface(withered.get_size(), pygame.SRCALPHA)
-                tint.fill((160, 150, 40, 95))
+                # 알파는 255 — RGBA_MULT에 95를 주면 알파까지 곱해져 줄기가 37% 반투명이 됐었다
+                tint.fill((180, 168, 90, 255))
                 withered.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
                 sh = withered.get_height()
                 withered = pygame.transform.scale(withered, (withered.get_width(), int(sh * 0.85)))
-                
+
                 sprite, offset = withered, (-24, -18 + int(sh * 0.15))
                 screen.blit(sprite, (x + offset[0], y + offset[1]))
-                
-                pygame.draw.ellipse(screen, (78, 52, 32), (x - 15, y - 1, 14, 9))
-                pygame.draw.ellipse(screen, (150, 108, 66), (x - 14, y - 2, 12, 7))
-                pygame.draw.ellipse(screen, (78, 52, 32), (x + 1, y + 2, 12, 8))
-                pygame.draw.ellipse(screen, (150, 108, 66), (x + 2, y + 1, 10, 6))
+
+                # 흙 위로 드러난 감자 덩이 — 매끈한 타원 대신 도트화(곡선 없음 규칙)
+                lumps = pygame.Surface((36, 16), pygame.SRCALPHA)
+                pygame.draw.ellipse(lumps, (78, 52, 32), (0, 3, 14, 9))
+                pygame.draw.ellipse(lumps, (150, 108, 66), (1, 2, 12, 7))
+                pygame.draw.ellipse(lumps, (78, 52, 32), (16, 6, 12, 8))
+                pygame.draw.ellipse(lumps, (150, 108, 66), (17, 5, 10, 6))
+                screen.blit(pixelate(lumps, 3, smooth=False), (x - 15, y - 4))
                 return
             elif game_state.crop == "rice":
                 self._rice_water_base(screen, x, y)
@@ -722,9 +843,12 @@ class FarmRenderer:
                 pygame.draw.line(screen, (82, 53, 35), (px - 22, py - 14), (px - 10, py - 8), 2)
                 pygame.draw.line(screen, (82, 53, 35), (px + 10, py + 14), (px + 22, py + 18), 2)
         elif not sim.is_tree and game_state.crop != "rice" and sim.moisture > 72:
+            # 과습 물웅덩이 — 매끈한 타원 대신 도트화(곡선 없음 규칙)
+            puddle = pygame.Surface((36, 6), pygame.SRCALPHA)
+            pygame.draw.ellipse(puddle, (95, 130, 155), (0, 0, 36, 6))
+            puddle = pixelate(puddle, 2, smooth=False)
             for idx, (x, y) in enumerate(self.crop_positions()):
-                px, py = x - 18, y + 36
-                pygame.draw.ellipse(screen, (95, 130, 155), (px, py, 36, 6))
+                screen.blit(puddle, (x - 18, y + 36))
 
         growth_stage = max(0, min(sim.growth, sim.growth_goal))
         if sim.is_tree:
@@ -750,12 +874,16 @@ class FarmRenderer:
     def draw(self, screen, farm_scene):
         sim = farm_scene.sim
         sc = farm_scene.season_colors
-        # 적응형 대시보드: 넓은 화면이면 여백에 사이드 패널(상시), 좁은 화면이면 상단 팝업 토글(잠깐 띄움).
+        # 적응형 대시보드: 넓은 화면이면 좌우 여백에 사이드 패널(상시), 세로가 긴 화면이면
+        # 위/아래 빈 밴드에 가로 패널(상시), 둘 다 아니면 상단 팝업 토글(잠깐 띄움).
         parent = screen.get_parent()
         ox = screen.get_offset()[0] if parent else 0
+        oy_off = screen.get_offset()[1] if parent else 0
+        # 가로가 넓으면 사이드 패널 상시, 아니면(세로 확장 포함) '밭 수첩' 토글 팝업.
+        # (세로 밴드 카드 실험은 폐기 — 세로 확장 화면은 배경 연장 + 중앙 게임 블록으로 통일.)
         wide = bool(parent) and ox >= 122
         overlay_open = (not wide) and getattr(game_state, "dashboard_open", False)
-        farm_scene._dash_wide = wide   # 입력 처리(좁은 화면 토글)에서 참조
+        farm_scene._dash_wide = wide   # 사이드 상시 표시 중엔 '밭 수첩' 토글 입력 무시
         draw_tiled_background(screen, 800, 600, sc["grass"], sc["grass_dark"],
                               sc["dirt"], sc["dirt_dark"])
 
@@ -770,7 +898,11 @@ class FarmRenderer:
         self.draw_farm_plot(screen, farm_scene)
 
         hour = datetime.datetime.now().hour
-        tint = pygame.Surface((800, 600), pygame.SRCALPHA)
+        # 시간대 틴트는 캔버스 '전체 폭'에 — 안전영역(800x600)에만 깔면 넓은 화면 여백이 밝게 남아
+        # 화면 가운데만 어두운 액자처럼 보인다
+        parent = screen.get_parent()
+        tint_target = parent if (parent is not None and parent.get_size() != (800, 600)) else screen
+        tint = pygame.Surface(tint_target.get_size(), pygame.SRCALPHA)
         if 4 <= hour <= 6:
             tint.fill((30, 20, 60, 70))
         elif 17 <= hour <= 19:
@@ -779,7 +911,7 @@ class FarmRenderer:
             tint.fill((10, 15, 30, 100))
 
         if hour < 7 or hour >= 17:
-            screen.blit(tint, (0, 0))
+            tint_target.blit(tint, (0, 0))
 
         self._draw_ambient(screen)   # 날씨 앰비언트 (비/강풍 잎/가뭄 먼지/구름 그림자/나비)
 
@@ -802,18 +934,22 @@ class FarmRenderer:
             screen.blit(pill, (px0, py0))
             screen.blit(ts, (px0 + 22, py0 + 9))
 
-        title_font = get_font(20)
         season_name = get_season(sim.growth, sim.growth_goal)
         if game_state.dad_mode:
             prefix = i18n.tf("[{season}] 아버지의 밭 ", season=i18n.t(season_name))
         else:
             prefix = i18n.tf("[{season}] {day}일째 ", season=i18n.t(season_name), day=sim.day)
 
-        prefix_surf = title_font.render(prefix, True, TEXT_DARK)
         weather_text = i18n.tf("{weather} ({turns}일간)", weather=i18n.t(game_state.weather),
                                turns=game_state.weather_turns_left)
+        # 긴 영어 제목(dad 모드 등)이 우드 패널을 넘지 않게 폰트 자동 축소
+        for sz in (20, 18, 16, 14):
+            title_font = get_font(sz)
+            if title_font.size(prefix)[0] + 25 + title_font.size(weather_text)[0] <= 350 - 16:
+                break
+        prefix_surf = title_font.render(prefix, True, TEXT_DARK)
         weather_surf = title_font.render(weather_text, True, TEXT_DARK)
-        
+
         title_rect = pygame.Rect(50, 82, 350, 48)
         draw_wood_panel(screen, title_rect)
         
@@ -853,7 +989,7 @@ class FarmRenderer:
         if sim.thought_text:
             tf = get_font(15)
             alpha = 1.0 if sim.thought_timer > 1.0 else max(0.0, sim.thought_timer)
-            line = wrap_text(sim._cropify(sim.thought_text), tf, 330, max_lines=1)[0]
+            line = wrap_text(i18n.tnar(sim.thought_text, crop_key=game_state.crop), tf, 330, max_lines=1)[0]
             ts = tf.render(line, True, (245, 232, 198))
             pad = 12
             pill_w = ts.get_width() + pad * 2
@@ -870,15 +1006,16 @@ class FarmRenderer:
         # '살펴보기' 결과 메시지는 조사·상태가 합쳐진 동적 문구라, 저장된 것을 쓰면 언어 전환이 한 턴
         # 늦게 반영된다. 매 프레임 현재 언어로 다시 생성해 즉시 반영되게 한다(inspect_message는 부작용 없음).
         msg = sim.inspect_message() if sim.last_action == "살펴보기" else sim.message
-        draw_bottom_bar(screen, "농장 일지", sim._cropify(f"{msg}\n{sim.notice}"))
+        ck = game_state.crop
+        draw_bottom_bar(screen, "농장 일지",
+                        i18n.tnar(msg or "", crop_key=ck) + "\n" + i18n.tnar(sim.notice or "", crop_key=ck))
         if not farm_scene.interaction:
             self._draw_journal_button(screen)   # 지난 일지 열람 (J)
 
         if farm_scene.forced_wait_active:
             pulse = abs(math.sin(pygame.time.get_ticks() * 0.005))
-            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-            overlay.fill((200, 30, 30, int(20 + 20 * pulse)))
-            screen.blit(overlay, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (200, 30, 30, int(20 + 20 * pulse)))   # 캔버스 전체 붉은 경고
             
             timer_box = pygame.Rect(220, 20, 360, 42)
             draw_panel(screen, timer_box, fill=(255, 230, 230), border=(200, 50, 50))
@@ -893,10 +1030,9 @@ class FarmRenderer:
 
         if not farm_scene.tutorial_active:
             if wide:
-                oy_off = screen.get_offset()[1] if parent else 0
                 self.draw_side_dashboard(parent, ox, farm_scene, oy=oy_off)  # 넓은 화면: 사이드 상시
             elif parent:
-                self._draw_dash_button(screen, overlay_open)               # 좁은 화면: 상단 팝업 토글
+                self._draw_dash_button(screen, overlay_open)               # 그 외: 상단 팝업 토글
                 if overlay_open:
                     self.draw_top_overlay(screen, farm_scene)
 
@@ -1016,13 +1152,13 @@ class FarmRenderer:
         self._draw_dash_button(screen, True)   # 버튼(닫기 ▴)을 오버레이 위에 다시 얹음
 
     def draw_tutorial(self, screen, farm_scene):
-        overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-        overlay.fill((10, 12, 18, 185))
-        screen.blit(overlay, (0, 0))
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (10, 12, 18, 185))   # 캔버스 전체(여백 포함)
 
         title, body = farm_scene.TUTORIAL_PAGES[farm_scene.tutorial_step]
-        title = farm_scene.sim._cropify(title)
-        body = farm_scene.sim._cropify(body)
+        # 표시 시점에 tnar — cropify 먼저 하면 비당근 회차 EN이 카탈로그와 안 맞아 통째로 미번역
+        title = i18n.tnar(title, crop_key=game_state.crop)
+        body = i18n.tnar(body, crop_key=game_state.crop)
         card = pygame.Rect(120, 180, 560, 252)
         draw_light_panel(screen, card)
 

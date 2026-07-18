@@ -54,10 +54,9 @@ class QuitOverlay:
         if not game_state.request_quit:
             return
 
-        # 어두운 틴트 오버레이
-        overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))
-        screen.blit(overlay, (0, 0))
+        # 어두운 틴트 오버레이 — 캔버스 전체(여백 포함)
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (0, 0, 0, 180))
 
         # 메인 패널
         draw_wood_panel(screen, self.panel)

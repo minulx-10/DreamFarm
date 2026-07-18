@@ -721,7 +721,10 @@ class FarmSimulator:
             lines.append("조금씩 알 것 같기도 하다.")
         else:
             lines.append("이 일의 무게가 느껴진다.")
-        game_state.journal_entries.append("\n".join(self._cropify(line) for line in lines))
+        # 정본(당근·밭 원문)으로 저장한다 — 여기서 작물 치환까지 해 버리면 비당근 회차의 일지가
+        # EN 카탈로그 키와 안 맞아 영어로 영영 번역되지 않는다. 치환은 표시 시점
+        # (_localize_journal_line)에서 언어별로 한다.
+        game_state.journal_entries.append("\n".join(lines))
 
     def is_good_turn(self):
         return (

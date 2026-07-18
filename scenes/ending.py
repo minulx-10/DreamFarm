@@ -20,10 +20,28 @@ _JOURNAL_STATUS_RE = re.compile(r'^\[(\d+)일째 · (.+?) · (.+?)\]$')
 _JOURNAL_GROWTH_RE = re.compile(r'^여기까지 성장 (\d+)%\.(.*)$')
 
 
+def _crop_food():
+    return current_crop()["food"]
+
+
+def _en_cropify(text):
+    """EN 문장 속 'carrot'을 지금 작물의 영어 단어로 바꾼다 — 카탈로그 본문이 리터럴
+    carrot을 쓰기 때문에, 비당근 회차 표시용."""
+    words = i18n._EN_CROP.get(game_state.crop)
+    if not words:
+        return text
+    food = words.get("food", "carrot")
+    if food == "carrot":
+        return text
+    return (text.replace("carrots", food).replace("Carrots", food.capitalize())
+                .replace("carrot", food).replace("Carrot", food.capitalize()))
+
+
 def _localize_journal_line(line):
-    """일지 줄을 현재 언어로 번역한다(일지는 한국어 원문으로 저장됨).
+    """일지 줄을 현재 언어로 번역한다(일지는 한국어 '정본'(당근·밭)으로 저장됨).
     상태([N일째·계절·날씨])·성장 줄은 동적 문구라 원문 패턴을 인식해 현재 언어로 재조립하고,
-    나머지 정적 줄은 카탈로그(i18n.t)로 번역한다 → 엔딩에서 언어를 바꿔도 즉시 반영된다."""
+    나머지 정적 줄은 카탈로그(i18n.t)로 번역한다. 작물 치환은 여기(표시 시점)에서 언어별로 한다.
+    (구버전 세이브의 '치환된' 일지 줄도 그대로 통과해 깨지지 않는다.)"""
     m = _JOURNAL_STATUS_RE.match(line)
     if m:
         return i18n.tf("[{day}일째 · {season} · {weather}]", day=m.group(1),
@@ -34,8 +52,10 @@ def _localize_journal_line(line):
             return i18n.tf("여기까지 성장 {prog}%. 수확이 가까워진다.", prog=m.group(1))
         return i18n.tf("여기까지 성장 {prog}%.", prog=m.group(1))
     hit = i18n.t(line)
-    if hit != line or i18n.get_language() == "ko":
-        return hit
+    if i18n.get_language() == "ko":
+        return swap_crop_word(hit, _crop_food())
+    if hit != line:
+        return _en_cropify(hit)
     # 카탈로그에 통짜로 없는 '조합' 줄(예: "잡초가 자꾸 올라온다, 잎 뒤로 벌레가 보인다.") —
     # 조각들을 ", "로 잇고 끝에 "."을 붙여 저장하므로, 마침표를 떼고 각 조각을 번역해 다시 잇는다.
     # (조각이 하나뿐이라 ", "가 없어도 마침표만 붙는 경우까지 포함)
@@ -43,8 +63,12 @@ def _localize_journal_line(line):
         frags = line[:-1].split(", ")
         tr = [i18n.t(f) for f in frags]
         if all(t != f for t, f in zip(tr, frags)):
-            return ", ".join(tr) + "."
-    return line
+            # 조각별 번역은 각자 대문자로 시작한다 — 쉼표 뒤는 소문자로 눕혀 한 문장처럼 잇는다
+            tr = [t if idx == 0 else (t[0].lower() + t[1:] if t else t)
+                  for idx, t in enumerate(tr)]
+            return _en_cropify(", ".join(tr) + ".")
+    # 번역이 없으면 최소한 작물·조사는 맞춘 한국어로
+    return swap_crop_word(line, _crop_food())
 
 
 class EndingScene:
@@ -68,8 +92,8 @@ class EndingScene:
             # 작물이 끝내 시들었으면 수확 못 한 '시듦' 엔딩으로 강제 (연출은 아래 advance에서 단축)
             self.crop_failed = game_state.crop_failed
             self.ending_data = self.get_ending("wither" if self.crop_failed else None)
-        # 이 엔딩에 맞는 '마지막 장'을 일지에 한 번 더한다 (엔딩별로 닫는 글이 달라짐)
-        append_ending_journal()
+        # '마지막 장' 일지는 get_ending의 실플레이 경로에서 닫는다(아카이브 기록보다 먼저).
+        # 갤러리 감상은 전역 일지를 건드리지 않는다 — 지난 감상의 닫는 장이 남는 오염 방지.
         self.pages = self.build_pages()
         self.page_index = 0
         self.text_to_print = self.prepare_page(self.page_index)
@@ -150,33 +174,38 @@ class EndingScene:
         },
     }
 
-    def get_ending(self, force_type=None):
+    def get_ending(self, force_type=None, replay=False):
+        """엔딩 데이터 구성. replay=True(1/2/3 재감상)는 연출만 바꾸고
+        기록·업적·아카이브 등 부작용을 일으키지 않는다 — 재호출이 회차를 위조하면 안 된다."""
         name = game_state.player_name
         name_eun = append_josa(name, "은/는")
         ending_type = force_type or get_attitude_ending()
-        
+
         # 악몽 모드 플레이 중 정상 클리어 시 악)몽중농원 전용 엔딩 지정
         if game_state.nightmare and ending_type != "wither" and not force_type:
             ending_type = "nightmare"
-            
-        game_state.last_ending = ending_type
 
-        # Record ending in meta save data
         from core import save_system
-        save_system.record_ending(ending_type)
+        if not replay:
+            game_state.last_ending = ending_type
 
-        # 실제 플레이로 도달한 엔딩에서만 업적을 해제한다 (갤러리 감상은 제외).
-        if not getattr(self, "from_gallery", False):
-            from core import achievements
-            achievements.on_ending(ending_type)
-            save_system.delete_save()
-            # 회차 아카이브 + 누적 통계 (창고 탭) — 기록 뒤 메타 기반 업적 재평가
-            days = getattr(game_state, "final_day", 0)
-            save_system.record_run(game_state.crop, ending_type, days,
-                                   getattr(game_state, "year_seed", "평년"),
-                                   game_state.journal_entries,
-                                   getattr(game_state, "run_stats", {}))
-            achievements.on_run_recorded(days, ending_type)
+            # Record ending in meta save data
+            save_system.record_ending(ending_type)
+
+            # 실제 플레이로 도달한 엔딩에서만 업적을 해제한다 (갤러리 감상은 제외).
+            if not getattr(self, "from_gallery", False):
+                from core import achievements
+                achievements.on_ending(ending_type)
+                save_system.delete_save()
+                # 일지 '마지막 장'을 아카이브 기록 전에 닫는다 — 뒤에 닫으면 지난 회차 일지에 빠진다
+                append_ending_journal()
+                # 회차 아카이브 + 누적 통계 (창고 탭) — 기록 뒤 메타 기반 업적 재평가
+                days = getattr(game_state, "final_day", 0)
+                save_system.record_run(game_state.crop, ending_type, days,
+                                       getattr(game_state, "year_seed", "평년"),
+                                       game_state.journal_entries,
+                                       getattr(game_state, "run_stats", {}))
+                achievements.on_run_recorded(days, ending_type)
 
         ck = game_state.crop
 
@@ -292,9 +321,14 @@ class EndingScene:
 
         if game_state.choice_impacts:
             lines.extend(["", impact_heading])
+            ck = game_state.crop
             for item in game_state.choice_impacts:
-                lines.append(item["title"])
-                lines.append(item["impact"])
+                # 정본 KO로 저장돼 있으므로 표시 시점에 작물 치환+번역한다
+                lines.append(i18n.tnar(item["title"], crop_key=ck))
+                impact = i18n.tnar(item.get("impact", ""), crop_key=ck)
+                if item.get("fail"):
+                    impact += " (" + i18n.tnar(item["fail"], crop_key=ck) + ")"
+                lines.append(impact)
 
         lines.extend([
             "",
@@ -377,10 +411,10 @@ class EndingScene:
 
     def change_ending(self, ending_type):
         self.crop_failed = False   # 갤러리 감상은 늘 전체 연출
-        self.ending_data = self.get_ending(ending_type)
+        self.ending_data = self.get_ending(ending_type, replay=True)
         self.pages = self.build_pages()
         self.page_index = 0
-        self.text_to_print = self.prepare_page(ending_type) if False else self.prepare_page(self.page_index)
+        self.text_to_print = self.prepare_page(self.page_index)
         self.phase = "narration"
         self.typewriter.set_text(self.text_to_print)
         self.phase_timer = 0
@@ -395,6 +429,8 @@ class EndingScene:
         self.carrot_pulse = 0
         self.credit_lines = self.build_credit_lines()
         self.credits_y = 620
+        self.journal_scroll = 0
+        self.credit_hold = 0.0
         self._select_ending_bgm()   # 갤러리에서 다른 엔딩을 보면 그 엔딩 BGM으로 전환
 
     # 엔딩 갤러리 키 (1회 클리어 이후에만 활성화 — 첫 플레이에서는 엔딩을 직접 얻어야 함)
@@ -404,6 +440,11 @@ class EndingScene:
 
     def gallery_unlocked(self):
         return game_state.is_second_run
+
+    def can_replay(self, ending_type):
+        """이미 획득한 엔딩만 재감상 허용 — 미획득 엔딩 스포일러·기록 위조 방지."""
+        from core import save_system
+        return ending_type in save_system.endings_seen()
 
     # 각 엔딩에 이르게 한 까닭을 한 줄로 — 결과가 '왜' 나왔는지 보여준다
     # (실존 엔딩 5종만 — happy/growth/skill/rush 는 옛 시스템의 죽은 키였다)
@@ -462,7 +503,8 @@ class EndingScene:
                         return
                 elif self.gallery_unlocked() and event.key in self.GALLERY_KEYS:
                     ending_type = self.GALLERY_KEYS[event.key]
-                    self.change_ending(ending_type)
+                    if self.can_replay(ending_type):
+                        self.change_ending(ending_type)
                     return
 
             click = (event.type == pygame.MOUSEBUTTONDOWN or
@@ -682,9 +724,8 @@ class EndingScene:
     def _draw_table(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
-        dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-        dark_overlay.fill((15, 10, 5, 140))
-        screen.blit(dark_overlay, (0, 0))
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (15, 10, 5, 140))   # 캔버스 전체(여백 포함)
 
         tc = min(255, self.table_alpha)
 
@@ -759,9 +800,8 @@ class EndingScene:
     def _draw_carrot_click(self, screen):
         # 몽환적인 밤하늘을 기저 배경으로 그리고 은은한 어둠 틴트 얹기
         draw_story_backdrop(screen, "nightmare" if game_state.nightmare else "night")
-        dark_overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-        dark_overlay.fill((15, 10, 5, 140))
-        screen.blit(dark_overlay, (0, 0))
+        from core.ui import draw_full_veil
+        draw_full_veil(screen, (15, 10, 5, 140))   # 캔버스 전체(여백 포함)
 
         # 은은한 등불 조명 — '계단 알파' 도트 글로우(캐시)
         blit_glow(screen, glow_sprite(160, (255, 210, 120), px=5, steps=(13, 27, 45)), (400, 320))
@@ -1003,10 +1043,13 @@ class EndingScene:
         for entry in game_state.journal_entries:
             # 여러 줄 엔트리(엔딩 마무리 블록 등)는 카탈로그 키가 '블록 전체'라, \n 으로 조각내기 전에
             # 통째로 번역해야 맞는다(HANDOFF 팁 #5). 회상 매칭은 원문(한국어) 줄 기준으로 유지한다.
-            disp_entry = _localize_journal_line(entry)
+            # 블록 경로는 'EN 카탈로그가 블록 전체로 번역해 준' 경우에만 —
+            # 단순 작물 치환 변화로 블록 판정하면 일일 일지의 줄 단위 번역이 건너뛰어진다.
             orig_lines = entry.split("\n")
-            disp_lines = disp_entry.split("\n")
-            block_ok = (disp_entry != entry and len(disp_lines) == len(orig_lines))
+            block_disp = i18n.t(entry)
+            disp_lines = _en_cropify(block_disp).split("\n")
+            block_ok = (i18n.get_language() != "ko" and block_disp != entry
+                        and len(disp_lines) == len(orig_lines))
             for li, line in enumerate(orig_lines):
                 is_head = line.startswith("[")
                 # 표시 시점에 현재 언어로 번역(일지는 한국어 원문 저장) + 패널 폭에 맞춰 줄바꿈(넘침 방지)
@@ -1017,11 +1060,12 @@ class EndingScene:
                         screen.blit(surf, (120, y))
                     y += 26 if is_head else 22
                 retro_text = None
-                from core.crops import current_crop, swap_crop_word
                 food = current_crop()["food"]
                 for k, v in JOURNAL_RETROSPECTIVES.items():
-                    if swap_crop_word(k, food) == line.strip():   # 매칭은 원문(한국어) 기준
-                        retro_text = swap_crop_word(v, food)
+                    # 일지는 이제 정본(당근) 저장 — 정본 그대로 대조. 구버전 세이브(치환 저장)도
+                    # 호환되게 치환본 대조를 남겨 둔다.
+                    if k == line.strip() or swap_crop_word(k, food) == line.strip():
+                        retro_text = i18n.tnar(v, crop_key=game_state.crop)
                         break
                 if self.is_happy and retro_text is not None:
                     if view.top - 30 < y < view.bottom + 4:

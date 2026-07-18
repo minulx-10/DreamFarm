@@ -88,12 +88,10 @@ class MemoryScene:
 
         # Fade overlay
         if self.transition_alpha > 0:
-            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, int(self.transition_alpha)))
-            screen.blit(overlay, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (0, 0, 0, int(self.transition_alpha)))
 
         # Exit flash (brief white flash when leaving memory)
         if self.exit_flash > 0:
-            flash = pygame.Surface((800, 600), pygame.SRCALPHA)
-            flash.fill((255, 255, 255, int(self.exit_flash)))
-            screen.blit(flash, (0, 0))
+            from core.ui import draw_full_veil
+            draw_full_veil(screen, (255, 255, 255, int(self.exit_flash)))

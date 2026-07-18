@@ -177,6 +177,7 @@ ENDING_JOURNAL_CLOSINGS = {
     "normal": ("[마지막 장 · 수확의 날]\n잘한 것도 못한 것도 있던 하루였다.\n조금은 알 것 같은, 그런 마음으로 밭을 나선다."),
     "bad": ("[마지막 장 · 수확의 날]\n끝내 입에 넣지 못한 당근.\n그래도 예전처럼 밀어내지는 않았다. 그거면, 시작은 된 셈이다."),
     "wither": ("[마지막 장 · 시든 밭]\n수확은 없었다. 흙만 남았다.\n아버지가 매일 무엇과 싸웠는지, 이제야 조금 안다.\n다음 새벽엔, 조금 다르게 해볼 수 있을 것 같다."),
+    "nightmare": ("[마지막 장 · 비워진 식탁]\n갈라진 붉은 하늘 아래에서도 밭은 밭이었다.\n마지막 한 조각까지 남기지 않았다.\n아침 식탁은, 처음으로 말끔히 비어 있었다."),
 }
 
 JOURNAL_RETROSPECTIVES = {
@@ -642,8 +643,6 @@ def append_ending_journal():
     key = "wither" if game_state.crop_failed else game_state.last_ending
     text = ENDING_JOURNAL_CLOSINGS.get(key)
     if text:
-        from core.crops import swap_crop_word, current_crop
-        food = current_crop()["food"]
-        text = swap_crop_word(text, food)
+        # 정본(당근·밭)으로 저장 — 표시 시점(_localize_journal_line)에 언어별 치환·번역
         game_state.journal_entries.append(text)
         game_state.journal_closed = True

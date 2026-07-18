@@ -53,7 +53,11 @@ class NameInputScene:
 
     def _try_start(self):
         """이름이 채워져 있으면 진행하고, 비어 있으면 경고를 띄운다."""
-        if len(self.input_text.strip()) > 0 and len(self.ime_text) == 0:
+        if len(self.ime_text) > 0:
+            # 한글 조합 중 Enter — 조합 확정이 곧 따라오므로 경고 없이 무시한다
+            # (이름이 차 있는데 '입력해 주세요' 경고가 떠 혼란스러웠다)
+            return
+        if len(self.input_text.strip()) > 0:
             audio.play("success")
             game_state.player_name = self.input_text.strip()
             from core import achievements
@@ -70,7 +74,10 @@ class NameInputScene:
         pygame.key.set_repeat(0)
         pygame.key.stop_text_input()
         from core import save_system
-        game_state.current_scene = "crop_select" if save_system.crops_unlocked() else "title"
+        from core.version import DEMO
+        # 데모 빌드는 작물 선택이 잠겨 있다 — 뒤로가기로 우회 입장되지 않게 타이틀로
+        unlocked = save_system.crops_unlocked() and not DEMO
+        game_state.current_scene = "crop_select" if unlocked else "title"
 
     def handle_events(self, events):
         mouse_pos = pygame.mouse.get_pos()
@@ -88,8 +95,10 @@ class NameInputScene:
                 else:
                     self.ime_text = event.text[:max(0, 8 - len(self.input_text))]
             elif event.type == pygame.TEXTINPUT:
-                if len(self.input_text) + len(event.text) <= 8:
-                    self.input_text += event.text
+                # 넘치면 통째로 버리지 말고 들어갈 만큼만 받는다 — IME 미리보기(자르기)와 동작 통일
+                room = 8 - len(self.input_text)
+                if room > 0 and event.text:
+                    self.input_text += event.text[:room]
                     audio.type_tick(event.text)
                     self.warn_timer = 0.0
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -173,7 +182,7 @@ class NameInputScene:
             elif IS_ANDROID:
                 msg = self.font_small.render("입력칸을 탭하여 이름을 입력하세요", True, TEXT_MUTED)
             else:
-                msg = self.font_small.render("Enter 키로도 입력 완료 가능", True, TEXT_MUTED)
+                msg = self.font_small.render("Enter 키로도 입력 완료 · 최대 8자", True, TEXT_MUTED)
             screen.blit(msg, (400 - msg.get_width() // 2, 412))
             shine = self.font_small.render("몽중농원", True, WHITE)
             screen.blit(shine, (400 - shine.get_width() // 2, 85))

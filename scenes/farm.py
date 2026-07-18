@@ -33,8 +33,9 @@ class Button:
             r = self.rect
             pixel_rect(screen, base, r, chamfer=CHAMFER)
             pixel_rect(screen, (150, 138, 126), r, width=1, chamfer=CHAMFER)
-            # "✕ "를 먼저 붙이면 통짜 문자열이 카탈로그와 안 맞아 EN에서 미번역 → 라벨만 먼저 번역
-            surf = self.font.render("✕ " + i18n.t(self.text), True, (236, 228, 214))
+            # "× "를 먼저 붙이면 통짜 문자열이 카탈로그와 안 맞아 EN에서 미번역 → 라벨만 먼저 번역
+            # (✕ U+2715는 Galmuri11에 없어 두부로 떴다 → 실제 글리프가 있는 × U+00D7 사용)
+            surf = self.font.render("× " + i18n.t(self.text), True, (236, 228, 214))
             screen.blit(surf, (r.centerx - surf.get_width() // 2,
                                r.centery - surf.get_height() // 2))
             return
@@ -212,7 +213,8 @@ class FarmScene:
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.action_menu_open:
-                    track_rect_clickable = pygame.Rect(722, 330, 24, 121)
+                    # 726부터 — 722면 행동 버튼 오른쪽 끝(724)과 2px 겹쳐 버튼 클릭을 가로챘다
+                    track_rect_clickable = pygame.Rect(726, 330, 20, 121)
                     if track_rect_clickable.collidepoint(event.pos):
                         self.scrollbar_dragging = True
                         self.drag_scrollbar(event.pos[1])

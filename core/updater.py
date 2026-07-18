@@ -20,7 +20,9 @@ _checked = False
 
 
 def _nums(v):
-    return tuple(int(x) for x in re.findall(r"\d+", v or "")[:3]) or (0,)
+    # '-dev.1' 같은 프리릴리스 꼬리는 떼고 숫자 전부를 취한다.
+    # 앞 3개로 자르면 핫픽스 4자리(v1.0.5.1)가 (1,0,5)로 뭉개져 알림이 영영 안 뜬다.
+    return tuple(int(x) for x in re.findall(r"\d+", (v or "").split("-")[0])) or (0,)
 
 
 def _worker():

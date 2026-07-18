@@ -67,7 +67,7 @@ FF_SCENES = {"intro", "memory", "story_choice", "epiphany", "father_day", "endin
 
 # 포커스를 잃으면 자동 일시정지할 씬 — '시간 압박'이 있는 곳만.
 # (타이틀·갤러리·서사 씬은 멈출 이유가 없는데도 멈춰서 복귀 때마다 클릭을 강요했다.)
-PAUSE_SCENES = MINIGAME_SCENES | {"farm", "story_choice"}
+PAUSE_SCENES = MINIGAME_SCENES | {"farm", "story_choice", "epilogue"}   # epilogue: 손맛 인터랙션에 제한시간 있음
 
 
 def main():
@@ -130,7 +130,7 @@ def main():
         # 적응형: 화면 비율에 맞춰 캔버스(안전영역 800x600 + 좌우/상하 여백)를 정하고, 그 캔버스를
         # 창에 '꽉 차게' 스케일한다(비율이 같아 레터박스 없음; 상한 초과 울트라와이드만 약간 남음).
         nonlocal offset_x, offset_y, target_w, target_h, virtual_screen, safe_sub
-        if actual_h <= 0:
+        if actual_w <= 0 or actual_h <= 0:
             return
         layout.set_viewport(actual_w, actual_h)
         cw, ch = layout.canvas_size()
@@ -147,8 +147,9 @@ def main():
             target_w = cw * iscale
             target_h = ch * iscale
         else:
-            target_w = int(cw * scale)
-            target_h = int(ch * scale)
+            # 내림(int)이면 꽉 차야 할 축이 1px 모자라 검은 헤어라인이 남는다 → 반올림
+            target_w = int(round(cw * scale))
+            target_h = int(round(ch * scale))
         if virtual_screen is None or virtual_screen.get_size() != (cw, ch):
             virtual_screen = pygame.Surface((cw, ch))
             safe_sub = virtual_screen.subsurface(layout.safe_rect())
@@ -217,12 +218,15 @@ def main():
     pygame.mouse.get_pos = mapped_get_pos
 
     BGM_BY_SCENE = {
-        "title": "night", "crop_select": "night", "gallery": "night",
+        "title": "night", "crop_select": "night",
+        "gallery": "gallery",                       # 추억 저장소 — 오르골
         "name_input": "night", "intro": "night", "credits": "night",
         "memory": None, "story_choice": "event", "father_day": None,
-        "farm": "farm", "stage1": "event", "stage2": "farm",
-        "epilogue": "night",
-        "stage3": "farm", "stage4": "farm", "star_connect": None,
+        "farm": "farm",
+        "stage1": "stage", "stage2": "stage",       # 밭일·수확 스테이지 — 경쾌한 일손 리듬
+        "stage3": "stage", "stage4": "stage",
+        "epilogue": "epilogue",                     # 아버지의 새벽 — 여명
+        "star_connect": None,
         "ending": None,
         "transition": None, "epiphany": None,
     }
@@ -293,7 +297,8 @@ def main():
         dt = clock.tick(60) / 1000.0
         # dt가 튀는 것을 방지하기 위해 최대 0.1초로 클램핑
         dt = min(0.1, dt)
-        game_state.play_time += dt
+        if not game_state.paused:   # 자동 일시정지 중에는 플레이 시간이 흐르지 않게
+            game_state.play_time += dt
 
         if fullscreen_cooldown > 0:
             fullscreen_cooldown = max(0.0, fullscreen_cooldown - dt)
@@ -331,16 +336,17 @@ def main():
             from core import save_system
             data = save_system.load_slot()
             if data:
-                if "farm" not in scenes:
-                    scenes["farm"] = SCENE_FACTORIES["farm"]()
+                # 작물·악몽·도전 규칙을 먼저 복원 — FarmScene(sim) 생성이 이 값들을 읽는다.
+                save_system.restore_state(data)
+                scenes["farm"] = SCENE_FACTORIES["farm"]()   # 항상 새로 만들어 이전 회차 잔밭 방지
                 save_system.restore(data, scenes["farm"])
                 game_state.current_scene = "farm"
                 current_scene_obj = scenes["farm"]
                 current_key = "farm"
+                target_scene = "farm"    # 이번 프레임 BGM 판정이 낡은 씬(title)으로 night를 틀지 않게
                 # 지옥 모드 여부에 맞게 창 크기 즉시 갱신
                 if game_state.nightmare != current_nightmare:
                     update_display_mode()
-                audio.play_bgm("event" if game_state.nightmare else "farm")
 
         # 개발자 모드에서 작물을 바꾸면 밭을 새로 만들어 farm으로 이동
         if getattr(game_state, "dev_new_farm", False):
@@ -457,9 +463,9 @@ def main():
             # 딤 위에 크롬만 밝게 떠 보이고 클릭까지 되던 문제(시각 위계·포커스 붕괴) 방지.
             farm_tutorial = (current_key == "farm"
                              and getattr(current_scene_obj, "tutorial_active", False))
-            # 배속 버튼 터치 선처리 (설정창·종료창이 닫혀 있고, 배속이 의미 있는 씬일 때만 작동)
-            if (not game_state.request_quit and not settings_overlay.open and not farm_tutorial
-                    and game_state.current_scene in FF_SCENES):
+            # 배속 버튼 터치 선처리 (설정창·종료창·개발자 창이 닫혀 있고, 배속이 의미 있는 씬일 때만 작동)
+            if (not game_state.request_quit and not settings_overlay.open and not dev_overlay.open
+                    and not farm_tutorial and game_state.current_scene in FF_SCENES):
                 ff_btn = pygame.Rect(708, 27, 28, 28)
                 filtered_events = []
                 for event in mapped_events:
@@ -477,23 +483,31 @@ def main():
                                                                       and not farm_tutorial)) \
                         and not dev_overlay.handle_events(mapped_events, farm_scene=scenes.get("farm")):
                     for event in mapped_events:
-                        if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                        # 이름 입력 중에는 'ㅁ'(m) 타이핑이 음소거로 새면 안 된다
+                        if (event.type == pygame.KEYDOWN and event.key == pygame.K_m
+                                and current_key != "name_input"):
                             audio.toggle_mute()
                     # ESC로 설정 오버레이 열기 — 여기까지 왔다는 건 설정이 닫혀 있다는 뜻(열려 있으면
                     # settings_overlay가 위에서 소비함). 단, ESC를 '뒤로가기'로 쓰는 메뉴 화면과
-                    # 밭 '지난 일지' 팝업(ESC=닫기)이 열려 있을 땐 씬에 넘긴다.
+                    # 밭 '지난 일지' 팝업·갤러리 모달(ESC=닫기)·밭 튜토리얼(크롬 차단)일 땐 씬에 넘긴다.
                     esc_pressed = any(e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE
                                       for e in mapped_events)
                     farm_journal = (current_key == "farm"
                                     and getattr(current_scene_obj, "journal_open", False))
-                    if (esc_pressed and not farm_journal
+                    gallery_modal = (current_key == "gallery"
+                                     and getattr(current_scene_obj, "reading_title", None))
+                    if (esc_pressed and not farm_journal and not gallery_modal and not farm_tutorial
                             and current_key not in ("crop_select", "name_input", "credits")):
                         settings_overlay.open = True
                     else:
                         current_scene_obj.handle_events(mapped_events)
 
         if not game_state.paused:
-            current_scene_obj.update(dt)
+            # 설정/종료/개발자 창이 열린 동안에는 시간 압박 씬(미니게임 타이머 등)의 시간을 멈춘다 —
+            # 설정을 열었다고 제한시간이 계속 흐르면 사실상 함정이다.
+            overlay_open = settings_overlay.open or game_state.request_quit or dev_overlay.open
+            if not (overlay_open and game_state.current_scene in PAUSE_SCENES):
+                current_scene_obj.update(dt)
             settings_overlay.update(dt)
             from core import achievements
             achievements.update(dt)
@@ -519,8 +533,9 @@ def main():
             if hovered_ff:
                 from core.ui import mix_color
                 bg_ff = mix_color(bg_ff, (250, 246, 231), 0.2)
-            pixel_rect(safe_sub, bg_ff, ff_btn, chamfer=CHAMFER_SM)
-            pixel_rect(safe_sub, (229, 192, 124), ff_btn, width=1, chamfer=CHAMFER_SM)
+            # 테두리 = 금색 채움 밑깔기 (width=1 링은 28px에서 좌우변이 끊겨 보임 — 설정 버튼과 동일)
+            pixel_rect(safe_sub, (229, 192, 124), ff_btn, chamfer=CHAMFER_SM)
+            pixel_rect(safe_sub, bg_ff, ff_btn.inflate(-2, -2), chamfer=CHAMFER_SM)
 
             # 화살표 기호 '>>' 렌더링
             from core.assets import get_font
@@ -581,6 +596,9 @@ def main():
         if game_state.paused:
             pause_veil = pygame.Surface((800, 600), pygame.SRCALPHA)
             pause_veil.fill((12, 14, 20, 195))
+            # 대화상자 속을 먼저 짙게 채운다 — 테두리만 그리면 뒤 화면 텍스트('오늘 할 일' 등)가
+            # 안내 문구와 겹쳐 읽힌다
+            pixel_rect(pause_veil, (22, 20, 30, 245), (198, 248, 404, 104), chamfer=CHAMFER)
             pixel_rect(pause_veil, (130, 105, 75, 230), (198, 248, 404, 104), width=2, chamfer=CHAMFER)
             from core.assets import get_font
             font_pause = get_font(23)
