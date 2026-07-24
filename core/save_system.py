@@ -106,7 +106,7 @@ _GS_FIELDS = [
     "is_second_run", "prev_ending", "prev_understanding",
     "last_ending", "play_time",
     "crop", "nightmare",
-    "year_seed", "run_stats", "challenge",
+    "year_seed", "run_stats", "challenge", "behavior_run_file",
 ]
 # set → list 변환이 필요한 필드
 _GS_SET_FIELDS = ["epiphanies_seen", "father_day_seen"]
@@ -148,6 +148,9 @@ def restore_state(data):
             setattr(game_state, k, gs[k])
     for k in _GS_SET_FIELDS:
         setattr(game_state, k, set(gs.get(k, [])))
+    # 행동 로그 이어쓰기 — 집계는 파일 재생으로 복원된다 (순환 import 방지, 지연 import)
+    from core import behavior
+    behavior.resume_run(getattr(game_state, "behavior_run_file", None))
 
 
 def restore(data, farm):
@@ -159,6 +162,9 @@ def restore(data, farm):
             setattr(game_state, k, gs[k])
     for k in _GS_SET_FIELDS:
         setattr(game_state, k, set(gs.get(k, [])))
+    # 행동 로그 이어쓰기 — 집계는 파일 재생으로 복원된다 (순환 import 방지, 지연 import)
+    from core import behavior
+    behavior.resume_run(getattr(game_state, "behavior_run_file", None))
     fm = data.get("farm", {})
     for k in _FARM_FIELDS:
         if k in fm and fm[k] is not None:
@@ -345,7 +351,8 @@ def epilogue_unlocked():
 
 _DEFAULT_SETTINGS = {"autosave": True, "show_version": True, "language": "ko", "update_check": True,
                      "text_speed": "normal",   # 타자기 텍스트 속도: slow | normal | fast
-                     "bgm_volume": 0.30, "sfx_volume": 0.55, "muted": False}
+                     "bgm_volume": 0.30, "sfx_volume": 0.55, "muted": False,
+                     "telemetry": False}       # 행동 데이터 공유 (옵트인 — 기본 꺼짐)
 
 
 def load_settings():

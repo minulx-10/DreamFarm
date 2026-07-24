@@ -34,6 +34,7 @@ class GameState:
 
         # 이번 회차의 손길 통계 (창고 탭 누적 통계의 원천 — 엔딩에서 메타로 합산)
         self.run_stats = {}
+        self.behavior_run_file = None   # 이번 회차 행동 로그 파일명 (core/behavior.py)
 
         # Journal system
         self.journal_entries = []

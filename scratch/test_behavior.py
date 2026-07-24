@@ -84,4 +84,18 @@ assert tl and tl[0][0] == 1, tl
 scan = behavior.lifetime_scan()
 assert scan["runs"] >= 2 and scan["actions"].get("물 주기", 0) >= 5, scan
 
+# 11) 세이브 왕복 — behavior_run_file이 스냅샷에 실리고 복원 시 resume된다
+assert "behavior_run_file" in _ss._GS_FIELDS
+game_state.behavior_run_file = saved
+snap = {"version": 1, "game_state": {k: getattr(game_state, k, None) for k in _ss._GS_FIELDS},
+        "farm": {}}
+game_state.behavior_run_file = None
+behavior.resume_run(None)
+_ss.restore_state(snap)
+assert game_state.behavior_run_file == saved
+assert behavior.profile() == p, "restore_state가 resume_run까지 해야 한다"
+
+# 12) telemetry 설정 기본값 OFF
+assert _ss.get_setting("telemetry") is False
+
 print("BEHAVIOR OK")
