@@ -12,6 +12,7 @@ from core.narrative_data import YEAR_SEEDS, roll_year_seed
 from core import audio
 from core import save_system
 from core import i18n
+from core import behavior
 from core.crops import farm_config, swap_crop_word, current_crop
 
 # 행동별 효과음 매핑
@@ -203,6 +204,9 @@ class FarmSimulator:
         elif ch == "no_journal":
             self.notice = "무일지 — 밭의 상태는 손끝의 감으로만 읽어야 한다."
 
+        # 행동 데이터 — 새 회차 로그 시작 (도전 규칙 반영 뒤의 최종 seed로)
+        behavior.start_run(game_state.crop, game_state.year_seed, ch)
+
         # 계절 전환 배너 상태
         self.last_season = get_season(self.growth, self.growth_goal)
         self.season_banner = ""
@@ -314,6 +318,7 @@ class FarmSimulator:
         if action == "수확하기":
             if self.is_harvest_ready():
                 audio.play("click")
+                behavior.log("action", kind="수확하기", day=self.day)
                 game_state.understanding += 12
                 game_state.final_health = self.health
                 game_state.farm_mistakes = self.mistakes
@@ -360,6 +365,7 @@ class FarmSimulator:
             game_state.weed_count += 1
         # 손길 통계 (창고 탭 누적 통계의 원천)
         game_state.run_stats[action] = game_state.run_stats.get(action, 0) + 1
+        behavior.log("action", kind=action, day=self.day)
         difficulty = 1 + self.growth // 6
         result, is_fail = self.apply_action(action, difficulty, quality)
         self.apply_field_pressure(difficulty, farm_scene)
@@ -593,6 +599,13 @@ class FarmSimulator:
         return "...", False
 
     def apply_field_pressure(self, difficulty, farm_scene):
+        # 행동 데이터 — 하루 마감 시점의 밭 상태 (지난 하루의 마감 수치)
+        behavior.log("day_end", day=self.day,
+                     growth=self.growth,
+                     moisture=self.moisture,
+                     health=self.health,
+                     weeds=self.weeds,
+                     drainage=self.drainage)
         self.day += 1
         # 도전 '이레' — 여드레를 넘기면 밭이 계절을 놓친다 (시듦 엔딩)
         if (getattr(game_state, "challenge", None) == "seven_days"
@@ -673,6 +686,7 @@ class FarmSimulator:
         self.stories_seen.add(STORY_EVENTS.index(event))
         self.story_cooldown = 4
         game_state.choice_data = event
+        behavior.log("event_seen", kind="story", title=event["title"], day=self.day)
         game_state.current_scene = "story_choice"
 
     def _write_journal(self):
@@ -837,6 +851,7 @@ class FarmSimulator:
                                            name_eun=append_josa(pname, "은/는"),
                                            name_ga=append_josa(pname, "이/가"))
         game_state.memory_next = "farm"
+        behavior.log("event_seen", kind="memory", day=self.day)
         game_state.current_scene = "memory"
 
     def pick_memory(self, forced_key):
@@ -868,6 +883,7 @@ class FarmSimulator:
                 game_state.return_scene = "farm"
                 self.special_done = True
                 self.minigame_cooldown = max(self.minigame_cooldown, 4)
+                behavior.log("event_seen", kind="minigame", day=self.day)
                 return
 
         from scenes.tending import WEATHER_MINIGAMES
@@ -877,6 +893,7 @@ class FarmSimulator:
             farm_scene.interaction = WEATHER_MINIGAMES[game_state.weather](farm_scene)
             farm_scene.interaction_action = "__weather__"
             self.weather_minigame_cooldown = 3
+            behavior.log("event_seen", kind="minigame", day=self.day)
             return
 
         if self.minigame_cooldown > 0:
@@ -894,6 +911,7 @@ class FarmSimulator:
         game_state.transition_next = "stage1"
         game_state.return_scene = "farm"
         self.minigame_cooldown = 6
+        behavior.log("event_seen", kind="minigame", day=self.day)
 
     def _wilt(self, farm_scene):
         self.withers += 1

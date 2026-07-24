@@ -7,6 +7,7 @@ __pycache__/
 core/save_data.json
 core/save_slot.json
 core/user_settings.json
+core/behavior/
 
 # 빌드 산출물 (PyInstaller)
 build/
