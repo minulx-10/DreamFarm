@@ -109,14 +109,14 @@ JSONL 한 줄 = 이벤트 하나.
 
 - Cloudflare Worker + D1 (무료 티어; KV는 쓰기 1k/일 제한이라 D1 채택)
 - `POST /v1/events` — gzip JSON 배치 `{client_id, game_version, events:[...]}`
-- D1 테이블 `events(client_id, game_version, received_at, payload)`
+- D1 테이블 `batches(client_id, game_version, received_at, payload)`
 - 코드 위치 `tools/telemetry-worker/` (wrangler 프로젝트).
   배포·계정 연결은 사용자가 수행 — README에 절차 문서화
 
 ### 클라이언트
 
 - **옵트인, 기본 꺼짐.** 설정 오버레이에 토글 + 수집 항목 안내 문구
-- 켜져 있으면 런 종료(엔딩/이탈) 시 해당 런 JSONL 배치 업로드
+- 켜져 있으면 엔딩 시(이탈 업로드는 미구현 — run_id 중복제거 도입 후 고려) 해당 런 JSONL 배치 업로드
 - 실패 시 로컬 큐 유지, 다음 기회에 재시도. 타임아웃 3초, 업로드는 스레드로
   — 메인 루프 블로킹 금지
 - 전송 내용 = 로컬 로그와 동일(스키마 v 포함), PII 없음

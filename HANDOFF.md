@@ -100,9 +100,11 @@ scenes/
    - **작물·아이콘**은 픽셀 스프라이트로 통일돼 있습니다(`create_sprite_from_string`, `draw_crop_food`, `icon_*`). 새 것도 같은 방식+정수 배율로.
    - **배경 그라데이션**은 계단식 밴딩(`_quantize`/`_bg_quant`)으로 도트 톤을 유지합니다.
    - **래스터(사진/일러스트) 에셋**이 새로 들어오면 `assets._pixelize()`(numpy 없음)로 도트 톤에 맞출 수 있습니다.
-7. **행동 데이터**: 모든 행동은 core/behavior.py `log()` 단일 관문 — JSONL(저장폴더/behavior/) + 인메모리 집계.
+7. **행동 데이터**: 게임 내 행동은 core/behavior.py `log()` 단일 관문(앱 세션은 `session()`이 별도 파일) —
+   JSONL(저장폴더/behavior/) + 인메모리 집계.
    성향(profile)은 저장하지 않고 로그에서 재계산(세이브 호환 무풍). 기록 실패는 전부 삼킨다 — 게임 우선.
-   반응형 훅은 event_weight()/difficulty_factor()가 도전 모드·데이터 부족 시 1.0을 보장하므로 호출부는 무조건 곱한다.
+   반응형 훅은 event_weight()/difficulty_factor()가 도전 모드·데이터 부족 시 1.0을 보장하므로
+   호출부는 보정치를 무조건 적용한다(타이머는 나누기, 속도는 곱하기).
    텔레메트리는 core/telemetry.py URL 상수가 비면 전체 no-op. 배포 절차는 tools/telemetry-worker/README.md.
    테스트: python scratch/test_behavior.py · scratch/test_behavior_report.py. 설계: specs/2026-07-24-behavior-data-design.md.
 

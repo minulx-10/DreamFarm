@@ -17,6 +17,9 @@ wrangler d1 execute dreamfarm-telemetry --remote --command "SELECT client_id, ga
 
 ## 계약
 
+수집 시점: 런이 엔딩에 도달했을 때 1회 배치 업로드(`core/telemetry.py:upload_run`). 이탈(중도 종료) 시
+업로드는 미구현 — run_id 중복제거 도입 후 고려.
+
 POST /v1/events — JSON(선택적 gzip, Content-Encoding: gzip):
 {"client_id": "<uuid hex>", "game_version": "2.5.0", "events": [{...}, ...]}
 이벤트 스키마는 specs/2026-07-24-behavior-data-design.md 참고. PII 없음(클라이언트가 보장).
