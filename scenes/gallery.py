@@ -15,7 +15,7 @@ class GalleryScene:
         self.font_small = get_font(13)
         self.font_btn = get_font(16)
         
-        self.active_tab = "endings"  # endings | stories | achievements | storehouse | hidden_achievements
+        self.active_tab = "endings"  # endings | stories | achievements | storehouse | trace | hidden_achievements
 
         self.back_rect = pygame.Rect(30, 24, 100, 32)
         self.tab_rects = []          # [(rect, tab_id, label)] — _update_tab_rects 가 채운다
@@ -70,18 +70,32 @@ class GalleryScene:
         self.hovered_tab = None          # 호버 중인 탭 id
         self.hovered_modal_close = False
 
+        # 발자취 탭 데이터 — 진입 시 1회 스캔
+        from core import behavior
+        self.trace_scan = behavior.lifetime_scan()
+        latest = getattr(game_state, "behavior_run_file", None)
+        if not latest:
+            try:
+                import os
+                files = sorted(f for f in os.listdir(behavior._dir())
+                               if f.startswith("run_") and f.endswith(".jsonl"))
+                latest = files[-1] if files else None
+            except Exception:
+                latest = None
+        self.trace_timeline = behavior.run_timeline(latest) if latest else []
+
     def _update_tab_rects(self):
         from core import achievements
         hidden_unlocked = achievements.has_any_hidden_unlocked()
         tabs = [("endings", "엔딩"), ("stories", "이야기·기억"),
                 ("achievements", "일반 업적" if hidden_unlocked else "업적"),
-                ("storehouse", "창고")]
+                ("storehouse", "창고"), ("trace", "발자취")]
         if hidden_unlocked:
             tabs.append(("hidden_achievements", "히든 업적"))
-        # 탭 수(4~5)에 맞춰 대칭 정렬
+        # 탭 수(5~6)에 맞춰 대칭 정렬
         n = len(tabs)
         gap = 8
-        w = 150 if n <= 4 else 138
+        w = 150 if n <= 4 else (138 if n == 5 else 124)
         x = (800 - (w * n + gap * (n - 1))) // 2
         self.tab_rects = []
         for tid, label in tabs:
@@ -261,6 +275,8 @@ class GalleryScene:
             self._draw_hidden_achievements_tab(screen)
         elif self.active_tab == "storehouse":
             self._draw_storehouse_tab(screen)
+        elif self.active_tab == "trace":
+            self._draw_trace_tab(screen)
         else:
             self._draw_stories_tab(screen)
             
@@ -656,6 +672,52 @@ class GalleryScene:
             screen.blit(ls, (stats_area.x + 16, y))
             screen.blit(vs, (stats_area.right - 16 - vs.get_width(), y))
             y += 18
+
+    def _draw_trace_tab(self, screen):
+        """발자취 — 행동 데이터 요약. 위: 최근 회차 일별 타임라인, 아래: 평생 패턴."""
+        # 1) 최근 회차 타임라인 (일별 행동 수 막대)
+        tl_area = pygame.Rect(90, 160, 620, 170)
+        draw_light_panel(screen, tl_area)
+        st = self.font_section.render(i18n.t("최근 회차의 하루하루"), True, TEXT_DARK)
+        screen.blit(st, (tl_area.x + 16, tl_area.y + 8))
+        if not self.trace_timeline:
+            empty = self.font_small.render(i18n.t("아직 남은 발자취가 없다."), True, TEXT_MUTED)
+            screen.blit(empty, (tl_area.x + 16, tl_area.y + 60))
+        else:
+            days = self.trace_timeline[-24:]                    # 최근 24일까지만
+            peak = max(c for _, c in days) or 1
+            bw = min(20, (tl_area.w - 32) // max(1, len(days)))
+            x = tl_area.x + 16
+            base = tl_area.bottom - 34
+            for day, cnt in days:
+                h = max(3, int(90 * cnt / peak))
+                pygame.draw.rect(screen, (123, 92, 65), (x, base - h, bw - 3, h))
+                ds = get_font(10).render(str(day), True, TEXT_MUTED)
+                screen.blit(ds, (x, base + 4))
+                x += bw
+        # 2) 평생 패턴
+        pat_area = pygame.Rect(90, 346, 620, 190)
+        draw_light_panel(screen, pat_area)
+        st2 = self.font_section.render(i18n.t("평생의 패턴"), True, TEXT_DARK)
+        screen.blit(st2, (pat_area.x + 16, pat_area.y + 8))
+        scan = self.trace_scan
+        top_action = max(scan["actions"].items(), key=lambda kv: kv[1])[0] if scan["actions"] else "-"
+        wet = int(100 * scan["water_days"] / scan["days"]) if scan["days"] else 0
+        rows = [
+            (i18n.t("기록된 회차"), str(scan["runs"])),
+            (i18n.t("기록된 행동"), str(scan["events"])),
+            (i18n.t("가장 자주 한 일"), i18n.t(top_action)),
+            (i18n.tf("물 준 날의 비율: {p}%", p=wet), ""),
+            (i18n.tf("미니게임 최고 기록: {p}%", p=int(scan["best_minigame"] * 100)), ""),
+        ]
+        y = pat_area.y + 44
+        for label, val in rows:
+            ls = self.font_small.render(label, True, TEXT_MUTED)
+            screen.blit(ls, (pat_area.x + 16, y))
+            if val:
+                vs = self.font_small.render(val, True, TEXT_DARK)
+                screen.blit(vs, (pat_area.right - 16 - vs.get_width(), y))
+            y += 26
 
     def _draw_modal_popup(self, screen):
         # 반투명 장막 — 캔버스 전체(여백 포함)
