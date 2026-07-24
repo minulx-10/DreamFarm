@@ -654,6 +654,13 @@ class FarmSimulator:
             if new_weather != old_weather and new_weather in WEATHER_WISDOM:
                 self.push_thought(WEATHER_WISDOM[new_weather], dur=5.0)
 
+        # 행동 성향 문구 — 습관이 뚜렷해지면 이따금 밭이 알은체한다
+        if self.day % 4 == 0 and random.random() < 0.25:
+            from core.narrative_data import pick_behavior_echo
+            echo = pick_behavior_echo(behavior.profile())
+            if echo:
+                self.push_thought(echo, dur=5.0)
+
     def apply_weather_effects(self):
         w = WEATHER_DATA.get(game_state.weather, {})
         self.moisture += w.get("moisture", 0)

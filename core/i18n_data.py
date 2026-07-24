@@ -1297,4 +1297,12 @@ EN = {
         "Harvest complete!\n\nPerfect harvests: {perfects}\nYou felt the full weight of a life. Understanding +{bonus}",
     "{name_eun} 검붉은 흙 앞에 선다.\n이 지옥의 밭에서 {crop_leul} 끝까지 길러 거두어야\n비로소 꿈에서 놓여날 수 있다.\n\n'남기지 마라. 이번엔, 끝까지.'":
         "{name} stands before the dark red soil.\nOnly by raising the {crop} to the very end in this infernal field\ncan the dream ever let go.\n\n'Leave nothing behind. This time, to the end.'",
+
+    # ── core/narrative_data.py: BEHAVIOR_ECHOES (행동 성향 문구) ──
+    "너 새벽마다 물을 주더라. 아버지가 그랬듯이.": "You water at dawn, every day. Like father did.",
+    "하루도 거르지 않는 손이 있다. 흙은 그걸 기억한다.": "A hand that never skips a day. The soil remembers.",
+    "밭은 기다림도 안다. 다만 너무 긴 기다림은 목마름이 된다.": "The field knows patience too. But too long a wait becomes thirst.",
+    "며칠 손이 뜸했다. 잎이 먼저 알아챘다.": "The hands have been away for days. The leaves noticed first.",
+    "손끝이 야물어졌다. 처음 잡던 호미가 아니다.": "Your fingers have grown sure. Not the same hoe-grip as day one.",
+    "잡초가 오래 버티지 못하는 밭이 됐다.": "Weeds don't last long in this field anymore.",
 }

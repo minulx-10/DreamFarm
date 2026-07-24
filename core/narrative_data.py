@@ -88,6 +88,41 @@ FATHER_ECHOES = {
     "살펴보기": ["오늘도 무사히 자라고 있구나.", "이 밭이 내 하루의 전부다."],
 }
 
+# ── 행동 성향 문구 — 플레이어의 습관을 밭이 알아본다 (core/behavior.profile 기반) ──
+BEHAVIOR_ECHOES = {
+    "diligent": [   # diligence >= 0.75
+        "너 새벽마다 물을 주더라. 아버지가 그랬듯이.",
+        "하루도 거르지 않는 손이 있다. 흙은 그걸 기억한다.",
+    ],
+    "neglect": [    # neglect >= 0.75
+        "밭은 기다림도 안다. 다만 너무 긴 기다림은 목마름이 된다.",
+        "며칠 손이 뜸했다. 잎이 먼저 알아챘다.",
+    ],
+    "skilled": [    # skill >= 0.8
+        "손끝이 야물어졌다. 처음 잡던 호미가 아니다.",
+    ],
+    "responsive": [ # reaction >= 0.8
+        "잡초가 오래 버티지 못하는 밭이 됐다.",
+    ],
+}
+
+
+def pick_behavior_echo(profile):
+    """성향이 뚜렷할 때만 문구 하나 (없으면 None). 호출부가 빈도를 조절한다."""
+    keys = []
+    if profile.get("diligence", 0.5) >= 0.75:
+        keys.append("diligent")
+    if profile.get("neglect", 0.5) >= 0.75:
+        keys.append("neglect")
+    if profile.get("skill", 0.5) >= 0.8:
+        keys.append("skilled")
+    if profile.get("reaction", 0.5) >= 0.8:
+        keys.append("responsive")
+    if not keys:
+        return None
+    return pick_fresh(BEHAVIOR_ECHOES[random.choice(keys)])
+
+
 WEATHER_WISDOM = {
     "맑음": "맑은 날이 오래가면 오히려 조심해야 한단다.",
     "흐림": "구름은 비를 데려오기도, 막아주기도 한다.",

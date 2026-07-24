@@ -146,6 +146,15 @@ class DevOverlay:
                 bx += 98
             y += 44
 
+        # 행동 성향 실시간 표시 (개발용)
+        from core import behavior
+        p = behavior.profile()
+        prof = get_font(13).render(
+            "성향 성실%.2f 방치%.2f 숙련%.2f 대응%.2f" % (
+                p["diligence"], p["neglect"], p["skill"], p["reaction"]),
+            True, (170, 200, 180))
+        screen.blit(prof, (self.panel.x + 20, self.panel.bottom - 56))
+
         if self.msg:
             m = get_font(14).render(self.msg, True, (230, 220, 160))
             screen.blit(m, (self.panel.centerx - m.get_width() // 2, self.panel.bottom - 30))
