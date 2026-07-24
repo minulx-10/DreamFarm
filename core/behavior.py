@@ -91,6 +91,22 @@ def start_run(crop, seed, challenge):
         log("run_start", crop=crop, seed=seed, challenge=challenge)
     except Exception:
         _path = None
+        try:
+            game_state.behavior_run_file = None   # 낡은 파일명이 남아 다음 저장에 실리지 않게
+        except Exception:
+            pass
+
+
+def discard_run(name):
+    """로드 복원 과정에서 생긴 유령 런 파일을 지운다 (현재 활성 파일이면 무시)."""
+    try:
+        if not name:
+            return
+        p = os.path.join(_dir(), os.path.basename(name))
+        if p != _path and os.path.exists(p):
+            os.remove(p)
+    except Exception:
+        pass
 
 
 def resume_run(name):

@@ -345,7 +345,13 @@ def main():
                 # 작물·악몽·도전 규칙을 먼저 복원 — FarmScene(sim) 생성이 이 값들을 읽는다.
                 save_system.restore_state(data)
                 scenes["farm"] = SCENE_FACTORIES["farm"]()   # 항상 새로 만들어 이전 회차 잔밭 방지
+                # FarmSimulator 생성이 behavior.start_run()을 불러 새 런 파일(유령)을 만든다 —
+                # 아래 restore()가 원래 파일로 되돌리므로, 다르면 방금 생긴 유령을 지운다.
+                ghost = getattr(game_state, "behavior_run_file", None)
                 save_system.restore(data, scenes["farm"])
+                if ghost != getattr(game_state, "behavior_run_file", None):
+                    from core import behavior
+                    behavior.discard_run(ghost)
                 game_state.current_scene = "farm"
                 current_scene_obj = scenes["farm"]
                 current_key = "farm"

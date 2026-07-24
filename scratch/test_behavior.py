@@ -109,4 +109,16 @@ telemetry._queue(saved)                      # 중복 삽입 방지
 pending = json.load(open(telemetry._pending_path(), encoding="utf-8"))
 assert pending.count(saved) == 1
 
+# 14) discard_run — 유령 런 파일 제거, 현재 활성 파일은 보호
+behavior.start_run("carrot", "평년", None)
+ghost_name = game_state.behavior_run_file
+behavior.start_run("carrot", "평년", None)   # 새 런 — ghost는 고아가 됨
+assert os.path.exists(os.path.join(behavior._dir(), ghost_name))
+behavior.discard_run(ghost_name)
+assert not os.path.exists(os.path.join(behavior._dir(), ghost_name))
+cur = game_state.behavior_run_file
+behavior.discard_run(cur)                     # 활성 파일은 지우지 않는다
+assert os.path.exists(os.path.join(behavior._dir(), cur))
+behavior.discard_run(None)                    # no-op
+
 print("BEHAVIOR OK")

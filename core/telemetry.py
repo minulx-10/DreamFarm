@@ -58,8 +58,8 @@ def _unqueue(name):
         pass
 
 
-def _post(events):
-    payload = json.dumps({"client_id": behavior.client_id(),
+def _post(events, cid):
+    payload = json.dumps({"client_id": cid,
                           "game_version": VERSION,
                           "events": events}, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
@@ -69,7 +69,7 @@ def _post(events):
         return resp.status == 200
 
 
-def _upload_file(name):
+def _upload_file(name, cid):
     try:
         path = os.path.join(behavior._dir(), os.path.basename(name))
         events = []
@@ -79,7 +79,7 @@ def _upload_file(name):
                     events.append(json.loads(line))
                 except Exception:
                     continue
-        if events and _post(events):
+        if events and _post(events, cid):
             _unqueue(name)
         else:
             _queue(name)
@@ -91,14 +91,18 @@ def upload_run(name):
     """런 종료 시 호출 — 백그라운드 스레드로 업로드. 비활성이면 no-op."""
     if not name or not enabled():
         return
-    threading.Thread(target=_upload_file, args=(name,), daemon=True).start()
+    # client_id는 최초 생성 시 meta 파일 쓰기가 일어난다 — 업로드 스레드가 아니라
+    # 여기(메인 스레드)에서 미리 해석해 넘겨야 자동저장 등 다른 메타 쓰기와 경합하지 않는다.
+    cid = behavior.client_id()
+    threading.Thread(target=_upload_file, args=(name, cid), daemon=True).start()
 
 
 def retry_pending():
     """세션 시작 시 호출 — 밀린 업로드 재시도."""
     if not enabled():
         return
+    cid = behavior.client_id()
     def _run():
         for name in list(_load_pending()):
-            _upload_file(name)
+            _upload_file(name, cid)
     threading.Thread(target=_run, daemon=True).start()

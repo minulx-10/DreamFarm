@@ -446,13 +446,16 @@ class SettingsOverlay:
             ny += 16
 
         # 알림 메시지 / 소리 불가 안내 — 하단은 텔레메트리 행까지 꽉 차서 위쪽 여백(제목 아래)에 그린다.
+        # 둘 다 뜰 수 있으므로(예: 소리 없는 기기에서 저장 성공) 세로로 쌓는다 — 겹쳐 보이면 안 된다.
+        note_y = self.panel.y + 50
         if self.show_message:
             msg_surf = get_font(14).render(self.show_message, True, (139, 69, 19))
-            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 50))
+            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, note_y))
+            note_y += 18
 
         if not audio.is_enabled():
             warn = get_font(13).render("(이 기기에서는 소리를 낼 수 없어요)", True, TEXT_MUTED)
-            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.y + 50))
+            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, note_y))
 
         # 확인 모달 (세이브 삭제 / 메인 이동)
         if self._confirm_action is not None:
