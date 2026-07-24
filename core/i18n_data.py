@@ -1248,6 +1248,8 @@ EN = {
     # ── QA 보강: 설정 토글 ON/OFF, 이름 입력 안내 등 (누락분) ──
     "자동저장: ON": "Autosave: ON",
     "자동저장: OFF": "Autosave: OFF",
+    "데이터 공유: {onoff}": "Share data: {onoff}",
+    "익명 플레이 기록만 보냅니다. 이름·글은 보내지 않습니다.": "Only anonymous play records are sent. Never your name or writing.",
     "전체화면: ON": "Fullscreen: ON",
     "전체화면: OFF": "Fullscreen: OFF",
     "버전 표시: ON": "Version: ON",

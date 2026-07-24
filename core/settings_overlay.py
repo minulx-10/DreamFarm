@@ -10,7 +10,7 @@ import math
 from core import audio
 from core import i18n
 from core.assets import get_font, WHITE, TEXT_DARK, TEXT_MUTED
-from core.ui import draw_panel, mix_color
+from core.ui import draw_panel, mix_color, wrap_text
 from core.pixelfx import pixel_rect, pixel_disc, CHAMFER, CHAMFER_SM
 from core.game_state import game_state
 from core.platform import IS_ANDROID
@@ -25,34 +25,40 @@ class SettingsOverlay:
         # 오른쪽 위 고정 버튼
         self.button = pygame.Rect(746, 27, 28, 28)
 
-        # 가운데 모달 패널 (전체화면·언어·텍스트 속도 토글 행이 들어가 세로로 늘림: 360x536)
-        self.panel = pygame.Rect(220, 30, 360, 536)
+        # 가운데 모달 패널 (전체화면·언어·텍스트 속도·텔레메트리 토글 행이 들어가 세로로 늘림: 360x570.
+        # 화면 높이 600 안에 딱 맞다 — 아래 각 행 사이 간격을 기존보다 조금씩 좁혀 텔레메트리 행 +
+        # 안내 문구(EN은 2줄로 접힘) 한 칸을 더 넣었다.)
+        self.panel = pygame.Rect(220, 30, 360, 570)
         pad = 26
         self._track_w = 160
         track_x = self.panel.x + pad + 72
-        
+
         self._bgm_track = pygame.Rect(track_x, self.panel.y + 76, self._track_w, 8)
         self._sfx_track = pygame.Rect(track_x, self.panel.y + 120, self._track_w, 8)
-        
+
         self._mute_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 164, 140, 36)
         self._autosave_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 164, 140, 36)
-        
-        self._save_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 224, 140, 36)
-        self._load_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 224, 140, 36)
-        
-        self._delete_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 284, 140, 36)
-        self._main_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 284, 140, 36)
+
+        self._save_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 216, 140, 36)
+        self._load_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 216, 140, 36)
+
+        self._delete_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 268, 140, 36)
+        self._main_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 268, 140, 36)
 
         # 완전 초기화 — 슬롯 + 메타 기록 전체 삭제 (전체폭)
-        self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 340, self.panel.width - 2 * pad, 34)
+        self._reset_all_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 312, self.panel.width - 2 * pad, 34)
 
-        # 하단 토글 그리드: [전체화면][언어] / [버전 표시][텍스트 속도] / [닫기(전체폭)]
-        self._fullscreen_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 388, 140, 36)
-        self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 388, 140, 36)
-        self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 432, 140, 36)
-        self._text_speed_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 432, 140, 36)
-        self._update_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 476, 140, 32)
-        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 476, 140, 32)
+        # 하단 토글 그리드: [전체화면][언어] / [버전 표시][텍스트 속도] / [업데이트 확인][닫기]
+        self._fullscreen_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 360, 140, 36)
+        self._lang_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 360, 140, 36)
+        self._version_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 404, 140, 36)
+        self._text_speed_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 404, 140, 36)
+        self._update_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 448, 140, 32)
+        self._close_btn = pygame.Rect(self.panel.right - pad - 140, self.panel.y + 448, 140, 32)
+
+        # 데이터 공유(텔레메트리) 토글 — 기본 OFF, 옵트인. 안내 문구는 _draw_panel에서
+        # 폭에 맞춰 줄바꿈해 그린다(그 아래 여백 계산에 그 줄바꿈 높이까지 포함해 뒀다).
+        self._telemetry_btn = pygame.Rect(self.panel.x + pad, self.panel.y + 486, 140, 32)
 
         self.show_message = ""
         self.message_timer = 0.0
@@ -292,6 +298,10 @@ class SettingsOverlay:
             # 안내해 놓고 UI가 없었다
             save_system.set_setting("update_check", not save_system.get_setting("update_check"))
             audio.play("click")
+        elif self._telemetry_btn.collidepoint(pos):
+            cur = save_system.get_setting("telemetry")
+            save_system.set_setting("telemetry", not cur)
+            audio.play("click")
         elif self._close_btn.collidepoint(pos) or self.button.collidepoint(pos):
             audio.play("click")
             self.open = False
@@ -368,7 +378,7 @@ class SettingsOverlay:
                                active=autosave)
 
         # 구분선
-        sep_y = self.panel.y + 214
+        sep_y = self.panel.y + 208
         pygame.draw.line(screen, (190, 175, 155), (self.panel.x + 26, sep_y), (self.panel.right - 26, sep_y), 1)
 
         # 저장하기 (인게임에서만 활성화 비주얼)
@@ -380,7 +390,7 @@ class SettingsOverlay:
         self._draw_text_button(screen, self._load_btn, "불러오기", active=False, disabled=not has_save)
 
         # 구분선
-        sep_y2 = self.panel.y + 274
+        sep_y2 = self.panel.y + 260
         pygame.draw.line(screen, (190, 175, 155), (self.panel.x + 26, sep_y2), (self.panel.right - 26, sep_y2), 1)
 
         # 세이브 삭제 (저장본이 있을 때만 활성화 비주얼)
@@ -420,14 +430,29 @@ class SettingsOverlay:
                                "업데이트 확인: ON" if upd else "업데이트 확인: OFF", active=upd)
         self._draw_text_button(screen, self._close_btn, "닫기", active=False)
 
-        # 알림 메시지 출력
+        # 데이터 공유(텔레메트리) 토글 — 옵트인, 기본 OFF (core/telemetry.py 소비)
+        tele = save_system.get_setting("telemetry")
+        self._draw_text_button(screen, self._telemetry_btn,
+                               i18n.tf("데이터 공유: {onoff}", onoff="ON" if tele else "OFF"),
+                               active=bool(tele))
+        # 안내 한 줄 — 무엇이 공유되는지 명시 (옵트인 고지). EN 번역이 KO보다 훨씬 길어 한 줄로
+        # render하면 패널 밖으로 넘친다 — 폭에 맞춰 줄바꿈해서 그린다.
+        note_font = get_font(11)
+        note_lines = wrap_text("익명 플레이 기록만 보냅니다. 이름·글은 보내지 않습니다.",
+                               note_font, self.panel.width - 52)
+        ny = self._telemetry_btn.bottom + 6
+        for line in note_lines:
+            screen.blit(note_font.render(line, True, TEXT_MUTED), (self.panel.x + 26, ny))
+            ny += 16
+
+        # 알림 메시지 / 소리 불가 안내 — 하단은 텔레메트리 행까지 꽉 차서 위쪽 여백(제목 아래)에 그린다.
         if self.show_message:
             msg_surf = get_font(14).render(self.show_message, True, (139, 69, 19))
-            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 514))
+            screen.blit(msg_surf, (self.panel.centerx - msg_surf.get_width() // 2, self.panel.y + 50))
 
         if not audio.is_enabled():
             warn = get_font(13).render("(이 기기에서는 소리를 낼 수 없어요)", True, TEXT_MUTED)
-            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.bottom - 20))
+            screen.blit(warn, (self.panel.centerx - warn.get_width() // 2, self.panel.y + 50))
 
         # 확인 모달 (세이브 삭제 / 메인 이동)
         if self._confirm_action is not None:

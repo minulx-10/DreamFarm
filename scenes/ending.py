@@ -210,6 +210,9 @@ class EndingScene:
                 from core import behavior
                 behavior.log("ending", kind=ending_type, days=days)
 
+                from core import telemetry
+                telemetry.upload_run(getattr(game_state, "behavior_run_file", None))
+
         ck = game_state.crop
 
         def T(title):   # 제목: 작물 치환(KO) / 카탈로그(EN)

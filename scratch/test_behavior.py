@@ -98,4 +98,15 @@ assert behavior.profile() == p, "restore_state가 resume_run까지 해야 한다
 # 12) telemetry 설정 기본값 OFF
 assert _ss.get_setting("telemetry") is False
 
+# 13) telemetry — URL 미설정이면 완전 비활성, 큐 왕복 동작
+from core import telemetry
+assert telemetry.enabled() is False          # URL 비어있음 + 설정 OFF
+telemetry.upload_run(saved)                  # 비활성이어도 예외 없이 no-op
+telemetry._queue(saved)
+pending = json.load(open(telemetry._pending_path(), encoding="utf-8"))
+assert saved in pending
+telemetry._queue(saved)                      # 중복 삽입 방지
+pending = json.load(open(telemetry._pending_path(), encoding="utf-8"))
+assert pending.count(saved) == 1
+
 print("BEHAVIOR OK")
