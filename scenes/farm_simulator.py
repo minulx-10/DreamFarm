@@ -676,7 +676,7 @@ class FarmSimulator:
             if self.story_cooldown > 0:
                 self.story_cooldown -= 1
                 return
-            if random.random() > 0.32:
+            if random.random() > 0.32 * behavior.event_weight("story"):
                 return
         # 작물 전용 이벤트("crop" 키)는 그 작물을 기를 때만, "not_crop"은 그 작물이 아닐 때만
         available = [e for i, e in enumerate(STORY_EVENTS)
@@ -840,6 +840,7 @@ class FarmSimulator:
 
         u = game_state.understanding
         chance = 0.24 if u < 18 else 0.14 if u < 45 else 0.06
+        chance *= behavior.event_weight("memory")
         # 첫인상 밀도 보장 — 3일째까지 회상을 한 번도 못 만났으면 반드시 한 편을 띄운다
         first_due = (not self.memories_seen) and self.day >= 3
         if forced_key is None and not first_due and random.random() >= chance:
@@ -896,7 +897,7 @@ class FarmSimulator:
         from scenes.tending import WEATHER_MINIGAMES
         if self.weather_minigame_cooldown > 0:
             self.weather_minigame_cooldown -= 1
-        elif game_state.weather in WEATHER_MINIGAMES and random.random() < 0.35:
+        elif game_state.weather in WEATHER_MINIGAMES and random.random() < 0.35 * behavior.event_weight("minigame"):
             farm_scene.interaction = WEATHER_MINIGAMES[game_state.weather](farm_scene)
             farm_scene.interaction_action = "__weather__"
             self.weather_minigame_cooldown = 3
