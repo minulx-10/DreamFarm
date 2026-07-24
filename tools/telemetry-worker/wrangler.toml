@@ -1,0 +1,8 @@
+name = "dreamfarm-telemetry"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dreamfarm-telemetry"
+database_id = "REPLACE_ME"   # wrangler d1 create dreamfarm-telemetry 출력으로 교체
