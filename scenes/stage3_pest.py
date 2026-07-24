@@ -45,9 +45,14 @@ class Bug:
 
 class Stage3Scene:
     def __init__(self):
-        game_state.timer = 15.0
+        from core import behavior
+        d = behavior.difficulty_factor()
+        game_state.timer = 15.0 / d
         game_state.score = 0
         self.bugs = [Bug() for _ in range(12)]
+        for b in self.bugs:
+            b.dx *= d
+            b.dy *= d
         self.stage_clear = False
         self.clear_timer = 2.0
 

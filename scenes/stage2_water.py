@@ -14,7 +14,8 @@ class Stage2Scene:
     Water 5 circular soil mounds to 100% moisture to clear the stage."""
 
     def __init__(self):
-        game_state.timer = 24.0
+        from core import behavior
+        game_state.timer = 24.0 / behavior.difficulty_factor()   # 숙련자는 시간이 조금 짧다
         game_state.score = 600
         self.stage_clear = False
         self.timed_out = False

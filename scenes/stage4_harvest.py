@@ -88,8 +88,9 @@ class Stage4Scene:
         self.feedback_timer = 0.0
 
         # 연타 클릭 관련
+        from core import behavior
         self.pull_per_click = 16.0       # 클릭당 올라가는 픽셀 (10 -> 16 버프)
-        self.slide_speed = 32.0          # 클릭 안 할 때 내려가는 속도 (50 -> 32 너프)
+        self.slide_speed = 32.0 * behavior.difficulty_factor()   # 숙련자는 미끄러짐이 조금 빠르다
         self.last_click_time = 0.0       # 마지막 클릭 시각 (pygame.time.get_ticks 기반)
         # 이 시간(초) 미만 간격이면 과도한 연타로 판정. 0.055는 사람 손으로 사실상 불가능해
         # (18타/초) '서두르면 상한다' 메커닉이 죽어 있었다 → 11타/초 수준으로 복원

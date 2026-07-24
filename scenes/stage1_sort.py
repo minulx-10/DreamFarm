@@ -57,7 +57,8 @@ class SortItem:
 
 class Stage1Scene:
     def __init__(self):
-        game_state.timer = 24.0
+        from core import behavior
+        game_state.timer = 24.0 / behavior.difficulty_factor()   # 숙련자는 시간이 조금 짧다
         game_state.score = 0
         self.items = []
         
