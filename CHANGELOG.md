@@ -5,6 +5,13 @@
 
 ## (미출시 · Unreleased)
 
+### 추가
+- 행동 데이터 시스템: 모든 플레이 행동을 회차별 JSONL로 기록 (core/behavior.py, 스키마 v1)
+- 갤러리 '발자취' 탭 — 회차 타임라인·평생 행동 패턴
+- 반응형 게임플레이: 성향 문구(서사)·이벤트 빈도 가중치(0.5~2.0)·미니게임 난이도 ±10% (도전 규칙 중 비활성)
+- 개발자 행동 리포트 tools/behavior_report.py (JSONL → HTML, stdlib)
+- 옵트인 텔레메트리(기본 OFF): Cloudflare Worker 수신기(tools/telemetry-worker) + urllib 배치 업로더
+
 ## v2.5.0-dev.2 (2026-07-18) — 프리릴리스 (전면 QA 3차 + 화면비 재설계 + BGM 다양화)
 
 - **화면비 적응 마무리 + BGM 다양화** (2026-07-18 저녁):
