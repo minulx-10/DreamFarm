@@ -73,6 +73,9 @@ PAUSE_SCENES = MINIGAME_SCENES | {"farm", "story_choice", "epilogue"}   # epilog
 def main():
     pygame.init()
 
+    from core import behavior
+    behavior.session("start")
+
     # 윈도우 작업표시줄 아이콘 대응 —
     # 파이썬/pygame 창은 기본적으로 작업표시줄에서 python.exe 아이콘으로 뜬다.
     # 프로세스에 고유한 AppUserModelID를 지정하면 윈도우가 이 창을 독립 앱으로 보고
@@ -616,6 +619,7 @@ def main():
 
         pygame.display.flip()
 
+    behavior.session("stop")
     steam.shutdown()
     pygame.quit()
     sys.exit()

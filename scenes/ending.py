@@ -207,6 +207,9 @@ class EndingScene:
                                        getattr(game_state, "run_stats", {}))
                 achievements.on_run_recorded(days, ending_type)
 
+                from core import behavior
+                behavior.log("ending", kind=ending_type, days=days)
+
         ck = game_state.crop
 
         def T(title):   # 제목: 작물 치환(KO) / 카탈로그(EN)

@@ -308,6 +308,12 @@ class Stage4Scene:
                     perfects=perfects, bonus=bonus)
                 game_state.transition_next = "ending"
                 game_state.is_clear_transition = True
+
+                from core import behavior
+                behavior.log("minigame", stage="stage4",
+                             score=perfects,
+                             norm=perfects / max(1, self.max_attempts))
+
                 game_state.current_scene = "transition"
             return
 

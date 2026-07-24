@@ -76,6 +76,12 @@ class Stage3Scene:
                 game_state.transition_text = i18n.tf("해충 대응 완료!\n\n획득 점수: {score}점\n잎 아래를 살피는 법을 익혔습니다. 이해도 +{bonus}", score=game_state.score, bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
+
+                from core import behavior
+                behavior.log("minigame", stage="stage3",
+                             score=game_state.score,
+                             norm=max(0.0, min(1.0, game_state.score / 500.0)))
+
                 game_state.current_scene = "transition"
             return
 

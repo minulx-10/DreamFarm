@@ -139,6 +139,10 @@ class StoryChoiceScene:
             from core import save_system
             save_system.record_story(self.canon_title)
 
+            from core import behavior
+            behavior.log("choice", title=self.canon_title,
+                         picked="b" if choice == self.choice_b else "a")
+
         for key, val in effects.items():
             if key == "understanding":
                 if not replay:
@@ -167,6 +171,10 @@ class StoryChoiceScene:
             # Record story in meta save data
             from core import save_system
             save_system.record_story(self.canon_title)
+
+            from core import behavior
+            behavior.log("choice", title=self.canon_title,
+                         picked="b" if self.qte_choice == self.choice_b else "a")
 
         if success:
             audio.play("success")

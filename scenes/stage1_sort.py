@@ -169,6 +169,12 @@ class Stage1Scene:
                 game_state.transition_text = i18n.tf("밭 정리 완료!\n\n획득 점수: {score}점\n흙을 보는 눈이 깊어졌습니다. 이해도 +{bonus}", score=game_state.score, bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
+
+                from core import behavior
+                behavior.log("minigame", stage="stage1",
+                             score=game_state.score,
+                             norm=max(0.0, min(1.0, game_state.score / 500.0)))
+
                 game_state.current_scene = "transition"
             return
         game_state.timer -= dt

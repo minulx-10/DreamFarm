@@ -70,6 +70,12 @@ class Stage2Scene:
                         bonus=bonus)
                 game_state.transition_next = game_state.return_scene
                 game_state.is_clear_transition = True
+
+                from core import behavior
+                behavior.log("minigame", stage="stage2",
+                             score=game_state.score,
+                             norm=0.4 if self.timed_out else 1.0)
+
                 game_state.current_scene = "transition"
             return
 
